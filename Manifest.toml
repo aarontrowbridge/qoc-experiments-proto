@@ -648,7 +648,9 @@ version = "1.2.0"
 
 [[deps.MathOptInterface]]
 deps = ["BenchmarkTools", "CodecBzip2", "CodecZlib", "DataStructures", "ForwardDiff", "JSON", "LinearAlgebra", "MutableArithmetics", "NaNMath", "OrderedCollections", "Printf", "SparseArrays", "SpecialFunctions", "Test", "Unicode"]
-git-tree-sha1 = "c167b0d6d165ce49f35fbe2ee1aea8844e7c7cea"
+git-tree-sha1 = "2fd1ffe5494c7cb9d10e48080b10337e043df9da"
+repo-rev = "master"
+repo-url = "https://github.com/jump-dev/MathOptInterface.jl.git"
 uuid = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 version = "1.4.0"
 

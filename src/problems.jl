@@ -34,14 +34,14 @@ function SingleQubitProblem(
     control_order=2,
     T=1000,
     Δt=0.01,
-    state_loss=amplitude_loss
+    loss=amplitude_loss
 ) where C <: Number
 
     if isa(ψ1, Vector{C})
         nqstates = 1
         isodim = 2 * length(ψ1)
         ψ̃goal = apply(gate, ψ1) |> ket_to_iso
-        loss = ψ̃ -> state_loss(ψ̃, ψ̃goal)
+        loss = ψ̃ -> loss(ψ̃, ψ̃goal)
         ψ̃1 = ket_to_iso(ψ1)
     else
         nqstates = length(ψ1)
@@ -125,9 +125,9 @@ end
 
 function objective(prob::MultiQubitProblem, X, u, Q, Qf, R)
     ψ̃ts = [X[1:(prob.isodim*prob.nqstates), t] for t = 1:prob.T]
-    J = dot([fill(Q, prob.T-1); Qf], prob.loss.(ψ̃ts))
-    J += R * dot(u, u)
-    return J
+    obj = dot([fill(Q, prob.T-1); Qf], prob.loss.(ψ̃ts))
+    obj += R * dot(u, u)
+    return obj
 end
 
 
