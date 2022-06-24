@@ -1,5 +1,7 @@
 using QubitControl
 
+import MathOptInterface as MOI
+
 σx = GATES[:X]
 σz = GATES[:Z]
 
@@ -12,6 +14,8 @@ gate = :X
 
 ψ1 = [1, 0]
 
-prob = SingleQubitProblem(H_drift, H_drive, gate, ψ1; T=10)
+system = SingleQubitSystem(H_drift, H_drive, gate, ψ1; T=10)
 
-solve(prob)
+prob = QubitProblem(system)
+
+solve!(prob)

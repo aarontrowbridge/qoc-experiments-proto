@@ -17,16 +17,16 @@ using LinearAlgebra
 #
 
 # general implicit midpoint method
-function implicit_midpoint(xₜ₊₁, xₜ, uₜ, Δt, G_drift, G_drive)
-    G = G_drift + uₜ * G_drive
-    return xₜ₊₁ - (xₜ + Δt * G * (xₜ₊₁ + xₜ) / 2)
+function implicit_midpoint(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, G_drift, G_drive)
+    G = G_drift + aₜ * G_drive
+    return ψ̃ₜ₊₁ - (ψ̃ₜ + Δt * G * (ψ̃ₜ₊₁ + ψ̃ₜ) / 2)
 end
 
 # analytic solution of midpoint equation for schroedinger dynamics
-function pade_schroedinger(xₜ₊₁, xₜ, uₜ, Δt, G_drift, G_drive)
-    G = G_drift + uₜ * G_drive
+function pade_schroedinger(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, G_drift, G_drive)
+    G = G_drift + aₜ * G_drive
     Id = I(size(G)[1])
-    return xₜ₊₁ - (inv(Id - Δt / 2 * G) * (Id + Δt / 2 * G) * xₜ)
+    return ψ̃ₜ₊₁ - (inv(Id - Δt / 2 * G) * (Id + Δt / 2 * G) * ψ̃ₜ)
 end
 
 #

@@ -8,7 +8,10 @@ include("quantumlogic.jl")
 include("dynamics.jl")
 @reexport using.Dynamics
 
-include("problems.jl")
-@reexport using .Problems
+include("qubitsystems.jl")
+@reexport using .QubitSystems
+
+include("nlmoi.jl")
+@reexport using .NLMOI
 
 end
