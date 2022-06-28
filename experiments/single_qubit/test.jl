@@ -6,18 +6,22 @@ using QubitControl
 H_drift = σz / 2
 H_drive = σx / 2
 
-gate = :X
+gate = :H
 
 ψ0 = [1, 0]
+ψ1 = [0, 1]
 
-system = SingleQubitSystem(H_drift, H_drive, gate, ψ0)
+ψ = [ψ0, ψ1]
+
+system = SingleQubitSystem(H_drift, H_drive, gate, ψ)
 
 T    = 1000
 Δt   = 0.01
 σ    = 1.0
-Q    = 0.1
-Qf   = 2500.0
-R    = 0.00000001
+Q    = 0.0
+Qf   = 500.0
+R    = 0.001
+loss = quaternionic_loss
 hess = false
 
 prob = QubitProblem(
@@ -29,13 +33,15 @@ prob = QubitProblem(
     Qf=Qf,
     R=R,
     eval_hessian=hess,
-    loss=quaternionic_loss
+    loss=loss
 )
-
-plot_path = "plots/single_qubit/pretest.png"
-plot_single_qubit_with_controls(prob, plot_path; fig_title="pretest")
 
 solve!(prob)
 
-plot_path = "plots/single_qubit/test.png"
-plot_single_qubit_with_controls(prob, plot_path; fig_title="test")
+plot_path = "plots/single_qubit/test/$(gate)_gate.png"
+
+plot_single_qubit_2_qstate_with_controls(
+    prob,
+    plot_path;
+    fig_title="$gate gate on basis states"
+)

@@ -31,7 +31,7 @@ function amplitude_loss(ψ̃, ψ̃f)
     ψ = iso_to_ket(ψ̃)
     ψf = iso_to_ket(ψ̃f)
     amp = ψ'ψf
-    return (1 - real(amp) + imag(amp))^2
+    return abs(1 - abs(real(amp)) + abs(imag(amp)))
 end
 
 function quaternionic_loss(ψ̃, ψ̃f)

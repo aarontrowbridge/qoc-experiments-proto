@@ -74,7 +74,7 @@ function QubitProblem(
         )
     end
 
-    # initial a(t = Tf) constraints: ∫a, a, da = 0
+    # initial a(t = 1) constraints: ∫a, a, da = 0
     for i = 1:(system.control_order + 1)
         MOI.add_constraints(
             optimizer,
@@ -83,8 +83,8 @@ function QubitProblem(
         )
     end
 
-    # final a(t = 0) constraints: ∫a, a = 0
-    for i = 1:system.control_order
+    # final a(t = T) constraints: ∫a, a, da = 0
+    for i = 1:( system.control_order + 1 )
         MOI.add_constraints(
             optimizer,
             variables[end - system.control_order - 2 + i],
@@ -147,11 +147,11 @@ end
 function solve!(prob::QubitProblem)
     initialize_trajectory!(prob)
     MOI.optimize!(prob.optimizer)
-    update_traj_data!(prob)
     loss = MOI.get(prob.optimizer, MOI.ObjectiveValue())
-    term_status = MOI.get(prob.optimizer, MOI.TerminationStatus())
+    status = MOI.get(prob.optimizer, MOI.TerminationStatus())
+    update_traj_data!(prob)
     println()
-    @info "solve completed" loss term_status
+    @info "solve completed" loss status
     println()
 end
 
