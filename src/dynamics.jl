@@ -28,9 +28,9 @@ using Symbolics
     aₜ₊₁s = xₜ₊₁[(end-system.control_order):end]
     âₜ₊₁s = zeros(typeof(xₜ[1]), system.control_order + 1)
     for i = 1:system.control_order
-        âₜ₊₁s[i] = Δt * aₜs[i+1]
+        âₜ₊₁s[i] = aₜs[i] + Δt * aₜs[i+1]
     end
-    âₜ₊₁s[end] = Δt * uₜ[1]
+    âₜ₊₁s[end] = aₜs[end] + Δt * uₜ[1]
     δaₜ₊₁s = aₜ₊₁s - âₜ₊₁s
     ψ̃ₜs = [xₜ[slice(i, system.isodim)] for i = 1:system.nqstates]
     ψ̃ₜ₊₁s = [xₜ₊₁[slice(i, system.isodim)] for i = 1:system.nqstates]
@@ -102,7 +102,6 @@ function SystemDynamics(
 
     ∇f̂ₜ_expr = Symbolics.build_function(∇f̂ₜ_symb, z)
     ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
-
 
     function ∇f(y)
         xus = [y[slice(t, vardim)] for t in 1:T]
