@@ -9,7 +9,7 @@ struct TrajectoryData
     actions::Vector{Vector{Float64}}
 end
 
-# TODO: do integrals of random control variable for augmented state
+# TODO: evaluate integrals of random control variable for augmented state
 
 function TrajectoryData(system::AbstractQubitSystem{N}, T::Int; σ=1.0) where N
     states = [

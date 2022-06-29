@@ -113,6 +113,7 @@ function SystemDynamics(
         return jac
     end
 
+    # TODO: fix this
     if eval_hessian
         Symbolics.@variables μ[1:system.nstates * (T - 1)]
         μ = collect(μ)

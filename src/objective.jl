@@ -77,15 +77,7 @@ function SystemObjective(
         return ∇
     end
 
-
-    # Symbolics.@variables y[1:(system.nstates+1)*T]
-
-    # y = collect(y)
-
-    # ∇L_symb = Symbolics.gradient(L(y), y)
-    # ∇L_expr = Symbolics.build_function(∇L_symb, y)
-    # ∇L = eval(∇L_expr[1])
-
+    # TODO: fix this
     if eval_hessian
         ∇²L_symb = Symbolics.sparsehessian(L(y), y)
         I, J, _ = findnz(∇²L_symb)
