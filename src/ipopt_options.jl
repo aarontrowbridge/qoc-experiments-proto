@@ -8,7 +8,7 @@ export Options
     https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_print_options_documentation
 """
 Base.@kwdef mutable struct Options{T}
-    tol::T = 1e-6
+    tol::T = 1e-4
     s_max::T = 100.0
     max_iter::Int = 1000
     # max_wall_time = 300.0

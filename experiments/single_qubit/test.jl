@@ -6,14 +6,18 @@ using QubitControl
 H_drift = σz / 2
 H_drive = σx / 2
 
-gate = :H
+gate = :X
 
 ψ0 = [1, 0]
 ψ1 = [0, 1]
 
 ψ = [ψ0, ψ1]
 
-system = SingleQubitSystem(H_drift, H_drive, gate, ψ)
+system = SingleQubitSystem(
+    H_drift,
+    H_drive,
+    gate, ψ
+)
 
 T    = 1000
 Δt   = 0.01

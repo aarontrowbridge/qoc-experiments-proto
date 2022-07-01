@@ -1,8 +1,7 @@
-module Objective
-
-export objective
+module Objectives
 
 export SystemObjective
+export MinTimeObjective
 
 using ..Utils
 using ..QubitSystems
@@ -15,13 +14,6 @@ using Symbolics
 # objective functions
 #
 
-@views function objective(system::AbstractQubitSystem{N}, loss, xs, us, T, Q, Qf, R) where N
-    ψ̃ts = [xs[t][1:(system.isodim*system.nqstates)] for t = 1:T]
-    u = vcat(us...)
-    Qs = [fill(Q, T-1); Qf]
-    return dot(Qs, loss.(ψ̃ts)) + R / 2 * dot(u, u)
-end
-
 struct SystemObjective
     L::Function
     ∇L::Function
@@ -32,11 +24,11 @@ end
 function SystemObjective(
     system::AbstractQubitSystem{N},
     loss::Function,
-    eval_hessian::Bool,
     T::Int,
     Q::Float64,
     Qf::Float64,
-    R::Float64
+    R::Float64,
+    eval_hessian::Bool
 ) where N
 
     vardim = system.nstates + 1
@@ -47,11 +39,12 @@ function SystemObjective(
         sum([l(ψ̃s[slice(i, system.isodim)]) for (i, l) in enumerate(ls)])
     end
 
-    @views function L(z)
-        xus = [z[slice(t, vardim)] for t in 1:T]
-        xs = [xu[1:end-1] for xu in xus]
-        us = [xu[end:end] for xu in xus]
-        return objective(system, system_loss, xs, us, T, Q, Qf, R)
+    @views function L(Z)
+        aug = system.control_order + 2
+        ψ̃ts = [Z[slice(t, vardim; stretch=-aug)] for t in 1:T]
+        us = [Z[t*vardim] for t in 1:T]
+        Qs = [fill(Q, T-1); Qf]
+        return dot(Qs, system_loss.(ψ̃ts)) + R / 2 * dot(us, us)
     end
 
     Symbolics.@variables ψ[1:system.isodim]
@@ -61,11 +54,11 @@ function SystemObjective(
     ∇ls_expr = [Symbolics.build_function(∇l, ψ) for ∇l in ∇ls_symb]
     ∇ls = [eval(∇l_expr[1]) for ∇l_expr in ∇ls_expr]
 
-    function ∇L(z)
+    function ∇L(Z)
         ∇ = zeros(vardim*T)
-        xus = [z[slice(t, vardim)] for t in 1:T]
-        ψ̃s = [xu[1:system.isodim*system.nqstates] for xu in xus]
-        us = [xu[end] for xu in xus]
+        zs = [Z[slice(t, vardim)] for t in 1:T]
+        ψ̃s = [z[1:system.isodim*system.nqstates] for z in zs]
+        us = [z[end] for z in zs]
         Qs = [fill(Q, T-1); Qf]
         for t = 1:T
             for k = 1:system.nqstates
@@ -77,7 +70,7 @@ function SystemObjective(
         return ∇
     end
 
-    # TODO: fix this
+    # TODO: fix Hessian
     if eval_hessian
         ∇²L_symb = Symbolics.sparsehessian(L(y), y)
         I, J, _ = findnz(∇²L_symb)
@@ -91,5 +84,33 @@ function SystemObjective(
 
     return SystemObjective(L, ∇L, ∇²L, ∇²L_structure)
 end
+
+
+# TODO: implement Hessian for MinTimeObjective
+
+struct MinTimeObjective
+    L::Function
+    ∇L::Function
+end
+
+function MinTimeObjective(T::Int, vardim::Int, B::Float64)
+    total_time(z) = sum([z[t*(vardim + 1)] for t = 1:T-1])
+
+    # L(z) = 0.5 * B * total_time(z)^2
+    # ∇L(z) = vcat(
+    #     [[zeros(vardim); B * total_time(z)] for _ = 1:T-1]...,
+    #     zeros(vardim)
+    # )
+
+    L(z) = B * total_time(z)
+    ∇L(z) = vcat(
+        [[zeros(vardim); B] for _ = 1:T-1]...,
+        zeros(vardim)
+    )
+    return MinTimeObjective(L, ∇L)
+end
+
+
+
 
 end

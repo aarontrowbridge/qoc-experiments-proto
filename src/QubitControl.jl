@@ -17,17 +17,20 @@ include("integrators.jl")
 include("losses.jl")
 @reexport using .Losses
 
-include("qubitsystems.jl")
+include("qubit_systems.jl")
 @reexport using .QubitSystems
 
 include("dynamics.jl")
 @reexport using .Dynamics
 
-include("objective.jl")
-@reexport using .Objective
+include("objectives.jl")
+@reexport using .Objectives
 
 include("nlmoi.jl")
 @reexport using .NLMOI
+
+include("evaluators.jl")
+@reexport using .Evaluators
 
 include("trajectories.jl")
 @reexport using .Trajectories
