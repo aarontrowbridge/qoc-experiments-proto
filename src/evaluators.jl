@@ -66,7 +66,8 @@ function MinTimeEvaluator(
     integrator::Function,
     T::Int,
     B::Float64,
-    eval_hessian::Bool
+    eval_hessian::Bool,
+    squared_loss::Bool
 ) where N
 
     dynamics = SystemDynamics(
@@ -79,7 +80,8 @@ function MinTimeEvaluator(
     objective = MinTimeObjective(
         T,
         system.nstates + 1,
-        B
+        B,
+        squared_loss
     )
 
     return MinTimeEvaluator(

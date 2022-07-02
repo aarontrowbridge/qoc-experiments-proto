@@ -93,20 +93,23 @@ struct MinTimeObjective
     ∇L::Function
 end
 
-function MinTimeObjective(T::Int, vardim::Int, B::Float64)
+function MinTimeObjective(T::Int, vardim::Int, B::Float64, squared_loss::Bool)
     total_time(z) = sum([z[t*(vardim + 1)] for t = 1:T-1])
 
-    # L(z) = 0.5 * B * total_time(z)^2
-    # ∇L(z) = vcat(
-    #     [[zeros(vardim); B * total_time(z)] for _ = 1:T-1]...,
-    #     zeros(vardim)
-    # )
+    if squared_loss
+        L = z -> 0.5 * B * total_time(z)^2
+        ∇L = z -> vcat(
+            [[zeros(vardim); B * total_time(z)] for _ = 1:T-1]...,
+            zeros(vardim)
+        )
+    else
+        L = z -> B * total_time(z)
+        ∇L = z -> vcat(
+            [[zeros(vardim); B] for _ = 1:T-1]...,
+            zeros(vardim)
+        )
+    end
 
-    L(z) = B * total_time(z)
-    ∇L(z) = vcat(
-        [[zeros(vardim); B] for _ = 1:T-1]...,
-        zeros(vardim)
-    )
     return MinTimeObjective(L, ∇L)
 end
 

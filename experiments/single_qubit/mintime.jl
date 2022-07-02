@@ -28,10 +28,15 @@ options = Options(
     max_iter = 500
 )
 
-B = 0.1
+B = 1.0
+squared_loss = false
+iter = parse(Int, ARGS[1])
+
+tol = 1e-10
 
 min_time_options = Options(
-    max_iter = 200
+    max_iter = iter,
+    tol = tol
 )
 
 prob = MinTimeProblem(
@@ -45,26 +50,31 @@ prob = MinTimeProblem(
     B=B,
     eval_hessian=hess,
     loss=loss,
+    squared_loss=squared_loss,
     options=options,
     min_time_options=min_time_options
 )
 
 plot_single_qubit_2_qstate_with_seperated_controls(
     prob.subprob.trajectory,
-    "plots/single_qubit/min_time/$(gate)_gate.png",
+    "plots/single_qubit/min_time/$(gate)_gate_B_$(B)_iter_$(iter)_tol_$(tol)" *
+        (squared_loss ? "_squared_loss" : "") * ".png",
     system.isodim,
     system.control_order,
     T;
-    fig_title="$gate gate on basis states"
+    fig_title="min time $gate gate on basis states (iter = $iter)" *
+        (squared_loss ? " w/ squared loss" : "")
 )
 
 solve!(prob)
 
 plot_single_qubit_2_qstate_with_seperated_controls(
     prob.subprob.trajectory,
-    "plots/single_qubit/min_time/$(gate)_gate.png",
+    "plots/single_qubit/min_time/$(gate)_gate_B_$(B)_iter_$(iter)_tol_$(tol)" *
+        (squared_loss ? "_squared_loss" : "") * ".png",
     system.isodim,
     system.control_order,
     T;
-    fig_title="$gate gate on basis states"
+    fig_title="min time $gate gate on basis states (iter = $iter; tol = $tol)" *
+        (squared_loss ? " w/ squared loss" : "")
 )

@@ -182,6 +182,7 @@ function MinTimeProblem(
     B=0.1,
     integrator=pade_schroedinger,
     eval_hessian=false,
+    squared_loss=true,
     min_time_options=Options(),
     kwargs...
 ) where N
@@ -211,7 +212,8 @@ function MinTimeProblem(
         integrator,
         T,
         B,
-        eval_hessian
+        eval_hessian,
+        squared_loss
     )
 
     variables = MOI.add_variables(optimizer, total_vars + T - 1)
