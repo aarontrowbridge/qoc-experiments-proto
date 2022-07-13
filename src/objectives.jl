@@ -42,7 +42,7 @@ function SystemObjective(
     @views function L(Z)
         aug = system.control_order + 2
         ψ̃ts = [Z[slice(t, vardim; stretch=-aug)] for t in 1:T]
-        us = [Z[t*vardim] for t in 1:T]
+        us = [Z[index(t, vardim)] for t in 1:T]
         Qs = [fill(Q, T-1); Qf]
         return dot(Qs, system_loss.(ψ̃ts)) + R / 2 * dot(us, us)
     end
@@ -54,7 +54,7 @@ function SystemObjective(
     ∇ls_expr = [Symbolics.build_function(∇l, ψ) for ∇l in ∇ls_symb]
     ∇ls = [eval(∇l_expr[1]) for ∇l_expr in ∇ls_expr]
 
-    function ∇L(Z)
+    @views function ∇L(Z)
         ∇ = zeros(vardim*T)
         zs = [Z[slice(t, vardim)] for t in 1:T]
         ψ̃s = [z[1:system.isodim*system.nqstates] for z in zs]
@@ -63,7 +63,7 @@ function SystemObjective(
         for t = 1:T
             for k = 1:system.nqstates
                 ψₖinds = slice(k, system.isodim)
-                ∇[ψₖinds .+ (t-1) * vardim] = Qs[t] * ∇ls[k](ψ̃s[t][ψₖinds])
+                ∇[ψₖinds .+ vardim * (t - 1)] = Qs[t] * ∇ls[k](ψ̃s[t][ψₖinds])
             end
             ∇[t*vardim] = R * us[t]
         end
@@ -93,21 +93,51 @@ struct MinTimeObjective
     ∇L::Function
 end
 
-function MinTimeObjective(T::Int, vardim::Int, B::Float64, squared_loss::Bool)
-    total_time(z) = sum([z[t*(vardim + 1)] for t = 1:T-1])
+function MinTimeObjective(T::Int, vardim::Int, Rᵤ::Float64, Rₛ::Float64)
 
-    if squared_loss
-        L = z -> 0.5 * B * total_time(z)^2
-        ∇L = z -> vcat(
-            [[zeros(vardim); B * total_time(z)] for _ = 1:T-1]...,
-            zeros(vardim)
-        )
-    else
-        L = z -> B * total_time(z)
-        ∇L = z -> vcat(
-            [[zeros(vardim); B] for _ = 1:T-1]...,
-            zeros(vardim)
-        )
+    total_time(z) = sum([z[index(t, vardim + 1)] for t = 1:T-1])
+
+    # TODO: chase down variables and remove end control variable
+
+    function u_smoothness_regulator(z)
+        ∑Δu² = 0.0
+        for t = 1:T-2
+            uₜ₊₁ = z[index(t + 1, vardim, vardim + 1)]
+            uₜ = z[index(t, vardim, vardim + 1)]
+            Δu = uₜ₊₁ - uₜ
+            ∑Δu² += Δu^2
+        end
+        return 0.5 * Rₛ * ∑Δu²
+    end
+
+    function u_amplitude_regulator(z)
+        ∑u² = 0.0
+        for t = 1:T-1
+            uₜ = z[index(t, vardim, vardim + 1)]
+            ∑u² += uₜ^2
+        end
+        return 0.5 * Rᵤ * ∑u²
+    end
+
+    L = z -> total_time(z) + u_smoothness_regulator(z) + u_amplitude_regulator(z)
+
+    function ∇L(z)
+        ∇ = zeros((vardim + 1) * (T - 1) + vardim)
+
+        for t = 1:T-1
+            ∇[index(t, vardim + 1)] = 1.0
+            ∇[index(t, vardim, vardim + 1)] = Rᵤ * z[index(t, vardim, vardim + 1)]
+        end
+
+        for t = 1:T-2
+            uₜ₊₁ = z[index(t + 1, vardim, vardim + 1)]
+            uₜ = z[index(t, vardim, vardim + 1)]
+            Δu = uₜ₊₁ - uₜ
+            ∇[index(t, vardim, vardim + 1)] += -Rₛ * Δu
+            ∇[index(t + 1, vardim, vardim + 1)] += Rₛ * Δu
+        end
+
+        return ∇
     end
 
     return MinTimeObjective(L, ∇L)

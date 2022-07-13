@@ -9,11 +9,7 @@ using LinearAlgebra
 # integrators
 #
 
-# general implicit midpoint method
-function implicit_midpoint(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, G_drift, G_drive)
-    G = G_drift + aₜ * G_drive
-    return ψ̃ₜ₊₁ - (ψ̃ₜ + Δt * G * (ψ̃ₜ₊₁ + ψ̃ₜ) / 2)
-end
+# TODO: add exponential and higher order pade integrators
 
 # analytic solution of midpoint equation for schroedinger dynamics
 function pade_schroedinger(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, G_drift, G_drive)

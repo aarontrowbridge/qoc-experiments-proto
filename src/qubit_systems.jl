@@ -18,6 +18,7 @@ struct SingleQubitSystem <: AbstractQubitSystem{1}
     G_drive::Matrix{Float64}
     ψ̃1::Vector{Float64}
     ψ̃goal::Vector{Float64}
+    gate::Symbol
 end
 
 function SingleQubitSystem(
@@ -60,6 +61,7 @@ function SingleQubitSystem(
         G_drive,
         ψ̃1,
         ψ̃goal,
+        gate
     )
 end
 

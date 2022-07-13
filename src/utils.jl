@@ -1,7 +1,12 @@
 module Utils
 
 export slice
+export index
 
-slice(t, dim; stretch=0) = (1 + (t - 1)*dim):(t*dim + stretch)
+index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
+index(t, dim) = index(t, dim, dim)
+
+slice(t, pos1, pos2, dim) = index(t, pos1, dim):index(t, pos2, dim)
+slice(t, dim; stretch=0) = slice(t, 1, dim + stretch, dim)
 
 end

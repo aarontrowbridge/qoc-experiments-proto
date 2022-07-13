@@ -1,5 +1,6 @@
 module Evaluators
 
+export AbstractPICOEvaluator
 export QubitEvaluator
 export MinTimeEvaluator
 
@@ -12,7 +13,9 @@ const MOI = MathOptInterface
 
 import Ipopt
 
-struct QubitEvaluator <: MOI.AbstractNLPEvaluator
+abstract type AbstractPICOEvaluator <: MOI.AbstractNLPEvaluator end
+
+struct QubitEvaluator <: AbstractPICOEvaluator
     dynamics::SystemDynamics
     objective::SystemObjective
     eval_hessian::Bool
@@ -55,7 +58,7 @@ function QubitEvaluator(
     )
 end
 
-struct MinTimeEvaluator <: MOI.AbstractNLPEvaluator
+struct MinTimeEvaluator <: AbstractPICOEvaluator
     dynamics::SystemDynamics
     objective::MinTimeObjective
     eval_hessian::Bool
@@ -65,9 +68,9 @@ function MinTimeEvaluator(
     system::AbstractQubitSystem{N},
     integrator::Function,
     T::Int,
-    B::Float64,
-    eval_hessian::Bool,
-    squared_loss::Bool
+    Rᵤ::Float64,
+    Rₛ::Float64,
+    eval_hessian::Bool
 ) where N
 
     dynamics = SystemDynamics(
@@ -80,8 +83,8 @@ function MinTimeEvaluator(
     objective = MinTimeObjective(
         T,
         system.nstates + 1,
-        B,
-        squared_loss
+        Rᵤ,
+        Rₛ
     )
 
     return MinTimeEvaluator(
