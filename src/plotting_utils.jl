@@ -99,6 +99,7 @@ function plot_single_qubit_2_qstate_with_controls(
     isodim::Int,
     control_order::Int,
     T::Int;
+    is=(1, 2),
     fig_title=nothing
 )
 
@@ -106,10 +107,10 @@ function plot_single_qubit_2_qstate_with_controls(
     us = traj.controls
     ts = traj.times
 
-    ψ̃¹s = [xs[t][slice(1, isodim)] for t = 1:T]
+    ψ̃¹s = [xs[t][slice(is[1], isodim)] for t = 1:T]
     ψ̃¹s = hcat(ψ̃¹s...)
 
-    ψ̃²s = [xs[t][slice(2, isodim)] for t = 1:T]
+    ψ̃²s = [xs[t][slice(is[2], isodim)] for t = 1:T]
     ψ̃²s = hcat(ψ̃²s...)
 
     as = [[xs[t][(end - control_order + 1):end]; us[t]] for t = 1:T]
@@ -164,6 +165,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
     isodim::Int,
     control_order::Int,
     T::Int;
+    is=(1, 2),
     fig_title=nothing
 )
 
@@ -171,10 +173,10 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
     us = traj.controls
     ts = traj.times
 
-    ψ̃¹s = [xs[t][slice(1, isodim)] for t = 1:T]
+    ψ̃¹s = [xs[t][slice(is[1], isodim)] for t = 1:T]
     ψ̃¹s = hcat(ψ̃¹s...)
 
-    ψ̃²s = [xs[t][slice(2, isodim)] for t = 1:T]
+    ψ̃²s = [xs[t][slice(is[2], isodim)] for t = 1:T]
     ψ̃²s = hcat(ψ̃²s...)
 
     as = [[xs[t][(end - control_order + 1):end]; us[t]] for t = 1:T]

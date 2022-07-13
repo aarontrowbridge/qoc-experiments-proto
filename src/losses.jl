@@ -13,6 +13,11 @@ using LinearAlgebra
 # loss functions
 #
 
+
+# TODO: renormalize vectors in place of abs
+#       ⋅ penalize cost to remain near unit norm
+#       ⋅ Σ α * (1 - ψ̃'ψ̃), α = 1e-3
+
 function geodesic_loss(ψ̃, ψ̃f)
     ψ = iso_to_ket(ψ̃)
     ψf = iso_to_ket(ψ̃f)
@@ -31,7 +36,8 @@ function amplitude_loss(ψ̃, ψ̃f)
     ψ = iso_to_ket(ψ̃)
     ψf = iso_to_ket(ψ̃f)
     amp = ψ'ψf
-    return abs(1 - abs(real(amp)) + abs(imag(amp)))
+    # return abs(1 - abs(real(amp)) + abs(imag(amp)))
+    return abs(1 - abs2(amp))
 end
 
 function quaternionic_loss(ψ̃, ψ̃f)

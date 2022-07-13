@@ -34,6 +34,7 @@ struct QubitProblem
     trajectory::TrajectoryData
     T::Int
     Δt::Float64
+    vardim::Int
     total_vars::Int
     total_states::Int
     total_dynamics::Int
@@ -50,6 +51,9 @@ function QubitProblem(
     R=0.5,
     σ=1.0,
     eval_hessian=false,
+    pin_first_qstate=true,
+    bound_a=true,
+    a_bound=1.0,
     options=Options(),
 ) where N
 
@@ -60,7 +64,8 @@ function QubitProblem(
         optimizer.options[String(name)] = getfield(options, name)
     end
 
-    total_vars = (system.nstates + 1) * T
+    vardim = system.nstates + 1
+    total_vars = vardim * T
     total_dynamics = system.nstates * (T - 1)
     total_states = system.nstates * T
 
@@ -86,6 +91,17 @@ function QubitProblem(
         )
     end
 
+    # pin first qstate to be equal to analytic solution
+    if pin_first_qstate
+        for i = 1:system.isodim
+            MOI.add_constraints(
+                optimizer,
+                variables[index(T, i, vardim)],
+                MOI.EqualTo(system.ψ̃goal[i])
+            )
+        end
+    end
+
     # initial a(t = 1) constraints: ∫a, a, da = 0
     for i = 1:(system.control_order + 1)
         MOI.add_constraints(
@@ -99,9 +115,28 @@ function QubitProblem(
     for i = 1:(system.control_order + 1)
         MOI.add_constraints(
             optimizer,
-            variables[end - system.control_order - 2 + i],
+            variables[index(T, n_wfn_states + i, vardim)],
             MOI.EqualTo(0.0)
         )
+    end
+
+    # bound |a(t)| < a_bound
+    if bound_a
+        for t = 2:T-1
+            idx = index(t, n_wfn_states + 2, vardim)
+
+            MOI.add_constraints(
+                optimizer,
+                variables[idx],
+                MOI.LessThan(a_bound)
+            )
+
+            MOI.add_constraints(
+                optimizer,
+                variables[idx],
+                MOI.GreaterThan(-a_bound)
+            )
+        end
     end
 
     traj = TrajectoryData(system, T, Δt; σ=σ)
@@ -123,6 +158,7 @@ function QubitProblem(
         traj,
         T,
         Δt,
+        vardim,
         total_vars,
         total_states,
         total_dynamics,
@@ -147,7 +183,7 @@ initialize_trajectory!(prob::QubitProblem) = initialize_trajectory!(prob, prob.t
     vardim = prob.system.nstates + 1
     z = MOI.get(prob.optimizer, MOI.VariablePrimal(), prob.variables)
     xs = [z[slice(t, vardim; stretch=-1)] for t = 1:prob.T]
-    us = [[z[t*vardim]] for t = 1:prob.T]
+    us = [[z[index(t, vardim)]] for t = 1:prob.T]
     prob.trajectory.states .= xs
     prob.trajectory.controls .= us
 end
@@ -179,10 +215,12 @@ end
 function MinTimeProblem(
     system::AbstractQubitSystem{N},
     T::Int;
-    B=0.1,
+    Rᵤ=0.001,
+    Rₛ=0.001,
     integrator=pade_schroedinger,
     eval_hessian=false,
-    squared_loss=true,
+    bound_a=true,
+    a_bound=1.0,
     min_time_options=Options(),
     kwargs...
 ) where N
@@ -194,7 +232,8 @@ function MinTimeProblem(
         optimizer.options[String(name)] = getfield(min_time_options, name)
     end
 
-    total_vars = (system.nstates + 1) * T
+    vardim = system.nstates + 1
+    total_vars = vardim * T
     total_dynamics = system.nstates * (T - 1)
 
     # set up sub problem
@@ -203,6 +242,8 @@ function MinTimeProblem(
         T;
         integrator=integrator,
         eval_hessian=eval_hessian,
+        bound_a=bound_a,
+        a_bound=a_bound,
         kwargs...
     )
 
@@ -211,9 +252,9 @@ function MinTimeProblem(
         subprob.system,
         integrator,
         T,
-        B,
-        eval_hessian,
-        squared_loss
+        Rᵤ,
+        Rₛ,
+        eval_hessian
     )
 
     variables = MOI.add_variables(optimizer, total_vars + T - 1)
@@ -242,26 +283,45 @@ function MinTimeProblem(
     for i = 1:(system.control_order + 1)
         MOI.add_constraints(
             optimizer,
-            variables[end - system.control_order - 2 + i],
+            variables[index(T, n_wfn_states + i, vardim + 1)],
             MOI.EqualTo(0.0)
         )
     end
 
     # constraints on Δtₜs
     for t = 1:T-1
+        idx = index(t, vardim + 1)
+
         MOI.add_constraints(
             optimizer,
-            variables[t*(system.nstates + 2)],
+            variables[idx],
             MOI.GreaterThan(0.1 * subprob.Δt)
+        )
+
+        MOI.add_constraints(
+            optimizer,
+            variables[idx],
+            MOI.LessThan(2.0 * subprob.Δt)
         )
     end
 
-    for t = 1:T-1
-        MOI.add_constraints(
-            optimizer,
-            variables[t*(system.nstates + 2)],
-            MOI.LessThan(2.0 * subprob.Δt)
-        )
+    # bound |a(t)| < a_bound
+    if bound_a
+        for t = 2:T-1
+            idx = index(t, n_wfn_states + 2, vardim + 1)
+
+            MOI.add_constraints(
+                optimizer,
+                variables[idx],
+                MOI.LessThan(a_bound)
+            )
+
+            MOI.add_constraints(
+                optimizer,
+                variables[idx],
+                MOI.GreaterThan(-a_bound)
+            )
+        end
     end
 
     dynamics_constraints = [
@@ -278,7 +338,7 @@ function MinTimeProblem(
         evaluator,
         variables,
         optimizer,
-        T
+        T,
     )
 end
 
@@ -302,9 +362,9 @@ end
 @views function update_traj_data!(prob::MinTimeProblem)
     vardim = prob.subprob.system.nstates + 1
     z = MOI.get(prob.optimizer, MOI.VariablePrimal(), prob.variables)
-    xs = [z[slice(t, vardim+1; stretch=-2)] for t = 1:prob.T]
-    us = [[z[t*(vardim + 1) - 1]] for t = 1:prob.T]
-    Δts = [0.0; [z[t*(vardim + 1)] for t = 1:prob.T-1]]
+    xs = [z[slice(t, vardim + 1; stretch=-2)] for t = 1:prob.T]
+    us = [[z[index(t, vardim, vardim + 1)]] for t = 1:prob.T]
+    Δts = [0.0; [z[index(t, vardim + 1)] for t = 1:prob.T-1]]
     prob.subprob.trajectory.states .= xs
     prob.subprob.trajectory.controls .= us
     prob.subprob.trajectory.times .= cumsum(Δts)
@@ -312,35 +372,24 @@ end
 
 
 function solve!(prob::MinTimeProblem)
-    println()
-    @info "beginning sub problem solve"
-    println()
-
     solve!(prob.subprob)
 
     init_traj = get_traj_data(prob.subprob)
 
-    println()
-    @info "sub problem solved... starting min time problem solve"
-    println()
-
     initialize_trajectory!(prob, init_traj)
 
+    # constrain end points to match subprob solution
     for j = 1:prob.subprob.system.nqstates*prob.subprob.system.isodim
         MOI.add_constraint(
             prob.optimizer,
-            prob.variables[end - prob.subprob.system.nstates - 1 + j],
+            prob.variables[index(prob.T, j, prob.subprob.vardim + 1)],
+            # prob.variables[end - prob.subprob.system.nstates - 1 + j],
             MOI.EqualTo(init_traj.states[end][j])
         )
     end
 
     MOI.optimize!(prob.optimizer)
-
     update_traj_data!(prob)
-
-    println()
-    @info "sub problem solved... starting min time problem solve"
-    println()
 end
 
 

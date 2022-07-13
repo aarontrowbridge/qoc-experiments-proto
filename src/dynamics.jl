@@ -103,8 +103,8 @@ function SystemDynamics(
         [
             collect(
                 zip(
-                    Is .+ (t-1) * system.nstates,
-                    Js .+ (t-1) * vardim
+                    Is .+ (t - 1) * system.nstates,
+                    Js .+ (t - 1) * vardim
                 )
             ) for t = 1:T-1
         ]...
@@ -163,7 +163,7 @@ function SystemDynamics(
 
     @views function f(z)
         zs = [z[slice(t, vardim + 1; stretch=-1)] for t in 1:T]
-        Δts = [z[t*(vardim + 1)] for t in 1:T-1]
+        Δts = [z[index(t, vardim + 1)] for t in 1:T-1]
         δxs = zeros(typeof(z[1]), system.nstates * (T - 1))
         for t = 1:T-1
             δxₜ₊₁ = fₜ(zs[t+1], zs[t], Δts[t])

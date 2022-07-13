@@ -5,6 +5,8 @@ export apply
 export ket_to_iso
 export iso_to_ket
 
+using LinearAlgebra
+
 const GATES = Dict(
     :X => [0 1;
            1 0],
@@ -25,10 +27,11 @@ const GATES = Dict(
 )
 
 function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
+    @assert norm(ψ) ≈ 1.0
     @assert gate in keys(GATES) "gate not found"
     U = GATES[gate]
     @assert size(U)[2] == size(ψ)[1] "gate size does not match ket dim"
-    return  ComplexF64.(U * ψ)
+    return ComplexF64.(normalize(U * ψ))
 end
 
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]
