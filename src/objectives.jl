@@ -22,27 +22,37 @@ struct SystemObjective
 end
 
 function SystemObjective(
-    system::AbstractQubitSystem{N},
+    system::AbstractQubitSystem,
     loss::Function,
     T::Int,
     Q::Float64,
     Qf::Float64,
     R::Float64,
     eval_hessian::Bool
-) where N
+)
 
-    vardim = system.nstates + 1
-
-    ls = [ψ̃ -> loss(ψ̃, system.ψ̃goal[slice(i, system.isodim)]) for i = 1:system.nqstates]
+    ls = [ψ̃ -> loss(ψ̃, system.ψ̃f[slice(i, system.isodim)]) for i = 1:system.nqstates]
 
     @views function system_loss(ψ̃s)
         sum([l(ψ̃s[slice(i, system.isodim)]) for (i, l) in enumerate(ls)])
     end
 
+    # TODO: add quadratic loss terms for augmented state vars
+
     @views function L(Z)
-        aug = system.control_order + 2
-        ψ̃ts = [Z[slice(t, vardim; stretch=-aug)] for t in 1:T]
-        us = [Z[index(t, vardim)] for t in 1:T]
+        ψ̃ts = [Z[slice(t, system.n_wfn_states, system.vardim)] for t = 1:T]
+        us = vcat(
+            [
+                Z[
+                    slice(
+                        t,
+                        system.nstates + 1,
+                        system.vardim,
+                        system.vardim
+                    )
+                ] for t = 1:T
+            ]...
+        )
         Qs = [fill(Q, T-1); Qf]
         return dot(Qs, system_loss.(ψ̃ts)) + R / 2 * dot(us, us)
     end
@@ -55,17 +65,19 @@ function SystemObjective(
     ∇ls = [eval(∇l_expr[1]) for ∇l_expr in ∇ls_expr]
 
     @views function ∇L(Z)
-        ∇ = zeros(vardim*T)
-        zs = [Z[slice(t, vardim)] for t in 1:T]
-        ψ̃s = [z[1:system.isodim*system.nqstates] for z in zs]
-        us = [z[end] for z in zs]
+        ∇ = zeros(system.vardim*T)
+        zs = [Z[slice(t, system.vardim)] for t in 1:T]
+        ψ̃s = [z[1:system.n_wfn_states] for z in zs]
+        us = [z[system.nstates + 1:end] for z in zs]
         Qs = [fill(Q, T-1); Qf]
         for t = 1:T
-            for k = 1:system.nqstates
-                ψₖinds = slice(k, system.isodim)
-                ∇[ψₖinds .+ vardim * (t - 1)] = Qs[t] * ∇ls[k](ψ̃s[t][ψₖinds])
+            for j = 1:system.nqstates
+                ψⱼinds = slice(j, system.isodim)
+                ∇[ψⱼinds .+ system.vardim * (t - 1)] = Qs[t] * ∇ls[j](ψ̃s[t][ψⱼinds])
             end
-            ∇[t*vardim] = R * us[t]
+            for k = 1:system.ncontrols
+                ∇[index(t, system.nstates + k, system.vardim)] = R * us[t][k]
+            end
         end
         return ∇
     end

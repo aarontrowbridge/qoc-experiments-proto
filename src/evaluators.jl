@@ -22,7 +22,7 @@ struct QubitEvaluator <: AbstractPICOEvaluator
 end
 
 function QubitEvaluator(
-    system::AbstractQubitSystem{N},
+    system::AbstractQubitSystem,
     integrator::Function,
     loss::Function,
     eval_hessian::Bool,
@@ -31,7 +31,7 @@ function QubitEvaluator(
     Q::Float64,
     Qf::Float64,
     R::Float64
-) where N
+)
 
     dynamics = SystemDynamics(
         system,
@@ -65,13 +65,13 @@ struct MinTimeEvaluator <: AbstractPICOEvaluator
 end
 
 function MinTimeEvaluator(
-    system::AbstractQubitSystem{N},
+    system::AbstractQubitSystem,
     integrator::Function,
     T::Int,
     Rᵤ::Float64,
     Rₛ::Float64,
     eval_hessian::Bool
-) where N
+)
 
     dynamics = SystemDynamics(
         system,

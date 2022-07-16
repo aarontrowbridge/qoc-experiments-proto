@@ -16,37 +16,45 @@ using Symbolics
 #
 
 @views function dynamics(
-    system::AbstractQubitSystem{N},
+    system::AbstractQubitSystem,
     integrator,
     xₜ₊₁,
     xₜ,
     uₜ,
     Δt
-) where N
-    aₜs = xₜ[(end-system.control_order):end]
-    aₜ₊₁s = xₜ₊₁[(end-system.control_order):end]
+)
+    augₜs = xₜ[(end - system.n_aug_states + 1):end]
+    augₜ₊₁s = xₜ₊₁[(end - system.n_aug_states + 1):end]
 
-    âₜ₊₁s = zeros(typeof(xₜ[1]), system.control_order + 1)
+    âugₜ₊₁s = zeros(typeof(xₜ[1]), system.n_aug_states)
 
-    for i = 1:system.control_order
-        âₜ₊₁s[i] = aₜs[i] + Δt * aₜs[i + 1]
+    for k = 1:system.ncontrols
+        for i = 1:system.augdim - 1
+            idx = index(k, i, system.augdim)
+            âugₜ₊₁s[idx] = augₜs[idx] + Δt * augₜs[idx + 1]
+        end
+        âugₜ₊₁s[index(k, system.augdim)] =
+            augₜs[index(k, system.augdim)] + Δt * uₜ[k]
     end
 
-    âₜ₊₁s[end] = aₜs[end] + Δt * uₜ[1]
+    δaₜ₊₁s = augₜ₊₁s - âugₜ₊₁s
 
-    δaₜ₊₁s = aₜ₊₁s - âₜ₊₁s
+    aₜs = [
+        xₜ[system.n_wfn_states + index(k, 2, system.augdim)]
+        for k = 1:system.ncontrols
+    ]
 
-    aₜ = xₜ[end-system.control_order+1]
     δψ̃ₜ₊₁s = [
         integrator(
             xₜ₊₁[slice(i, system.isodim)],
             xₜ[slice(i, system.isodim)],
-            aₜ,
+            aₜs,
             Δt
         ) for i = 1:system.nqstates
     ]
 
     δxₜ₊₁ = vcat(δψ̃ₜ₊₁s..., δaₜ₊₁s)
+
     return δxₜ₊₁
 end
 
@@ -59,40 +67,38 @@ struct SystemDynamics
 end
 
 function SystemDynamics(
-    system::AbstractQubitSystem{N},
+    system::AbstractQubitSystem,
     integrator::Function,
     T::Int,
     Δt::Float64,
     eval_hessian::Bool
-) where N
+)
 
-    vardim = system.nstates + 1
-
-    function system_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt)
-        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, system.G_drift, system.G_drive)
+    function system_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt)
+        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt, system.G_drift, system.G_drives)
     end
 
     @views function fₜ(zₜ₊₁, zₜ)
         xₜ₊₁ = zₜ₊₁[1:end-1]
-        xₜ = zₜ[1:end-1]
-        uₜ = zₜ[end:end]
-        return dynamics(system, system_integrator, xₜ₊₁, xₜ, uₜ, Δt)
+        xₜ = zₜ[1:system.nstates]
+        uₜs = zₜ[system.nstates + 1:end]
+        return dynamics(system, system_integrator, xₜ₊₁, xₜ, uₜs, Δt)
     end
 
     @views function f(Z)
         δxs = zeros(typeof(Z[1]), system.nstates * (T - 1))
         for t = 1:T-1
-            δxₜ₊₁ = fₜ(Z[slice(t+1, vardim)], Z[slice(t, vardim)])
+            δxₜ₊₁ = fₜ(Z[slice(t + 1, system.vardim)], Z[slice(t, system.vardim)])
             δxs[slice(t, system.nstates)] = δxₜ₊₁
         end
         return δxs
     end
 
-    Symbolics.@variables zz[1:2*vardim]
+    Symbolics.@variables zz[1:2*system.vardim]
 
     zz = collect(zz)
 
-    f̂ₜ(zₜzₜ₊₁) = fₜ(zₜzₜ₊₁[vardim+1:end], zₜzₜ₊₁[1:vardim])
+    f̂ₜ(zₜzₜ₊₁) = fₜ(zₜzₜ₊₁[system.vardim+1:end], zₜzₜ₊₁[1:system.vardim])
 
     ∇f̂ₜ_symb = Symbolics.sparsejacobian(f̂ₜ(zz), zz)
 
@@ -104,7 +110,7 @@ function SystemDynamics(
             collect(
                 zip(
                     Is .+ (t - 1) * system.nstates,
-                    Js .+ (t - 1) * vardim
+                    Js .+ (t - 1) * system.vardim
                 )
             ) for t = 1:T-1
         ]...
@@ -114,10 +120,10 @@ function SystemDynamics(
     ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
 
     function ∇f(Z)
-        jac = spzeros(system.nstates*(T-1), vardim*T)
+        jac = spzeros(system.nstates*(T-1), system.vardim*T)
         for t = 1:T-1
-            ∇fₜ = ∇f̂ₜ(Z[slice(t, vardim; stretch=vardim)])
-            jac[slice(t, system.nstates), slice(t, vardim; stretch=vardim)] = ∇fₜ
+            jac[slice(t, system.nstates), slice(t, system.vardim; stretch=system.vardim)] =
+                ∇f̂ₜ(Z[slice(t, system.vardim; stretch=system.vardim)])
         end
         return jac
     end
@@ -142,11 +148,11 @@ end
 
 # min time system dynamics (dynamical Δts)
 function SystemDynamics(
-    system::AbstractQubitSystem{N},
+    system::AbstractQubitSystem,
     integrator::Function,
     T::Int,
     eval_hessian::Bool
-) where N
+)
 
     vardim = system.nstates + 1
 
@@ -191,8 +197,8 @@ function SystemDynamics(
         [
             collect(
                 zip(
-                    Is .+ (t-1) * system.nstates,
-                    Js .+ (t-1) * (vardim + 1)
+                    Is .+ (t - 1) * system.nstates,
+                    Js .+ (t - 1) * (vardim + 1)
                 )
             ) for t = 1:T-1
         ]...

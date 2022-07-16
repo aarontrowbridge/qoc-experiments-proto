@@ -1,68 +1,199 @@
 module QubitSystems
 
 export AbstractQubitSystem
+
 export SingleQubitSystem
+export MultiModeQubitSystem
 
 using ..QuantumLogic
 
 using LinearAlgebra
+using HDF5
 
-abstract type AbstractQubitSystem{N} end
+Im2 = [
+    0 -1;
+    1  0
+]
 
-struct SingleQubitSystem <: AbstractQubitSystem{1}
+⊗(A, B) = kron(A, B)
+
+G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
+
+abstract type AbstractQubitSystem end
+
+struct SingleQubitSystem <: AbstractQubitSystem
     nstates::Int
     nqstates::Int
     isodim::Int
+    augdim::Int
+    ncontrols::Int
     control_order::Int
     G_drift::Matrix{Float64}
-    G_drive::Matrix{Float64}
+    G_drive::Union{Matrix{Float64}, Vector{Matrix{Float64}}}
     ψ̃1::Vector{Float64}
-    ψ̃goal::Vector{Float64}
-    gate::Symbol
+    ψ̃f::Vector{Float64}
+    gate::Union{Symbol, Nothing}
 end
 
 function SingleQubitSystem(
     H_drift::Matrix,
-    H_drive::Matrix,
-    gate::Symbol,
+    H_drive::Union{Matrix{C}, Vector{Matrix{C}}},
+    gate::Union{Symbol, Nothing},
     ψ1::Union{Vector{C}, Vector{Vector{C}}};
+    ψf=nothing,
     control_order=2
 ) where C <: Number
 
     if isa(ψ1, Vector{C})
         nqstates = 1
         isodim = 2 * length(ψ1)
-        ψ̃goal = ket_to_iso(apply(gate, ψ1))
+        if isnothing(ψf)
+            ψ̃f = ket_to_iso(apply(gate, ψ1))
+        else
+            ψ̃f = ket_to_iso(ψf)
+        end
         ψ̃1 = ket_to_iso(ψ1)
     else
         nqstates = length(ψ1)
         isodim = 2 * length(ψ1[1])
-        ψ̃goal = vcat(ket_to_iso.(apply.(gate, ψ1))...)
+        if isnothing(ψf)
+            ψ̃f = vcat(ket_to_iso.(apply.(gate, ψ1))...)
+        else
+            @assert isa(ψf, Vector{Vector{C}})
+            ψ̃f = vcat(ket_to_iso.(ψf)...)
+        end
         ψ̃1 = vcat(ket_to_iso.(ψ1)...)
     end
 
-    Im2 = [0 -1; 1 0]
-
-    ⊗(A, B) = kron(A, B)
-
-    G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
-
     G_drift = G(H_drift)
-    G_drive = G(H_drive)
 
-    nstates = nqstates * isodim + control_order + 1
+    if isa(H_drive, Matrix{C})
+        ncontrols = 1
+        G_drive = G(H_drive)
+    else
+        ncontrols = length(H_drive)
+        G_drive = G.(H_drive)
+    end
+
+    augdim = ncontrols * (control_order + 1)
+    nstates = nqstates * isodim + augdim
 
     return SingleQubitSystem(
         nstates,
         nqstates,
         isodim,
+        augdim,
+        ncontrols,
         control_order,
         G_drift,
         G_drive,
         ψ̃1,
-        ψ̃goal,
+        ψ̃f,
         gate
     )
+end
+
+function SingleQubitSystem(
+    H_drift::Matrix,
+    H_drive::Union{Matrix{C}, Vector{Matrix{C}}},
+    ψ1::Union{Vector{C}, Vector{Vector{C}}},
+    ψf::Union{Vector{C}, Vector{Vector{C}}};
+    kwargs...
+) where C <: Number
+    return SingleQubitSystem(
+        H_drift,
+        H_drive,
+        nothing,
+        ψ1;
+        ψf=ψf,
+        kwargs...
+    )
+end
+
+
+struct MultiModeQubitSystem <: AbstractQubitSystem
+    ncontrols::Int
+    nqstates::Int
+    nstates::Int
+    n_wfn_states::Int
+    n_aug_states::Int
+    isodim::Int
+    augdim::Int
+    vardim::Int
+    control_order::Int
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
+    ψ̃1::Vector{Float64}
+    ψ̃f::Vector{Float64}
+    ts::Vector{Float64}
+end
+
+function MultiModeQubitSystem(
+    H_drift::Matrix,
+    H_drives::Vector{Matrix{C}} where C,
+    ψ1::Vector,
+    ψf::Vector,
+    ts::Vector{Float64};
+    control_order=2
+)
+    isodim = 2 * length(ψ1)
+
+    ψ̃1 = ket_to_iso(ψ1)
+    ψ̃f = ket_to_iso(ψf)
+
+    G_drift = G(H_drift)
+
+    ncontrols = length(H_drives)
+
+    G_drives = G.(H_drives)
+
+    augdim = control_order + 1
+    nqstates = 1
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+
+    return MultiModeQubitSystem(
+        ncontrols,
+        nqstates,
+        nstates,
+        n_wfn_states,
+        n_aug_states,
+        isodim,
+        augdim,
+        vardim,
+        control_order,
+        G_drift,
+        G_drives,
+        ψ̃1,
+        ψ̃f,
+        ts
+    )
+end
+
+# TODO: make sure HDF5 doesn't permute matrix dims b/w python and julia
+
+function MultiModeQubitSystem(hf_path::String)
+    h5open(hf_path, "r") do hf
+
+        H_drift = hf["H_drift"][:, :]
+        H_drives = [hf["H_drives"][:, :, i] for i = 1:size(hf["H_drives"], 3)]
+
+        ψ1 = vcat(transpose(hf["psi1"][:, :])...)
+        ψf = vcat(transpose(hf["psif"][:, :])...)
+
+        ts = hf["tlist"][:]
+
+        return MultiModeQubitSystem(
+            H_drift,
+            H_drives,
+            ψ1,
+            ψf,
+            ts
+        )
+    end
 end
 
 

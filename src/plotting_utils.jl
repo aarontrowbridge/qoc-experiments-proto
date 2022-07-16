@@ -3,9 +3,11 @@ module PlottingUtils
 export plot_single_qubit_1_qstate_with_controls
 export plot_single_qubit_2_qstate_with_controls
 export plot_single_qubit_2_qstate_with_seperated_controls
+export plot_multimode_qubit
 
 using ..Utils
 using ..Trajectories
+using ..QubitSystems
 using ..Problems
 
 using LaTeXStrings
@@ -36,7 +38,7 @@ function plot_single_qubit_1_qstate_with_controls(
     i=1
 )
     xs = traj.states
-    us = traj.controls
+    us = traj.actions
     ts = traj.times
 
     ψ̃s = [xs[t][slice(i, isodim)] for t = 1:T]
@@ -104,7 +106,7 @@ function plot_single_qubit_2_qstate_with_controls(
 )
 
     xs = traj.states
-    us = traj.controls
+    us = traj.actions
     ts = traj.times
 
     ψ̃¹s = [xs[t][slice(is[1], isodim)] for t = 1:T]
@@ -170,7 +172,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
 )
 
     xs = traj.states
-    us = traj.controls
+    us = traj.actions
     ts = traj.times
 
     ψ̃¹s = [xs[t][slice(is[1], isodim)] for t = 1:T]
@@ -248,6 +250,62 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
     end
 
     save(filename, fig)
+end
+
+function plot_multimode_qubit(
+    system::MultiModeQubitSystem,
+    traj::TrajectoryData,
+    path::String
+)
+    T = length(traj.times)
+    xs = traj.states
+    us = traj.actions
+    ts = traj.times
+
+    ψs = hcat([xs[t][1:2] for t = 1:T]...)
+
+    data = augs_and_actions(traj, system)
+
+
+    fig = Figure(resolution=(1200, 1500))
+
+    ψax = Axis(fig[1:2, :]; title="multimode system components", xlabel=L"t")
+    series!(ψax, ts, ψs, labels=["|g0⟩", "|g1⟩"])
+    axislegend(ψax; position=:lb)
+
+
+    for i = 0:system.control_order
+        ax = Axis(
+            fig[3 + i, :];
+            xlabel = L"t"
+        )
+
+        as = [[augs_and_actions[t][k][1 + i] for k = 1:system.ncontrols] for t = 1:T]
+        as = hcat(as...)
+
+
+        series!(
+            ax,
+            ts,
+            ;
+            labels = [
+                i == 0 ?
+                latexstring("a_$k (t)") :
+                latexstring(
+                    "\\mathrm{d}^{",
+                    i == 1 ? "" : "$i",
+                    "}_t a_$k"
+                )
+                for k = 1:system.ncontrols
+            ]
+        )
+
+        axislegend(ax; position=:lt)
+    end
+
+
+
+    save(path, fig)
 end
 
 
