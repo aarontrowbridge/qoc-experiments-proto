@@ -196,14 +196,11 @@ function MultiModeQubitSystem(hf_path::String)
         ψ1 = vcat(transpose(hf["psi1"][:, :])...)
         ψf = vcat(transpose(hf["psif"][:, :])...)
 
-        ts = hf["tlist"][:]
-
         return MultiModeQubitSystem(
             H_drift,
             H_drives,
             ψ1,
-            ψf,
-            ts
+            ψf
         )
     end
 end

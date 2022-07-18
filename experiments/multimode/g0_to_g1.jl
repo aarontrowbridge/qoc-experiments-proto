@@ -20,13 +20,13 @@ system = MultiModeQubitSystem(
     ψf
 )
 
-Δt = ts[2] - ts[1]
+Δt_init_traj = ts[2] - ts[1]
 
 controls = copy(transpose(hf["controls"][:,:]))
 
-init_traj = Trajectory(system, controls, Δt)
+init_traj = Trajectory(system, controls, Δt_init_traj)
 
-iter = parse(Int, ARGS[1])
+iter = parse(Int, ARGS[4])
 
 options = Options(
     max_iter = iter,
@@ -35,30 +35,52 @@ options = Options(
     linear_solver = "mumps"
 )
 
-Δt = 0.5
-T = 1000
+T = parse(Int, ARGS[1])
+Δt = parse(Float64, ARGS[2])
+R = parse(Float64, ARGS[3])
 
-pin_first_qstate = false
+traj_guess = parse(Bool, ARGS[5])
 
-prob = QubitProblem(
-    system,
-    T;
-    # init_traj;
-    Δt=Δt,
-    pin_first_qstate=pin_first_qstate,
-    options=options
-)
+if traj_guess
+    Δt = Δt_init_traj
+    T = length(ts)
+end
 
-plot_path = "plots/multimode/g0_to_g1_iter_$(iter)_dt_$(Δt)_T_$(T).png"
+pin_first_qstate = parse(Bool, ARGS[6])
+
+if traj_guess
+    prob = QubitProblem(
+        system,
+        init_traj;
+        Δt=Δt,
+        R=R,
+        pin_first_qstate=pin_first_qstate,
+        options=options
+    )
+else
+    prob = QubitProblem(
+        system,
+        T;
+        Δt=Δt,
+        R=R,
+        pin_first_qstate=pin_first_qstate,
+        options=options
+    )
+end
+
+plot_path = "plots/multimode/g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" *
+    (traj_guess ? "_init_traj" : "") * (pin_first_qstate ? "_pinned" : "") * ".png"
 
 plot_multimode_qubit(system, prob.trajectory, plot_path)
 
 solve!(prob)
 
 pico_controls = controls_matrix(prob.trajectory, prob.system)
+tlist = hcat(prob.trajectory.times...)
 
 h5open("notebooks/controls_data.h5", "w") do hdf
     hdf["controls"] = pico_controls
+    hdf["tlist"] = tlist
 end
 
 plot_multimode_qubit(system, prob.trajectory, plot_path)

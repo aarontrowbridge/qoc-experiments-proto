@@ -268,12 +268,18 @@ function plot_multimode_qubit(
 
     for j = 0:system.control_order
 
-        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t (ns)")
+
+        data = jth_order_controls_matrix(traj, system, j)
+
+        if j == system.control_order
+            data[:, end] = data[:, end-1]
+        end
 
         series!(
             ax_j,
             traj.times,
-            jth_order_controls_matrix(traj, system, j);
+            data;
             labels = [
                 j == 0 ?
                 latexstring("a_$k (t)") :

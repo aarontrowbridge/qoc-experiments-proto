@@ -150,22 +150,20 @@ function MinTimeSystemDynamics(
     eval_hessian::Bool
 )
 
-    vardim = sys.nstates + 1
-
     function sys_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt)
-        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, sys.G_drift, sys.G_drive)
+        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, sys.G_drift, sys.G_drives)
     end
 
     @views function fₜ(xuₜ₊₁, xuₜ, Δt)
-        xₜ₊₁ = xuₜ₊₁[1:end-1]
-        xₜ = xuₜ[1:end-1]
-        uₜ = xuₜ[end:end]
+        xₜ₊₁ = xuₜ₊₁[1:sys.nstates]
+        xₜ = xuₜ[1:sys.nstates]
+        uₜ = xuₜ[end - sys.ncontrols + 1:end]
         return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜ, Δt)
     end
 
     @views function f(z)
-        zs = [z[slice(t, vardim + 1; stretch=-1)] for t in 1:T]
-        Δts = [z[index(t, vardim + 1)] for t in 1:T-1]
+        zs = [z[slice(t, 1, sys.vardim, sys.vardim + 1)] for t in 1:T]
+        Δts = [z[index(t, sys.vardim + 1)] for t in 1:T-1]
         δxs = zeros(typeof(z[1]), sys.nstates * (T - 1))
         for t = 1:T-1
             δxₜ₊₁ = fₜ(zs[t+1], zs[t], Δts[t])
@@ -174,14 +172,14 @@ function MinTimeSystemDynamics(
         return δxs
     end
 
-    Symbolics.@variables zΔtz[1:(2*vardim + 1)]
+    Symbolics.@variables zΔtz[1:(2*sys.vardim + 1)]
 
     zΔtz = collect(zΔtz)
 
     @views f̂ₜ(zₜΔtzₜ₊₁) = fₜ(
-        zₜΔtzₜ₊₁[vardim+2:end], # zₜ₊₁
-        zₜΔtzₜ₊₁[1:vardim],     # zₜ
-        zₜΔtzₜ₊₁[vardim+1],     # Δt
+        zₜΔtzₜ₊₁[(end - sys.vardim + 1):end], # zₜ₊₁
+        zₜΔtzₜ₊₁[1:sys.vardim],               # zₜ
+        zₜΔtzₜ₊₁[sys.vardim + 1],             # Δt
     )
 
     ∇f̂ₜ_symb = Symbolics.sparsejacobian(f̂ₜ(zΔtz), zΔtz)
@@ -194,7 +192,7 @@ function MinTimeSystemDynamics(
             collect(
                 zip(
                     Is .+ (t - 1) * sys.nstates,
-                    Js .+ (t - 1) * (vardim + 1)
+                    Js .+ (t - 1) * (sys.vardim + 1)
                 )
             ) for t = 1:T-1
         ]...
@@ -204,12 +202,12 @@ function MinTimeSystemDynamics(
     ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
 
     function ∇f(Z)
-        jac = spzeros(sys.nstates*(T - 1), (vardim + 1)*T)
+        jac = spzeros(sys.nstates * (T - 1), (sys.vardim + 1) * T)
         for t = 1:T-1
-            zₜΔtzₜ₊₁_inds = slice(t, vardim+1; stretch=vardim)
-            zₜΔtzₜ₊₁ = Z[zₜΔtzₜ₊₁_inds]
+            zₜΔtzₜ₊₁_idxs = slice(t, sys.vardim + 1; stretch=sys.vardim)
+            zₜΔtzₜ₊₁ = Z[zₜΔtzₜ₊₁_idxs]
             ∇fₜ = ∇f̂ₜ(zₜΔtzₜ₊₁)
-            jac[slice(t, sys.nstates), zₜΔtzₜ₊₁_inds] = ∇fₜ
+            jac[slice(t, sys.nstates), zₜΔtzₜ₊₁_idxs] = ∇fₜ
         end
         return jac
     end

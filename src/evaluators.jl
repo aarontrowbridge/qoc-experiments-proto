@@ -73,7 +73,7 @@ function MinTimeEvaluator(
     eval_hessian::Bool
 )
 
-    dynamics = SystemDynamics(
+    dynamics = MinTimeSystemDynamics(
         system,
         integrator,
         T,
@@ -81,8 +81,8 @@ function MinTimeEvaluator(
     )
 
     objective = MinTimeObjective(
+        system,
         T,
-        system.nstates + 1,
         Rᵤ,
         Rₛ
     )
