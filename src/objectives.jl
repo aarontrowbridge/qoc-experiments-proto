@@ -41,18 +41,11 @@ function SystemObjective(
 
     @views function L(Z)
         ψ̃ts = [Z[slice(t, system.n_wfn_states, system.vardim)] for t = 1:T]
-        us = vcat(
-            [
-                Z[
-                    slice(
-                        t,
-                        system.nstates + 1,
-                        system.vardim,
-                        system.vardim
-                    )
-                ] for t = 1:T
-            ]...
-        )
+        us = zeros(system.ncontrols * T)
+        for t = 1:T
+            us[slice(t, system.ncontrols)] =
+                Z[slice(t, system.nstates + 1, system.vardim, system.vardim)]
+        end
         Qs = [fill(Q, T-1); Qf]
         return dot(Qs, system_loss.(ψ̃ts)) + R / 2 * dot(us, us)
     end
@@ -68,12 +61,12 @@ function SystemObjective(
         ∇ = zeros(system.vardim*T)
         zs = [Z[slice(t, system.vardim)] for t in 1:T]
         ψ̃s = [z[1:system.n_wfn_states] for z in zs]
-        us = [z[system.nstates + 1:end] for z in zs]
+        us = [z[end - system.ncontrols + 1:end] for z in zs]
         Qs = [fill(Q, T-1); Qf]
         for t = 1:T
             for j = 1:system.nqstates
                 ψⱼinds = slice(j, system.isodim)
-                ∇[ψⱼinds .+ system.vardim * (t - 1)] = Qs[t] * ∇ls[j](ψ̃s[t][ψⱼinds])
+                ∇[index(t, 0, system.vardim) .+ ψⱼinds] = Qs[t] * ∇ls[j](ψ̃s[t][ψⱼinds])
             end
             for k = 1:system.ncontrols
                 ∇[index(t, system.nstates + k, system.vardim)] = R * us[t][k]

@@ -22,14 +22,17 @@ G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 abstract type AbstractQubitSystem end
 
 struct SingleQubitSystem <: AbstractQubitSystem
+    n_wfn_states::Int
+    n_aug_states::Int
     nstates::Int
     nqstates::Int
     isodim::Int
     augdim::Int
+    vardim::Int
     ncontrols::Int
     control_order::Int
     G_drift::Matrix{Float64}
-    G_drive::Union{Matrix{Float64}, Vector{Matrix{Float64}}}
+    G_drives::Vector{Matrix{Float64}}
     ψ̃1::Vector{Float64}
     ψ̃f::Vector{Float64}
     gate::Union{Symbol, Nothing}
@@ -37,12 +40,13 @@ end
 
 function SingleQubitSystem(
     H_drift::Matrix,
-    H_drive::Union{Matrix{C}, Vector{Matrix{C}}},
+    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
     gate::Union{Symbol, Nothing},
     ψ1::Union{Vector{C}, Vector{Vector{C}}};
     ψf=nothing,
     control_order=2
-) where C <: Number
+) where {C <: Number, T <: Number}
+
 
     if isa(ψ1, Vector{C})
         nqstates = 1
@@ -67,22 +71,31 @@ function SingleQubitSystem(
 
     G_drift = G(H_drift)
 
-    if isa(H_drive, Matrix{C})
+    if isa(H_drive, Matrix{T})
         ncontrols = 1
-        G_drive = G(H_drive)
+        G_drive = [G(H_drive)]
     else
         ncontrols = length(H_drive)
         G_drive = G.(H_drive)
     end
 
     augdim = ncontrols * (control_order + 1)
-    nstates = nqstates * isodim + augdim
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
 
     return SingleQubitSystem(
+        n_wfn_states,
+        n_aug_states,
         nstates,
         nqstates,
         isodim,
         augdim,
+        vardim,
         ncontrols,
         control_order,
         G_drift,
@@ -125,15 +138,13 @@ struct MultiModeQubitSystem <: AbstractQubitSystem
     G_drives::Vector{Matrix{Float64}}
     ψ̃1::Vector{Float64}
     ψ̃f::Vector{Float64}
-    ts::Vector{Float64}
 end
 
 function MultiModeQubitSystem(
     H_drift::Matrix,
     H_drives::Vector{Matrix{C}} where C,
     ψ1::Vector,
-    ψf::Vector,
-    ts::Vector{Float64};
+    ψf::Vector;
     control_order=2
 )
     isodim = 2 * length(ψ1)
@@ -147,10 +158,12 @@ function MultiModeQubitSystem(
 
     G_drives = G.(H_drives)
 
-    augdim = control_order + 1
     nqstates = 1
     n_wfn_states = nqstates * isodim
+
+    augdim = control_order + 1
     n_aug_states = ncontrols * augdim
+
     nstates = n_wfn_states + n_aug_states
 
     vardim = nstates + ncontrols
@@ -168,8 +181,7 @@ function MultiModeQubitSystem(
         G_drift,
         G_drives,
         ψ̃1,
-        ψ̃f,
-        ts
+        ψ̃f
     )
 end
 

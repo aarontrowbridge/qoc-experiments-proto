@@ -37,6 +37,7 @@ Base.@kwdef mutable struct Options{T}
     print_frequency_time = 0.0
     skip_finalize_solution_call = "no"
     # timing_statistics = :no
+    linear_solver = "mumps"
 end
 
 end

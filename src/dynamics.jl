@@ -1,7 +1,7 @@
 module Dynamics
 
-export dynamics
 export SystemDynamics
+export MinTimeSystemDynamics
 
 using ..Utils
 using ..QuantumLogic
@@ -16,42 +16,40 @@ using Symbolics
 #
 
 @views function dynamics(
-    system::AbstractQubitSystem,
-    integrator,
+    sys::AbstractQubitSystem,
+    integrator::Function,
     xₜ₊₁,
     xₜ,
     uₜ,
     Δt
 )
-    augₜs = xₜ[(end - system.n_aug_states + 1):end]
-    augₜ₊₁s = xₜ₊₁[(end - system.n_aug_states + 1):end]
+    augₜs = xₜ[(end - sys.n_aug_states + 1):end]
+    augₜ₊₁s = xₜ₊₁[(end - sys.n_aug_states + 1):end]
 
-    âugₜ₊₁s = zeros(typeof(xₜ[1]), system.n_aug_states)
+    âugₜ₊₁s = zeros(typeof(xₜ[1]), sys.n_aug_states)
 
-    for k = 1:system.ncontrols
-        for i = 1:system.augdim - 1
-            idx = index(k, i, system.augdim)
-            âugₜ₊₁s[idx] = augₜs[idx] + Δt * augₜs[idx + 1]
+    for i = 1:sys.augdim
+        for k = 1:sys.ncontrols
+            idxᵢₖ = index(i, k, sys.ncontrols)
+            if i != sys.augdim
+                idxᵢ₊₁ₖ = index(i + 1, k, sys.ncontrols)
+                âugₜ₊₁s[idxᵢₖ] = augₜs[idxᵢₖ] + Δt * augₜs[idxᵢ₊₁ₖ]
+            else
+                âugₜ₊₁s[idxᵢₖ] = augₜs[idxᵢₖ] + Δt * uₜ[k]
+            end
         end
-        âugₜ₊₁s[index(k, system.augdim)] =
-            augₜs[index(k, system.augdim)] + Δt * uₜ[k]
     end
 
     δaₜ₊₁s = augₜ₊₁s - âugₜ₊₁s
 
-    aₜs = [
-        xₜ[system.n_wfn_states + index(k, 2, system.augdim)]
-        for k = 1:system.ncontrols
-    ]
+    δψ̃ₜ₊₁s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
 
-    δψ̃ₜ₊₁s = [
-        integrator(
-            xₜ₊₁[slice(i, system.isodim)],
-            xₜ[slice(i, system.isodim)],
-            aₜs,
-            Δt
-        ) for i = 1:system.nqstates
-    ]
+    aₜs = xₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+
+    for i = 1:sys.nqstates
+        ψ̃ᵢslice = slice(i, sys.isodim)
+        δψ̃ₜ₊₁s[ψ̃ᵢslice] = integrator(xₜ₊₁[ψ̃ᵢslice], xₜ[ψ̃ᵢslice], aₜs, Δt)
+    end
 
     δxₜ₊₁ = vcat(δψ̃ₜ₊₁s..., δaₜ₊₁s)
 
@@ -67,70 +65,68 @@ struct SystemDynamics
 end
 
 function SystemDynamics(
-    system::AbstractQubitSystem,
+    sys::AbstractQubitSystem,
     integrator::Function,
     T::Int,
     Δt::Float64,
     eval_hessian::Bool
 )
 
-    function system_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt)
-        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt, system.G_drift, system.G_drives)
+    function sys_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt)
+        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt, sys.G_drift, sys.G_drives)
     end
 
     @views function fₜ(zₜ₊₁, zₜ)
-        xₜ₊₁ = zₜ₊₁[1:end-1]
-        xₜ = zₜ[1:system.nstates]
-        uₜs = zₜ[system.nstates + 1:end]
-        return dynamics(system, system_integrator, xₜ₊₁, xₜ, uₜs, Δt)
+        xₜ₊₁ = zₜ₊₁[1:sys.nstates]
+        xₜ = zₜ[1:sys.nstates]
+        uₜs = zₜ[end - sys.ncontrols + 1:end]
+        return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜs, Δt)
     end
 
     @views function f(Z)
-        δxs = zeros(typeof(Z[1]), system.nstates * (T - 1))
+        δxs = zeros(typeof(Z[1]), sys.nstates * (T - 1))
         for t = 1:T-1
-            δxₜ₊₁ = fₜ(Z[slice(t + 1, system.vardim)], Z[slice(t, system.vardim)])
-            δxs[slice(t, system.nstates)] = δxₜ₊₁
+            δxₜ₊₁ = fₜ(Z[slice(t + 1, sys.vardim)], Z[slice(t, sys.vardim)])
+            δxs[slice(t, sys.nstates)] = δxₜ₊₁
         end
         return δxs
     end
 
-    Symbolics.@variables zz[1:2*system.vardim]
+    Symbolics.@variables zz[1:(sys.vardim * 2)]
 
     zz = collect(zz)
 
-    f̂ₜ(zₜzₜ₊₁) = fₜ(zₜzₜ₊₁[system.vardim+1:end], zₜzₜ₊₁[1:system.vardim])
+    f̂ₜ(zₜzₜ₊₁) = fₜ(zₜzₜ₊₁[sys.vardim+1:end], zₜzₜ₊₁[1:sys.vardim])
 
     ∇f̂ₜ_symb = Symbolics.sparsejacobian(f̂ₜ(zz), zz)
 
     Is = findnz(∇f̂ₜ_symb)[1]
     Js = findnz(∇f̂ₜ_symb)[2]
 
-    ∇f_structure = vcat(
-        [
-            collect(
-                zip(
-                    Is .+ (t - 1) * system.nstates,
-                    Js .+ (t - 1) * system.vardim
-                )
-            ) for t = 1:T-1
-        ]...
-    )
+    ∇f_structure = []
+    for t = 1:T-1
+        idxs = zip(
+            Is .+ index(t, 0, sys.nstates),
+            Js .+ index(t, 0, sys.vardim)
+        )
+        append!(∇f_structure, collect(idxs))
+    end
 
     ∇f̂ₜ_expr = Symbolics.build_function(∇f̂ₜ_symb, zz)
     ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
 
     function ∇f(Z)
-        jac = spzeros(system.nstates*(T-1), system.vardim*T)
+        jac = spzeros(sys.nstates*(T-1), sys.vardim*T)
         for t = 1:T-1
-            jac[slice(t, system.nstates), slice(t, system.vardim; stretch=system.vardim)] =
-                ∇f̂ₜ(Z[slice(t, system.vardim; stretch=system.vardim)])
+            var_idxs = slice(t, sys.vardim; stretch=sys.vardim)
+            jac[slice(t, sys.nstates), var_idxs] = ∇f̂ₜ(Z[var_idxs])
         end
         return jac
     end
 
     # TODO: fix this
     if eval_hessian
-        Symbolics.@variables μ[1:system.nstates * (T - 1)]
+        Symbolics.@variables μ[1:sys.nstates * (T - 1)]
         μ = collect(μ)
         ∇²f_symb = Symbolics.sparsehessian(dot(μ, f(y)), [y; μ])
         I, J, _ = findnz(∇²f_symb)
@@ -146,34 +142,34 @@ function SystemDynamics(
     return SystemDynamics(f, ∇f, ∇f_structure, ∇²f, ∇²f_structure)
 end
 
-# min time system dynamics (dynamical Δts)
-function SystemDynamics(
-    system::AbstractQubitSystem,
+# min time sys dynamics (dynamical Δts)
+function MinTimeSystemDynamics(
+    sys::AbstractQubitSystem,
     integrator::Function,
     T::Int,
     eval_hessian::Bool
 )
 
-    vardim = system.nstates + 1
+    vardim = sys.nstates + 1
 
-    function system_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt)
-        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, system.G_drift, system.G_drive)
+    function sys_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt)
+        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, sys.G_drift, sys.G_drive)
     end
 
     @views function fₜ(xuₜ₊₁, xuₜ, Δt)
         xₜ₊₁ = xuₜ₊₁[1:end-1]
         xₜ = xuₜ[1:end-1]
         uₜ = xuₜ[end:end]
-        return dynamics(system, system_integrator, xₜ₊₁, xₜ, uₜ, Δt)
+        return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜ, Δt)
     end
 
     @views function f(z)
         zs = [z[slice(t, vardim + 1; stretch=-1)] for t in 1:T]
         Δts = [z[index(t, vardim + 1)] for t in 1:T-1]
-        δxs = zeros(typeof(z[1]), system.nstates * (T - 1))
+        δxs = zeros(typeof(z[1]), sys.nstates * (T - 1))
         for t = 1:T-1
             δxₜ₊₁ = fₜ(zs[t+1], zs[t], Δts[t])
-            δxs[slice(t, system.nstates)] = δxₜ₊₁
+            δxs[slice(t, sys.nstates)] = δxₜ₊₁
         end
         return δxs
     end
@@ -197,7 +193,7 @@ function SystemDynamics(
         [
             collect(
                 zip(
-                    Is .+ (t - 1) * system.nstates,
+                    Is .+ (t - 1) * sys.nstates,
                     Js .+ (t - 1) * (vardim + 1)
                 )
             ) for t = 1:T-1
@@ -208,19 +204,19 @@ function SystemDynamics(
     ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
 
     function ∇f(Z)
-        jac = spzeros(system.nstates*(T - 1), (vardim + 1)*T)
+        jac = spzeros(sys.nstates*(T - 1), (vardim + 1)*T)
         for t = 1:T-1
             zₜΔtzₜ₊₁_inds = slice(t, vardim+1; stretch=vardim)
             zₜΔtzₜ₊₁ = Z[zₜΔtzₜ₊₁_inds]
             ∇fₜ = ∇f̂ₜ(zₜΔtzₜ₊₁)
-            jac[slice(t, system.nstates), zₜΔtzₜ₊₁_inds] = ∇fₜ
+            jac[slice(t, sys.nstates), zₜΔtzₜ₊₁_inds] = ∇fₜ
         end
         return jac
     end
 
     # TODO: redo hessian
     if eval_hessian
-        Symbolics.@variables μ[1:system.nstates * (T - 1)]
+        Symbolics.@variables μ[1:sys.nstates * (T - 1)]
         μ = collect(μ)
         ∇²f_symb = Symbolics.sparsehessian(dot(μ, f(y)), [y; μ])
         I, J, _ = findnz(∇²f_symb)

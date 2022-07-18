@@ -4,6 +4,7 @@ export plot_single_qubit_1_qstate_with_controls
 export plot_single_qubit_2_qstate_with_controls
 export plot_single_qubit_2_qstate_with_seperated_controls
 export plot_multimode_qubit
+export plot_single_qubit
 
 using ..Utils
 using ..Trajectories
@@ -29,7 +30,7 @@ function plot_single_qubit_1_qstate_with_controls(
 end
 
 function plot_single_qubit_1_qstate_with_controls(
-    traj::TrajectoryData,
+    traj::Trajectory,
     filename::String,
     isodim::Int,
     control_order::Int,
@@ -96,7 +97,7 @@ function plot_single_qubit_2_qstate_with_controls(
 end
 
 function plot_single_qubit_2_qstate_with_controls(
-    traj::TrajectoryData,
+    traj::Trajectory,
     filename::String,
     isodim::Int,
     control_order::Int,
@@ -115,7 +116,7 @@ function plot_single_qubit_2_qstate_with_controls(
     ψ̃²s = [xs[t][slice(is[2], isodim)] for t = 1:T]
     ψ̃²s = hcat(ψ̃²s...)
 
-    as = [[xs[t][(end - control_order + 1):end]; us[t]] for t = 1:T]
+    as = [[xs[t][slice()]; us[t]] for t = 1:T]
     as = hcat(as...)
     as[end, end] = as[end, end-1]
 
@@ -162,7 +163,7 @@ function plot_single_qubit_2_qstate_with_controls(
 end
 
 function plot_single_qubit_2_qstate_with_seperated_controls(
-    traj::TrajectoryData,
+    traj::Trajectory,
     filename::String,
     isodim::Int,
     control_order::Int,
@@ -254,59 +255,94 @@ end
 
 function plot_multimode_qubit(
     system::MultiModeQubitSystem,
-    traj::TrajectoryData,
+    traj::Trajectory,
     path::String
 )
-    T = length(traj.times)
-    xs = traj.states
-    us = traj.actions
-    ts = traj.times
-
-    ψs = hcat([xs[t][1:2] for t = 1:T]...)
-
-    data = augs_and_actions(traj, system)
-
-
     fig = Figure(resolution=(1200, 1500))
 
+    ψs = wfn_components_matrix(traj, system; components=[1,2])
+
     ψax = Axis(fig[1:2, :]; title="multimode system components", xlabel=L"t")
-    series!(ψax, ts, ψs, labels=["|g0⟩", "|g1⟩"])
+    series!(ψax, traj.times, ψs, labels=["|g0⟩", "|g1⟩"])
     axislegend(ψax; position=:lb)
 
+    for j = 0:system.control_order
 
-    for i = 0:system.control_order
-        ax = Axis(
-            fig[3 + i, :];
-            xlabel = L"t"
-        )
-
-        as = [[augs_and_actions[t][k][1 + i] for k = 1:system.ncontrols] for t = 1:T]
-        as = hcat(as...)
-
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
 
         series!(
-            ax,
-            ts,
-            ;
+            ax_j,
+            traj.times,
+            jth_order_controls_matrix(traj, system, j);
             labels = [
-                i == 0 ?
+                j == 0 ?
                 latexstring("a_$k (t)") :
                 latexstring(
                     "\\mathrm{d}^{",
-                    i == 1 ? "" : "$i",
+                    j == 1 ? "" : "$j",
                     "}_t a_$k"
                 )
                 for k = 1:system.ncontrols
             ]
         )
 
-        axislegend(ax; position=:lt)
+        axislegend(ax_j; position=:lt)
     end
-
-
 
     save(path, fig)
 end
+
+function plot_single_qubit(
+    system::SingleQubitSystem,
+    traj::Trajectory,
+    path::String;
+    fig_title=nothing
+)
+    fig = Figure(resolution=(1200, 1500))
+
+    ψs = wfn_components_matrix(traj, system)
+
+    ψax = Axis(fig[1:2, :]; title="qubit components", xlabel=L"t")
+    series!(ψax, traj.times, ψs;
+        labels=[
+            L"\psi_1^R",
+            L"\psi_2^R",
+            L"\psi_1^I",
+            L"\psi_2^I"]
+    )
+
+    axislegend(ψax; position=:lb)
+
+    for j = 0:system.control_order
+
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+
+        series!(
+            ax_j,
+            traj.times,
+            jth_order_controls_matrix(traj, system, j);
+            labels = [
+                j == 0 ?
+                latexstring("a_$k (t)") :
+                latexstring(
+                    "\\mathrm{d}^{",
+                    j == 1 ? "" : "$j",
+                    "}_t a_$k"
+                )
+                for k = 1:system.ncontrols
+            ]
+        )
+
+        axislegend(ax_j; position=:lt)
+    end
+
+    # if !isnothing(fig_title)
+    #     Label(fig[0,:], fig_title; textsize=30)
+    # end
+
+    save(path, fig)
+end
+
 
 
 end

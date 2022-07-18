@@ -18,6 +18,7 @@ using ..Evaluators
 using ..IpoptOptions
 
 using Ipopt
+using Libdl
 using MathOptInterface
 const MOI = MathOptInterface
 
@@ -31,7 +32,7 @@ struct QubitProblem
     evaluator::QubitEvaluator
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
-    trajectory::TrajectoryData
+    trajectory::Trajectory
     T::Int
     Δt::Float64
     total_vars::Int
@@ -45,6 +46,10 @@ function QubitProblem(mmsys::MultiModeQubitSystem; kwargs...)
     return QubitProblem(mmsys, T; Δt=Δt, kwargs...)
 end
 
+function QubitProblem(system::AbstractQubitSystem, init_traj::Trajectory; kwargs...)
+    return QubitProblem(system, init_traj.T; init_traj=init_traj, kwargs...)
+end
+
 function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
@@ -52,15 +57,20 @@ function QubitProblem(
     loss=amplitude_loss,
     Δt=0.01,
     Q=0.0,
-    Qf=500.0,
+    Qf=200.0,
     R=0.1,
-    σ=1.0,
     eval_hessian=false,
     pin_first_qstate=true,
     bound_a=true,
     a_bound=1.0,
+    init_traj=Trajectory(system, Δt, T),
     options=Options(),
 )
+
+    if getfield(options, :linear_solver) == "pardiso"
+        Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
+        Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
+    end
 
     optimizer = Ipopt.Optimizer()
 
@@ -106,30 +116,20 @@ function QubitProblem(
 
     # initial a(t = 1) constraints: ∫a, a, da = 0
     for i = 1:system.n_aug_states
+        idx = index(1, system.n_wfn_states + i, system.vardim)
         MOI.add_constraints(
             optimizer,
-            variables[
-                index(
-                    1,
-                    system.n_wfn_states + i,
-                    system.vardim
-                )
-            ],
+            variables[idx],
             MOI.EqualTo(0.0)
         )
     end
 
     # final a(t = T) constraints: ∫a, a, da = 0
     for i = 1:system.n_aug_states
+        idx = index(T, system.n_wfn_states + i, system.vardim)
         MOI.add_constraints(
             optimizer,
-            variables[
-                index(
-                    T,
-                    system.n_wfn_states + i,
-                    system.vardim
-                )
-            ],
+            variables[idx],
             MOI.EqualTo(0.0)
         )
     end
@@ -160,8 +160,6 @@ function QubitProblem(
         end
     end
 
-    traj = TrajectoryData(system, T, Δt; σ=σ)
-
     dynamics_constraints = [
         MOI.NLPBoundsPair(0.0, 0.0) for _ = 1:total_dynamics
     ]
@@ -176,7 +174,7 @@ function QubitProblem(
         evaluator,
         variables,
         optimizer,
-        traj,
+        init_traj,
         T,
         Δt,
         total_vars,
@@ -185,7 +183,7 @@ function QubitProblem(
     )
 end
 
-function initialize_trajectory!(prob::QubitProblem, traj::TrajectoryData)
+function initialize_trajectory!(prob::QubitProblem, traj::Trajectory)
     for (t, x, u) in zip(1:prob.T, traj.states, traj.actions)
         MOI.set(
             prob.optimizer,
@@ -196,7 +194,7 @@ function initialize_trajectory!(prob::QubitProblem, traj::TrajectoryData)
     end
 end
 
-initialize_trajectory!(prob::QubitProblem) = initialize_trajectory!(prob, prob.trajectory)
+initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
 
 @views function update_traj_data!(prob::QubitProblem)
     z = MOI.get(prob.optimizer, MOI.VariablePrimal(), prob.variables)
@@ -206,18 +204,13 @@ initialize_trajectory!(prob::QubitProblem) = initialize_trajectory!(prob, prob.t
             slice(
                 t,
                 prob.system.nstates + 1,
-                prob.system.nstates + prob.system.ncontrols,
+                prob.system.vardim,
                 prob.system.vardim
             )
         ] for t = 1:prob.T
     ]
     prob.trajectory.states .= xs
     prob.trajectory.actions .= us
-end
-
-function get_traj_data(prob::QubitProblem)
-    update_traj_data!(prob)
-    return prob.trajectory
 end
 
 function solve!(prob::QubitProblem; init_traj=prob.trajectory)
@@ -259,8 +252,7 @@ function MinTimeProblem(
         optimizer.options[String(name)] = getfield(min_time_options, name)
     end
 
-    vardim = system.nstates + 1
-    total_vars = vardim * T
+    total_vars = system.vardim * T
     total_dynamics = system.nstates * (T - 1)
 
     # set up sub problem
@@ -310,7 +302,7 @@ function MinTimeProblem(
     for i = 1:(system.control_order + 1)
         MOI.add_constraints(
             optimizer,
-            variables[index(T, n_wfn_states + i, vardim + 1)],
+            variables[index(T, system.n_wfn_states + i, system.vardim + 1)],
             MOI.EqualTo(0.0)
         )
     end
@@ -369,7 +361,7 @@ function MinTimeProblem(
     )
 end
 
-function initialize_trajectory!(prob::MinTimeProblem, traj::TrajectoryData)
+function initialize_trajectory!(prob::MinTimeProblem, traj::Trajectory)
     vardim = prob.subprob.system.nstates + 1
     Δt = prob.subprob.Δt
     for (t, x, u) in zip(1:prob.T, traj.states, traj.actions)
