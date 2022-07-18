@@ -4,10 +4,10 @@ This package directly implements quantum optimal control problems using Ipopt.jl
 
 ## TODO: 
 
-- [ ] min time problem
+- [x] min time problem
 - [ ] implement Hessian methods
-- [ ] document solver options
+- [x] document solver options (kinda completed, see `options.jl`)
 - [ ] higher order Pade integrators
 - [ ] exponential integrator
-- [ ] add constraints on a(t)
+- [x] add constraints on a(t)
 - [ ] write documentation 
