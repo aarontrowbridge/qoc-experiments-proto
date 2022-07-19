@@ -17,7 +17,7 @@ $$
 \min_{\substack{\mathbf{x}\_1,\dots,\mathbf{x}\_T \\\ \mathbf{u}\_1, \dots, \mathbf{u}\_{T-1}}} \quad
 & \sum_{i=1}^n Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
 \text{subject to} \quad 
-& \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = \mathbf{0}  \\
+& \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = \mathbf{0}  \\
 &  \tilde \psi^i_1 = \tilde \psi^i\_\text{init} \\
 & \tilde \psi^1_T = \tilde \psi^1\_\text{goal} \quad \text{if }\ \small \textsf{pin\\_first\\_qstate = true}\\
 & \smallint \mathbf{a}_1 = \mathbf{a}_1 = \mathrm{d}_t \mathbf{a}_1 = \mathbf{0} \\  
