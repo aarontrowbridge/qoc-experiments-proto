@@ -1,6 +1,6 @@
 # QubitControl.jl
 
-This package directly implements quantum optimal control problems using MathOptInterface.jl and Ipopt.jl as the nonlinear solver backend.
+This package direct collocation to solve quantum optimal control problems. It currently relies on MathOptInterface.jl, with Ipopt.jl as the nonlinear solver backend.
 
 ## Problem formulation
 
