@@ -18,7 +18,8 @@ $$
 & \sum_{i=1}^n Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
 \text{subject to} \quad 
 & \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = \mathbf{0}  \\
-&  \tilde \psi^i_1 = \tilde \psi^i\_\text{init}, \ \tilde \psi^1_T = \tilde \psi^1\_\text{goal} \\
+&  \tilde \psi^i_1 = \tilde \psi^i\_\text{init} \\
+& \tilde \psi^1_T = \tilde \psi^1\_\text{goal} \quad \text{if }\ \small \textsf{pin\_first\_qstate = true}\\
 & \smallint \mathbf{a}_1 = \mathbf{a}_1 = \mathrm{d}_t \mathbf{a}_1 = \mathbf{0} \\  
 & \smallint \mathbf{a}_T = \mathbf{a}_T = \mathrm{d}_t \mathbf{a}\_T = \mathbf{0} \\
 & |a^j_t| \leq a^j\_\text{bound} \\
