@@ -15,7 +15,7 @@ we solve the optimization problem
 $$
 \begin{align}
 \min_{\substack{\mathbf{x}\_1,\dots,\mathbf{x}\_T \\\ \mathbf{u}\_1, \dots, \mathbf{u}\_{T-1}}} \quad
-& Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_f^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
+& Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
 \text{subject to} \quad 
 & \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = 0  \\
 & \psi^i_1 = \ket{\psi^i}\_\text{init}, \ \psi^i_T = \ket{\psi^i}\_\text{goal} \\
