@@ -39,7 +39,7 @@ $$
 {d \tilde \psi^i \over dt} = \widetilde{(- i H)}(\mathbf{a}(t), t) \tilde \psi^i
 $$
 
-I will the use the notation $G(H, \mathbf{a}(t))(t) = \widetilde{(- i H)}(\mathbf{a}(t), t)$, to describe this operator, which acts on the isomorphic quantum state vectors 
+I will the use the notation $G(H)(\mathbf{a}(t), t) = \widetilde{(- i H)}(\mathbf{a}(t), t)$, to describe this operator, which acts on the isomorphic quantum state vectors 
 
 $$
 \tilde \psi = \begin{pmatrix} \psi^{\mathrm{Re}} \\\ \psi^{\mathrm{Im}} \end{pmatrix}
