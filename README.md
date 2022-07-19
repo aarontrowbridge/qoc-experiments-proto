@@ -7,7 +7,7 @@ This package implements direct collocation to solve quantum optimal control prob
 Given a Hamiltonian for a qubit (or qubit coupled to harmonic oscillator(s)) system of the form
 
 $$
-H(\mathbf{{a}}(t), t ) = H_{\text{drift}} + \sum_{i} a_i(t) H_{\text{drive}}^i
+H(\mathbf{{a}}(t), t ) = H_{\text{drift}} + \sum_{j} a^j(t) H_{\text{drive}}^j
 $$
 
 we solve the optimization problem
@@ -15,10 +15,10 @@ we solve the optimization problem
 $$
 \begin{align}
 \min_{\substack{\mathbf{x}\_1,\dots,\mathbf{x}\_T \\\ \mathbf{u}\_1, \dots, \mathbf{u}\_{T-1}}} \quad
-& Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
+& \sum_{i=1}^n Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
 \text{subject to} \quad 
 & \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = \mathbf{0}  \\
-& \psi^i_1 = \ket{\psi^i\_\text{init}}, \ \psi^i_T = \ket{\psi^i\_\text{goal}} \\
+&  \psi^i_1 = \ket{\psi^i\_\text{init}}, \ \psi^i_T = \ket{\psi^i\_\text{goal}} \\
 & \smallint \mathbf{a}_1 = \mathbf{a}_1 = \mathrm{d}_t \mathbf{a}_1 = \mathbf{0} \\  
 & \smallint \mathbf{a}_T = \mathbf{a}_T = \mathrm{d}_t \mathbf{a}\_T = \mathbf{0} \\
 & |a^j_t| \leq a^j\_\text{bound} \\
@@ -60,7 +60,7 @@ $$
 where
 
 $$
-G(\mathbf{a}(t),t) = G(H_{\text{drift}}) + \sum_i a_i(t) G(H_{\text{drive}}^i) 
+G(\mathbf{a}(t),t) = G(H_{\text{drift}}) + \sum_j a^j(t) G(H_{\text{drive}}^j) 
 $$
 
 Currently the code is set up to support any quantum state cost function $\ell$; the default choice is currently
