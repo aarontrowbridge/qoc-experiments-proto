@@ -18,7 +18,7 @@ $$
 & Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
 \text{subject to} \quad 
 & \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = 0  \\
-& \psi^i_1 = \ket{\psi^i}\_\text{init}, \ \psi^i_T = \ket{\psi^i}\_\text{goal} \\
+& \psi^i_1 = \ket{\psi^i\_\text{init}}, \ \psi^i_T = \ket{\psi^i\_\text{goal}} \\
 & \smallint \mathbf{a}_1 = \mathbf{a}_1 = \mathrm{d}_t \mathbf{a}_1 = 0 \\  
 & \smallint \mathbf{a}_T = \mathbf{a}_T = \mathrm{d}_t \mathbf{a}\_T = 0 \\
 & |a^j_t| \leq a^j\_\text{bound} \\
@@ -61,6 +61,12 @@ where
 
 $$
 G(\mathbf{a}(t),t) = G(H_{\text{drift}}) + \sum_i a_i(t) G(H_{\text{drive}}^i) 
+$$
+
+Currently the code is set up to support any quantum state cost function $\ell$; the default choice is currently
+
+$$
+\ell(\tilde\psi_t, \tilde\psi\_{goal}) = 1 - \braket{\psi_t | \psi\_{goal}}
 $$
 
 ## TODO: 
