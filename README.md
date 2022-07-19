@@ -33,7 +33,7 @@ $$
 
 So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
 
-Finally, $\mathbf{f}(\mathbf{x}_{t+1}, \mathbf{u}_{t+1}, \mathbf{x}_t, \mathbf{u}_t)$, describes the dynamics of the all the variables in the system, where controls' dynamics are trivial and at a high level $\tilde \psi^i_t$ satisfies a discretized version of the isomorphic Schroedinger equation:
+Finally, $\mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t)$, describes the dynamics of the all the variables in the system, where controls' dynamics are trivial and at a high level $\tilde \psi^i_t$ satisfies a discretized version of the isomorphic Schroedinger equation:
 
 $$
 {d \tilde \psi^i \over dt} = \widetilde{(- i H)}(\mathbf{a}(t), t) \tilde \psi^i
