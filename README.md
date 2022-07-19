@@ -31,7 +31,7 @@ $$
 \mathbf{x}_t = \begin{pmatrix} \tilde \psi^1_t \\\ \vdots \\\ \tilde \psi^n_t \\\ \smallint \mathbf{a}_t \\\ \mathbf{a}_t \\\ \mathrm{d}_t \mathbf{a}_t \end{pmatrix} \ \text{and} \ \ \ \mathbf{u}_t = \begin{pmatrix} \mathrm{d}^2_t \mathbf{a}_t  \end{pmatrix}
 $$
 
-So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
+So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim = nstates`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
 
 Finally, $\mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t)$ describes the dynamics of all the variables in the system, where the controls' dynamics are trivial and formally $\tilde \psi^i_t$ satisfies a discretized version of the isomorphic Schroedinger equation:
 
