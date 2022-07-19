@@ -4,7 +4,7 @@ This package implements direct collocation to solve quantum optimal control prob
 
 ## Problem formulation
 
-Given a Hamiltonian for a qubit (or qubit coupled to harmonic oscillator(s)) system, of the form
+Given a Hamiltonian for a qubit (or qubit coupled to harmonic oscillator(s)) system of the form
 
 $$
 H(\mathbf{{a}}(t), t ) = H_{\text{drift}} + \sum_{i} a_i(t) H_{\text{drive}}^i
