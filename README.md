@@ -28,7 +28,7 @@ $$
 here the *state* vector $\mathbf{x}_t$ contains both the $n$ (`nqstates`) quantum isomorphism states $\tilde \psi^i_t$ (each of dimension `isodim`) and the augmented control states $\smallint \mathbf{a}_t$, $\mathbf{a}_t$, and $\mathrm{d}_t \mathbf{a}_t$ (the number of augmented state vector is `augdim`). The *action* vector $\mathbf{u}_t$ contains the second derivative of the *control* vector $\mathbf{a}_t$, which has dimension `ncontrols`. Thus, we have:
 
 $$
-\mathbf{x}_t = \begin{pmatrix} \tilde \psi^1_t \\ \vdots \\ \tilde \psi^n_t \\ \smallint \mathbf{a}_t \\ \mathbf{a}_t \\ \mathrm{d}_t \mathbf{a}_t \end{pmatrix} \ \text{and} \ \ \ \mathbf{u}_t = \begin{pmatrix} \mathrm{d}^2_t \mathbf{a}_t  \end{pmatrix}
+\mathbf{x}_t = \begin{pmatrix} \tilde \psi^1_t \\\ \vdots \\\ \tilde \psi^n_t \\\ \smallint \mathbf{a}_t \\\ \mathbf{a}_t \\\ \mathrm{d}_t \mathbf{a}_t \end{pmatrix} \ \text{and} \ \ \ \mathbf{u}_t = \begin{pmatrix} \mathrm{d}^2_t \mathbf{a}_t  \end{pmatrix}
 $$
 
 So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
