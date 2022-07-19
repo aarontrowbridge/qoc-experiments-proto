@@ -2,6 +2,17 @@
 
 This package implements direct collocation to solve quantum optimal control problems. It currently relies on MathOptInterface.jl, with Ipopt.jl as the nonlinear solver backend.
 
+## Installation
+
+To install and use this repo on your own machine:
+
+1. clone the repo into a directory of your choosing
+2. open a julia REPL from the repo directory and enter the package manager via `julia> ]`
+3. run `(@v1.7) pkg> activate .` 
+4. then run `(@v1.7) pkg> instantiate`
+5. now the package is available in the REPL or from a script via `using QubitControl`
+
+
 ## Problem formulation
 
 Given a Hamiltonian for a qubit (or qubit coupled to harmonic oscillator(s)) system of the form
