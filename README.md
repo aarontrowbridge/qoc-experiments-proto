@@ -74,7 +74,7 @@ $$
 - [ ] write documentation 
 - [ ] constraint types
 - [ ] multimode system with specified control limits
-- [ ] implicit \ddot a(t)
+- [ ] implicit $\ddot a(t)$
 - [ ] add ability to change linear solver
   - [ ] mac
   - [ ] ubuntu
