@@ -33,13 +33,13 @@ $$
 
 So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
 
-Finally, $\mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t)$, describes the dynamics of all the variables in the system, where the controls' dynamics are trivial and formally $\tilde \psi^i_t$ satisfies a discretized version of the isomorphic Schroedinger equation:
+Finally, $\mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{u}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t)$ describes the dynamics of all the variables in the system, where the controls' dynamics are trivial and formally $\tilde \psi^i_t$ satisfies a discretized version of the isomorphic Schroedinger equation:
 
 $$
 {d \tilde \psi^i \over dt} = \widetilde{(- i H)}(\mathbf{a}(t), t) \tilde \psi^i
 $$
 
-I will the use the notation $G(H, \mathbf{a}(t))(t) = \widetilde{(- i H)}(\mathbf{a}(t), t)$, to describe this operator, which acts on the isomorphism wavefunctions 
+I will the use the notation $G(H, \mathbf{a}(t))(t) = \widetilde{(- i H)}(\mathbf{a}(t), t)$, to describe this operator, which acts on the isomorphic quantum state vectors 
 
 $$
 \tilde \psi = \begin{pmatrix} \psi^{\mathrm{Re}} \\ \psi^{\mathrm{Im}} \end{pmatrix}
