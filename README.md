@@ -51,7 +51,7 @@ $$
 G(H) =  - \begin{pmatrix} 0 & -1 \\\ 1 & 0 \end{pmatrix} \otimes H^{\mathrm{Re}} + \begin{pmatrix} 1 & 0 \\\ 0 &1 \end{pmatrix} \otimes H^{\mathrm{Im}}
 $$
 
-where $\otimes$ is the Kronecker product.  We then have the linear isomorphic dynamics equation:
+where $\otimes$ is the Kronecker product.  We then have the linear isomorphism dynamics equation:
 
 $$
 {d \tilde \psi \over dt} = G(\mathbf{a}(t),t) \tilde \psi
