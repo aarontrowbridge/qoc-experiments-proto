@@ -48,7 +48,7 @@ $$
 It can be shown then that
 
 $$
-G(H) = \begin{pmatrix} 1 & 0 \\ 0 &1 \end{pmatrix} \otimes H^{\mathrm{Im}} - \begin{pmatrix} 0 & -1 \\ 1 & 0 \end{pmatrix} \otimes H^{\mathrm{Re}}
+G(H) = \begin{pmatrix} 1 & 0 \\\ 0 &1 \end{pmatrix} \otimes H^{\mathrm{Im}} - \begin{pmatrix} 0 & -1 \\\ 1 & 0 \end{pmatrix} \otimes H^{\mathrm{Re}}
 $$
 
 we then have the linear isomorphic dynamics equation:
