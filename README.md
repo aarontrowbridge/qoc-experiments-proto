@@ -66,7 +66,7 @@ $$
 Currently the code is set up to support any quantum state cost function $\ell$; the default choice is currently
 
 $$
-\ell(\tilde\psi, \tilde\psi\_{goal}) = 1 - \braket{\psi_t | \psi\_{\text{goal}}}
+\ell(\tilde\psi, \tilde\psi\_{goal}) = 1 - |\braket{\psi_t | \psi\_{\text{goal}}}|^2
 $$
 
 ## TODO: 
