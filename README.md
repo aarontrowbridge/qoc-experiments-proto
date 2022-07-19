@@ -42,7 +42,7 @@ $$
 I will the use the notation $G(H, \mathbf{a}(t))(t) = \widetilde{(- i H)}(\mathbf{a}(t), t)$, to describe this operator, which acts on the isomorphic quantum state vectors 
 
 $$
-\tilde \psi = \begin{pmatrix} \psi^{\mathrm{Re}} \\ \psi^{\mathrm{Im}} \end{pmatrix}
+\tilde \psi = \begin{pmatrix} \psi^{\mathrm{Re}} \\\ \psi^{\mathrm{Im}} \end{pmatrix}
 $$ 
 
 It can be shown then that
