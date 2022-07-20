@@ -88,7 +88,8 @@ $$
 The implicit dynamics constraint function $\mathbf{f}$ can be decomposed as follows:
 $$
 \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}_t) 
-= \begin{pmatrix} \mathbf{P}^m (\tilde \psi^1\_{t+1}, \tilde \psi^1\_t, \mathbf{a}\_t) \\\ 
+= \begin{pmatrix} 
+  \mathbf{P}^m (\tilde \psi^1\_{t+1}, \tilde \psi^1\_t, \mathbf{a}\_t) \\\ 
   \vdots \\\
   \mathbf{P}^m (\tilde \psi^n\_{t+1}, \tilde \psi^n\_t, \mathbf{a}\_t) \\\
   \smallint \mathbf{a}\_{t+1} - \left(\smallint \mathbf{a}\_t + \Delta t\_t \mathbf{a}\_t   \right) \\\
