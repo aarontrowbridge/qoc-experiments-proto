@@ -92,7 +92,11 @@ $$
 = \begin{pmatrix} 
   \mathbf{P}^m (\tilde \psi^1\_{t+1}, \tilde \psi^1\_t, \mathbf{a}\_t) \\\ 
   \vdots \\\
-  \mathbf{P}^m (\tilde \psi^n\_{t+1}, \tilde \psi^n\_t, \mathbf{a}\_t)\end{pmatrix}
+  \mathbf{P}^m (\tilde \psi^n\_{t+1}, \tilde \psi^n\_t, \mathbf{a}\_t) \\\
+  \smallint \mathbf{a}\_{t+1} - \left(\smallint \mathbf{a}\_t + \Delta t\_t \mathbf{a}\_t   \right) \\\
+  \mathbf{a}\_{t+1} - \left(\mathbf{a}\_t + \Delta t\_t \mathrm{d}\_t \mathbf{a}\_t   \right) \\\
+  \mathrm{d}\_t \mathbf{a}\_{t+1} - \left(\mathrm{d}\_t \mathbf{a}\_t + \Delta t\_t \mathbf{u}\_t \right)
+  \end{pmatrix}
 $$
 
 ## TODO: 
