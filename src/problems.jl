@@ -16,6 +16,7 @@ using ..Trajectories
 using ..NLMOI
 using ..Evaluators
 using ..IpoptOptions
+using ..Constraints
 
 using Ipopt
 using Libdl
@@ -61,7 +62,6 @@ function QubitProblem(
     R=0.1,
     eval_hessian=false,
     pin_first_qstate=true,
-    bound_a=true,
     a_bound=1.0,
     init_traj=Trajectory(system, Δt, T),
     options=Options(),
@@ -94,75 +94,59 @@ function QubitProblem(
         Q, Qf, R
     )
 
+    cons = AbstractConstraint[]
+
     # initial quantum state constraints: ψ̃(t=1) = ψ̃1
-    for i = 1:system.n_wfn_states
-        MOI.add_constraints(
-            optimizer,
-            variables[i],
-            MOI.EqualTo(system.ψ̃1[i])
-        )
-    end
+    ψ1_con = EqualityConstraint(
+        1,
+        1:system.n_wfn_states,
+        system.ψ̃1,
+        system.vardim
+    )
+    push!(cons, ψ1_con)
 
     # pin first qstate to be equal to analytic solution
     if pin_first_qstate
-        for i = 1:system.isodim
-            MOI.add_constraints(
-                optimizer,
-                variables[index(T, i, system.vardim)],
-                MOI.EqualTo(system.ψ̃f[i])
-            )
-        end
+        pin_con = EqualityConstraint(
+            T,
+            1:system.isodim,
+            system.ψ̃f[1:system.isodim],
+            system.vardim
+        )
+        push!(cons, pin_con)
     end
 
     # initial a(t = 1) constraints: ∫a, a, da = 0
-    for i = 1:system.n_aug_states
-        idx = index(1, system.n_wfn_states + i, system.vardim)
-        MOI.add_constraints(
-            optimizer,
-            variables[idx],
-            MOI.EqualTo(0.0)
-        )
-    end
+    aug1_con = EqualityConstraint(
+        1,
+        system.n_wfn_states .+ (1:system.n_aug_states),
+        0.0,
+        system.vardim
+    )
+    push!(cons, aug1_con)
 
     # final a(t = T) constraints: ∫a, a, da = 0
-    for i = 1:system.n_aug_states
-        idx = index(T, system.n_wfn_states + i, system.vardim)
-        MOI.add_constraints(
-            optimizer,
-            variables[idx],
-            MOI.EqualTo(0.0)
-        )
-    end
+    augT_con = EqualityConstraint(
+        T,
+        system.n_wfn_states .+ (1:system.n_aug_states),
+        0.0,
+        system.vardim
+    )
+    push!(cons, augT_con)
 
 
     # bound |a(t)| < a_bound
-    if bound_a
-        for t = 2:T-1
-            for k = 1:system.ncontrols
-                idx = index(
-                    t,
-                    system.n_wfn_states + system.ncontrols + k,
-                    system.vardim
-                )
+    a_bound_con = BoundsConstraint(
+        2:T-1,
+        (system.n_wfn_states + system.ncontrols) .+ 1:system.ncontrols,
+        a_bound,
+        system.vardim
+    )
+    push!(cons, a_bound_con)
 
-                MOI.add_constraints(
-                    optimizer,
-                    variables[idx],
-                    MOI.LessThan(a_bound)
-                )
+    constrain!(optimizer, variables, cons)
 
-                MOI.add_constraints(
-                    optimizer,
-                    variables[idx],
-                    MOI.GreaterThan(-a_bound)
-                )
-            end
-        end
-    end
-
-    dynamics_constraints = [
-        MOI.NLPBoundsPair(0.0, 0.0) for _ = 1:total_dynamics
-    ]
+    dynamics_constraints = fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
 
     block_data = MOI.NLPBlockData(dynamics_constraints, evaluator, true)
 

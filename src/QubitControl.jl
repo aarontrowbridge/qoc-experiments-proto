@@ -38,6 +38,9 @@ include("nlmoi.jl")
 include("trajectories.jl")
 @reexport using .Trajectories
 
+include("constraints.jl")
+@reexport using .Constraints
+
 include("problems.jl")
 @reexport using .Problems
 

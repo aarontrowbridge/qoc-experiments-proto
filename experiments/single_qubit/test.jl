@@ -8,8 +8,9 @@ H_drift = σz / 2
 H_drive = [σx / 2, σy / 2]
 
 gate = Symbol(ARGS[1])
+iter = parse(Int, ARGS[2])
 
-plot_path = "plots/single_qubit/test/$(gate)_gate_2_controls_test.png"
+plot_path = "plots/single_qubit/test/$(gate)_gate_2_controls_test_iter_$(iter).png"
 
 ψ0 = [1, 0]
 ψ1 = [0, 1]
@@ -35,7 +36,6 @@ Qf   = 200.0
 R    = 0.1
 loss = amplitude_loss
 hess = false
-iter = parse(Int, ARGS[2])
 
 options = Options(
     max_iter = iter,
