@@ -45,6 +45,16 @@ $$
 
 So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim = nstates`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
 
+### loss functions
+
+Currently the code is set up to support any quantum state cost function $\ell$; the default choice is currently
+
+$$
+\ell(\tilde\psi, \tilde\psi\_{goal}) = 1 - |\braket{\psi | \psi\_{\text{goal}}}|^2
+$$
+
+### dynamics
+
 Finally, $\mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t)$ describes the dynamics of all the variables in the system, where the controls' dynamics are trivial and formally $\tilde \psi^i_t$ satisfies a discretized version of the isomorphic Schroedinger equation:
 
 $$
@@ -75,10 +85,9 @@ $$
 G(\mathbf{a}(t),t) = G(H_{\text{drift}}) + \sum_j a^j(t) G(H_{\text{drive}}^j) 
 $$
 
-Currently the code is set up to support any quantum state cost function $\ell$; the default choice is currently
-
 $$
-\ell(\tilde\psi, \tilde\psi\_{goal}) = 1 - |\braket{\psi | \psi\_{\text{goal}}}|^2
+\mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}_t) 
+= \begin{pmatrix} mathbf{P}^m (\tilde \psi^i_{t+1}) \end{pmatrix}
 $$
 
 ## TODO: 
