@@ -85,6 +85,7 @@ $$
 G(\mathbf{a}(t),t) = G(H_{\text{drift}}) + \sum_j a^j(t) G(H_{\text{drive}}^j) 
 $$
 
+The implicit dynamics constraint function $\mathbf{f}$ can be decomposed as follows:
 $$
 \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}_t) 
 = \begin{pmatrix} \mathbf{P}^m (\tilde \psi^1\_{t+1}, \tilde \psi^1\_t, \mathbf{a}\_t) \\\ 
