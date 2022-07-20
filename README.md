@@ -47,7 +47,7 @@ So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim = nstates`, a
 
 ### loss functions
 
-Currently the code is set up to support any quantum state cost function $\ell$; the default choice is currently
+Currently the code is set up to support any quantum state cost function $\ell$; the default choice is
 
 $$
 \ell(\tilde\psi, \tilde\psi\_{goal}) = 1 - |\braket{\psi | \psi\_{\text{goal}}}|^2
@@ -87,7 +87,7 @@ $$
 
 $$
 \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}_t) 
-= \begin{pmatrix} mathbf{P}^m (\tilde \psi^i_{t+1}) \end{pmatrix}
+= \begin{pmatrix} \mathbf{P}^m (\tilde \psi^i\_{t+1}) \end{pmatrix}
 $$
 
 ## TODO: 
