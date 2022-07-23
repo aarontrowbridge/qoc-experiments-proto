@@ -39,7 +39,7 @@ struct QuantumStateLoss
     end
 end
 
-function (qloss::QuantumStateLoss)(ψ̃::Vector{Real})
+function (qloss::QuantumStateLoss)(ψ̃::AbstractVector)
     loss = 0.0
     for (i, lⁱ) in enumerate(qloss.ls)
         loss += lⁱ(ψ̃[slice(i, qloss.isodim)])
@@ -61,7 +61,7 @@ struct QuantumStateLossGradient
     end
 end
 
-function (∇l::QuantumStateLossGradient)(ψ̃::Vector{Real})
+function (∇l::QuantumStateLossGradient)(ψ̃::AbstractVector)
     ∇ = similar(ψ̃)
     for (i, ∇lⁱ) in enumerate(∇l.∇ls)
         ψ̃ⁱ_slice = slice(i, ∇l.isodim)
@@ -86,14 +86,14 @@ struct QuantumStateLossHessian
 
         ∇²l_structures = []
 
-        for (i, ∇²l_symb) in enumerate(∇²l_symbs)
-            Is, Js = findnz(∇²l_symb)
+        for ∇²l_symb in ∇²l_symbs
+            K, J = findnz(∇²l_symb)
 
-            idxs = collect(zip(Is, Js))
+            KJ = collect(zip(K, J))
 
-            filter!((j, k) -> j ≤ k, idxs)
+            filter!(((k, j),) -> k ≤ j, KJ)
 
-            push!(∇²l_structures, idxs)
+            push!(∇²l_structures, KJ)
         end
 
         ∇²l_exprs = [Symbolics.build_function(∇²l_symb, ψ̃) for ∇²l_symb in ∇²l_symbs]
@@ -104,24 +104,24 @@ struct QuantumStateLossHessian
     end
 end
 
-function structure(H::QuantumStateLossHessian, T::Int)
+function structure(H::QuantumStateLossHessian, T::Int, vardim::Int)
     H_structure = []
-    for (i, idxs) in enumerate(∇²l_structures)
-        for idx in idxs
-            offset = index(T, i, H.vardim)
-            append!(H_structure, idx .+ offset)
+    for (i, KJ) in enumerate(H.∇²l_structures)
+        for kj in KJ
+            offset = index(T, i, vardim)
+            push!(H_structure, kj .+ offset)
         end
     end
     return H_structure
 end
 
-function (∇²l::QuantumStateLossHessian)(ψ̃::Vector{Real})
+function (H::QuantumStateLossHessian)(ψ̃::AbstractVector)
     Hs = []
-    for (i, ∇²lⁱ) in enumerate(∇²l.∇²ls)
-        for (j, k) in ∇²l.∇²l_structures[i]
-            ψ̃ⁱ = ψ̃[slice(i, ∇²l.isodim)]
-            Hⁱⱼₖ = ∇²lⁱ(ψ̃ⁱ)[j, k]
-            append!(Hs, Hⁱⱼₖ)
+    for (i, ∇²lⁱ) in enumerate(H.∇²ls)
+        for (k, j) in H.∇²l_structures[i]
+            ψ̃ⁱ = ψ̃[slice(i, H.isodim)]
+            Hⁱᵏʲ = ∇²lⁱ(ψ̃ⁱ)[k, j]
+            append!(Hs, Hⁱᵏʲ)
         end
     end
     return Hs

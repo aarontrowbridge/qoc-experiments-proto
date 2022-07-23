@@ -54,13 +54,12 @@ end
 function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
-    integrator=FourthOrderPade,
-    loss=amplitude_loss,
+    integrator=:FourthOrderPade,
+    loss_fn=amplitude_loss,
     Δt=0.01,
-    Q=0.0,
-    Qf=200.0,
+    Q=200.0,
     R=0.1,
-    eval_hessian=false,
+    eval_hessian=true,
     pin_first_qstate=true,
     a_bound=1.0,
     init_traj=Trajectory(system, Δt, T),
@@ -85,13 +84,19 @@ function QubitProblem(
 
     variables = MOI.add_variables(optimizer, total_vars)
 
+    qloss = QuantumStateLoss(system; loss=loss_fn)
+
+    # TODO: this is super hacky, I know; it should be fixed
+    # subtype(::Type{Type{T}}) where T <: AbstractQuantumIntegrator = T
+    # integrator = subtype(integrator)
+
     evaluator = QubitEvaluator(
         system,
         integrator,
-        loss,
+        qloss,
         eval_hessian,
         T, Δt,
-        Q, Qf, R
+        Q, R
     )
 
     cons = AbstractConstraint[]

@@ -19,7 +19,7 @@ using LinearAlgebra
 
 # G(a) helper function
 
-function G(a::Vector, G_drift::Matrix, G_drives::Vector{Matrix})
+function G(a::AbstractVector, G_drift::AbstractMatrix, G_drives::Vector{<:AbstractMatrix})
     return G_drift + sum([aʲ * Gʲ_drive for (aʲ, Gʲ_drive) in zip(a, G_drives)])
 end
 
@@ -42,11 +42,11 @@ struct Exponential <: AbstractQuantumIntegrator
 end
 
 function (integrator::Exponential)(
-    ψ̃ₜ₊₁::Vector{R},
-    ψ̃ₜ::Vector{R},
-    aₜ::Vector{R},
-    Δt::R,
-) where R <: Real
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+)
     Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
     return ψ̃ₜ₊₁ - exp(Gₜ * Δt) * ψ̃ₜ
 end
@@ -62,7 +62,12 @@ struct SecondOrderPade <: AbstractQuantumIntegrator
         new(sys.G_drift, sys.G_drives)
 end
 
-function (integrator::SecondOrderPade)(ψ̃ₜ₊₁::Vector, ψ̃ₜ::Vector, aₜ::Vector, Δt::Real)
+function (integrator::SecondOrderPade)(
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
     Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
     # Id = I(size(Gₜ, 1))
     # return (Id - Δt / 2 * Gₜ) * ψ̃ₜ₊₁ -
@@ -81,7 +86,12 @@ struct FourthOrderPade <: AbstractQuantumIntegrator
         new(sys.G_drift, sys.G_drives)
 end
 
-function (integrator::FourthOrderPade)(ψ̃ₜ₊₁::Vector, ψ̃ₜ::Vector, aₜ::Vector, Δt::Real)
+function (integrator::FourthOrderPade)(
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
     Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
     Id = I(size(Gₜ, 1))
     # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
@@ -97,7 +107,7 @@ end
 function Jacobian(integrator::AbstractQuantumIntegrator)
     if isa(integrator, SecondOrderPade)
         return SecondOrderPadeJacobian(integrator)
-    elseif isa(integrator, FourthOrderPadeJacobian)
+    elseif isa(integrator, FourthOrderPade)
         return FourthOrderPadeJacobian(integrator)
     end
 end
@@ -117,7 +127,7 @@ end
 
 # Jacobian of 2nd order Pade integrator with respect to ψ̃ⁱₜ
 
-function (J::SecondOrderPadeJacobian)(aₜ::Vector, Δt::Real, ψ̃ⁱₜ₊₁::Bool)
+function (J::SecondOrderPadeJacobian)(aₜ::AbstractVector, Δt::Real, ψ̃ⁱₜ₊₁::Bool)
     Gₜ = G(aₜ, J.G_drift, J.G_drives)
     Id = I(size(Gₜ, 1))
     if ψ̃ⁱₜ₊₁
@@ -131,9 +141,9 @@ end
 # Jacobian of 2nd order Pade integrator with respect to control aʲₜ
 
 function (J::SecondOrderPadeJacobian)(
-    ψ̃ⁱₜ₊₁::Vector,
-    ψ̃ⁱₜ::Vector,
-    aₜ::Vector, # not used here, but kept to match function signature to 4th order P
+    ψ̃ⁱₜ₊₁::AbstractVector,
+    ψ̃ⁱₜ::AbstractVector,
+    aₜ::AbstractVector, # not used here, but kept to match function signature to 4th order P
     Δt::Real,
     j::Int
 )
@@ -148,25 +158,35 @@ struct FourthOrderPadeJacobian
     G_drift::Matrix
     G_drives::Vector{Matrix}
     G_drift_anticoms::Vector{Matrix}
-    G_drive_anticoms::Symmetric{AbstractMatrix, Matrix{Matrix}}
+    G_drive_anticoms::Symmetric
 
     function FourthOrderPadeJacobian(integrator::AbstractQuantumIntegrator)
-        drive_anticoms = fill(zeros(size(integrator.G_drift)), integrator.ncontrols, integrator.ncontrols)
-        for j = 1:integrator.ncontrols
-            for k = j:integrator.ncontrols
-                if j == k
-                    drive_anticoms[j, j] = 2 * integrator.G_drives[j]^2
+
+        ncontrols = length(integrator.G_drives)
+
+        drive_anticoms = fill(
+            zeros(size(integrator.G_drift)),
+            ncontrols,
+            ncontrols
+        )
+
+        for j = 1:ncontrols
+            for k = 1:j
+                if k == j
+                    drive_anticoms[k, k] = 2 * integrator.G_drives[k]^2
                 else
-                    drive_anticoms[j, k] = anticom(
-                        integrator.G_drives[j],
-                        integrator.G_drives[k]
+                    drive_anticoms[k, j] = anticom(
+                        integrator.G_drives[k],
+                        integrator.G_drives[j]
                     )
                 end
             end
         end
+
         drift_anticoms = [
             anticom(G_drive, integrator.G_drift) for G_drive in integrator.G_drives
         ]
+
         return new(
             integrator.G_drift,
             integrator.G_drives,
@@ -181,7 +201,7 @@ anticom(A::Matrix, B::Matrix) = A * B + B * A
 
 # Jacobian of 4th order Pade integrator with respect to ψ̃ⁱₜ
 
-function (J::FourthOrderPadeJacobian)(aₜ::Vector, Δt::Real, ψ̃ⁱₜ₊₁::Bool)
+function (J::FourthOrderPadeJacobian)(aₜ::AbstractVector, Δt::Real, ψ̃ⁱₜ₊₁::Bool)
     Gₜ = G(aₜ, J.G_drift, J.G_drives)
     Id = I(size(Gₜ, 1))
     if ψ̃ⁱₜ₊₁
@@ -195,13 +215,13 @@ end
 # Jacobian of 2nd order Pade integrator with respect to control aʲₜ
 
 function (J::FourthOrderPadeJacobian)(
-    ψ̃ⁱₜ₊₁::Vector,
-    ψ̃ⁱₜ::Vector,
-    aₜ::Vector,
+    ψ̃ⁱₜ₊₁::AbstractVector,
+    ψ̃ⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
     Δt::Real,
     j::Int
 )
-    Gʲ_anticom_Gₜ = G(aₜ, J.G_drift_anticoms[j], J.G_drive_anticoms[j, :])
+    Gʲ_anticom_Gₜ = G(aₜ, J.G_drift_anticoms[j], J.G_drive_anticoms[:, j])
     Gʲ = J.G_drives[j]
     return -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) + Δt^2 / 9 * Gʲ_anticom_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
 end
@@ -233,9 +253,9 @@ end
 # Hessian of the 4th order Pade integrator with respect to aʲₜ and aᵏₜ
 
 function (H::FourthOrderPadeHessian)(
-    ψ̃ₜ₊₁::Vector,
-    ψ̃ₜ::Vector,
-    μₜ::Vector,
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    μₜ::AbstractVector,
     Δt::Real,
     k::Int,
     j::Int
