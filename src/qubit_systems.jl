@@ -47,7 +47,6 @@ function SingleQubitSystem(
     control_order=2
 ) where {C <: Number, T <: Number}
 
-
     if isa(ψ1, Vector{C})
         nqstates = 1
         isodim = 2 * length(ψ1)
@@ -79,7 +78,7 @@ function SingleQubitSystem(
         G_drive = G.(H_drive)
     end
 
-    augdim = ncontrols * (control_order + 1)
+    augdim = control_order + 1
 
     n_wfn_states = nqstates * isodim
     n_aug_states = ncontrols * augdim
@@ -221,15 +220,52 @@ struct TransmonSystem <: AbstractQubitSystem
     ψ̃f::Vector{Float64}
 end
 
-function TransmonSystem(
-    H_drift::Matrix, 
-    H_drive::Union{Matrix{T, Vector{Matrix{T}}}};
+function TransmonSystem(;
+    levels::Int, 
+    rotating_frame::Bool,
+    ω::Float64,
+    α::Float64,
+    #H_drive::Union{Matrix{T}, Vector{Matrix{T}}}
     ψ1::Union{Vector{C}, Vector{Vector{C}}},
-    ψ_f::Union{Vector{C}, Vector{Vector{C}}},
+    ψf::Union{Vector{C}, Vector{Vector{C}}},
     control_order = 2
 ) where {C <: Number, T<:Number}
+    # if it is just one state
+    if isa(ψ1, Vector{C})
+        nqstates = 1
+        isodim = 2 * length(ψ1)
+        ψ̃f = ket_to_iso(ψf)
+        ψ̃1 = ket_to_iso(ψ1)
+    # otherwise it is multiple states and we are defining an (partial) isometry
+    else 
+        nqstates = length(ψ1)
+        isodim = 2 * length(ψ1[1])
+        @assert isa(ψf, Vector{Vector{C}})
+        # takes care of real-to-complex isomorphism and stacks the states
+        ψ̃f = vcat(ket_to_iso.(ψf)...)
+        ψ̃1 = vcat(ket_to_iso.(ψ1)...)
+    end
 
-    if isa()
+    if rotating_frame
+        H_drift = α/2 * quad(levels)
+    else 
+        H_drift = ω * number(levels) + α/2 * quad(levels)
+    end
+
+    G_drift = G(H_drift)
+
+    ncontrols = 2 
+
+    H_drive = [create(levels) + annihilate(levels), 
+              1im * (create(levels) - annihilate(levels))]
+    G_drive = G.(H_drive)
+
+
+    # just need da and a, no ∫a
+    augdim = control_order
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
 
 
 end

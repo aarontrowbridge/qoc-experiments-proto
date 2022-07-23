@@ -38,19 +38,19 @@ function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
     return ComplexF64.(normalize(U * ψ))
 end
 
-function annihilate(levels)
+function annihilate(levels::Int)
        diagm(1 => map(sqrt, 1:levels - 1))
 end
 
-function create(levels)
+function create(levels::Int)
        (annihilate(levels))'
 end
 
-function number(levels)
+function number(levels::Int)
        create(levels)*annihilate(levels)
 end
 
-function quad(levels)
+function quad(levels::Int)
        number(levels)*(number(levels) - I(levels))
 end
 
