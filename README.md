@@ -25,8 +25,8 @@ we solve the optimization problem
 
 $$
 \begin{align}
-\underset{\mathbf{x}\_{1:T}, \mathbf{u}\_{1:T-1}}{\text{minimize}} \quad
-& \sum_{i=1}^n Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T} R_t \cdot \mathbf{u}\_t^2\\ 
+\underset{\mathbf{x}\_{1:T}, \ \mathbf{u}\_{1:T-1}}{\text{minimize}} \quad
+& \sum_{i=1}^n Q_T \cdot \ell(\tilde \psi_T^i, \tilde \psi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \mathbf{u}\_t^2\\ 
 \text{subject to} \quad 
 & \mathbf{f}(\mathbf{x}\_{t+1}, \mathbf{x}\_t, \mathbf{u}\_t) = \mathbf{0}  \\
 &  \tilde \psi^i_1 = \tilde \psi^i\_\text{init} \\
