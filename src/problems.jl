@@ -54,7 +54,7 @@ end
 function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
-    integrator=pade_schroedinger,
+    integrator=FourthOrderPade,
     loss=amplitude_loss,
     Δt=0.01,
     Q=0.0,
@@ -110,7 +110,7 @@ function QubitProblem(
         pin_con = EqualityConstraint(
             T,
             1:system.isodim,
-            system.ψ̃f[1:system.isodim],
+            system.ψ̃goal[1:system.isodim],
             system.vardim
         )
         push!(cons, pin_con)
@@ -221,7 +221,7 @@ function MinTimeProblem(
     T::Int;
     Rᵤ=0.001,
     Rₛ=0.001,
-    integrator=pade_schroedinger,
+    integrator=FourthOrderPade,
     eval_hessian=false,
     bound_a=true,
     a_bound=1.0,

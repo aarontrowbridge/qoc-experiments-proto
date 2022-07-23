@@ -5,6 +5,7 @@ export QubitEvaluator
 export MinTimeEvaluator
 
 using ..QubitSystems
+using ..Integrators
 using ..Dynamics
 using ..Objectives
 
@@ -23,7 +24,7 @@ end
 
 function QubitEvaluator(
     system::AbstractQubitSystem,
-    integrator::Function,
+    integrator::AbstractQuantumIntegrator,
     loss::Function,
     eval_hessian::Bool,
     T::Int,

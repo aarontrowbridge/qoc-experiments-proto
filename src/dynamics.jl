@@ -6,10 +6,10 @@ export MinTimeSystemDynamics
 using ..Utils
 using ..QuantumLogic
 using ..QubitSystems
+using ..Integrators
 
 using LinearAlgebra
 using SparseArrays
-using Symbolics
 
 #
 # dynamics functions
@@ -17,142 +17,329 @@ using Symbolics
 
 @views function dynamics(
     sys::AbstractQubitSystem,
-    integrator::Function,
-    xₜ₊₁,
-    xₜ,
-    uₜ,
-    Δt
+    integrator::AbstractQuantumIntegrator,
+    xₜ₊₁::Vector,
+    xₜ::Vector,
+    uₜ::Vector,
+    Δt::Real
 )
-    augₜs = xₜ[(end - sys.n_aug_states + 1):end]
-    augₜ₊₁s = xₜ₊₁[(end - sys.n_aug_states + 1):end]
 
-    âugₜ₊₁s = zeros(typeof(xₜ[1]), sys.n_aug_states)
+    augsₜ = xₜ[(sys.n_wfn_states + 1):end]
+    augsₜ₊₁ = xₜ₊₁[(sys.n_wfn_states + 1):end]
 
-    for i = 1:sys.augdim
-        for k = 1:sys.ncontrols
-            idxᵢₖ = index(i, k, sys.ncontrols)
-            if i != sys.augdim
-                idxᵢ₊₁ₖ = index(i + 1, k, sys.ncontrols)
-                âugₜ₊₁s[idxᵢₖ] = augₜs[idxᵢₖ] + Δt * augₜs[idxᵢ₊₁ₖ]
-            else
-                âugₜ₊₁s[idxᵢₖ] = augₜs[idxᵢₖ] + Δt * uₜ[k]
-            end
-        end
-    end
+    controlsₜ = [augsₜ[(sys.ncontrols + 1):end]; uₜ]
 
-    δaₜ₊₁s = augₜ₊₁s - âugₜ₊₁s
+    δaugs = augsₜ₊₁ - (augsₜ + controlsₜ * Δt)
 
-    δψ̃ₜ₊₁s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
+    δψ̃s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
 
-    aₜs = xₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+    aₜ = augsₜ[slice(2, sys.ncontrols)]
 
     for i = 1:sys.nqstates
-        ψ̃ᵢslice = slice(i, sys.isodim)
-        δψ̃ₜ₊₁s[ψ̃ᵢslice] = integrator(xₜ₊₁[ψ̃ᵢslice], xₜ[ψ̃ᵢslice], aₜs, Δt)
+        ψ̃ⁱslice = slice(i, sys.isodim)
+        δψ̃s[ψ̃ⁱslice] = integrator(xₜ₊₁[ψ̃ⁱslice], xₜ[ψ̃ⁱslice], aₜ, Δt)
     end
 
-    δxₜ₊₁ = vcat(δψ̃ₜ₊₁s..., δaₜ₊₁s)
-
-    return δxₜ₊₁
+    return [δψ̃s; δaugs]
 end
 
 struct SystemDynamics
-    f::Function
-    ∇f::Function
-    ∇f_structure::Vector{Tuple{Int, Int}}
-    ∇²f::Function
-    ∇²f_structure::Vector{Tuple{Int, Int}}
+    F::Function
+    ∇F::Function
+    ∇F_structure::Vector{Tuple{Int, Int}}
+    ∇²F::Union{Function, Nothin}
+    ∇²F_structrure::Union{Vector{Tuple{Int, Int}}, Nothing}
 end
 
 function SystemDynamics(
     sys::AbstractQubitSystem,
-    integrator::Function,
+    integrator::AbstractQuantumIntegrator,
     T::Int,
     Δt::Float64,
     eval_hessian::Bool
 )
+    sys_integrator = integrator(sys)
 
-    function sys_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt)
-        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜs, Δt, sys.G_drift, sys.G_drives)
-    end
-
-    @views function fₜ(zₜ₊₁, zₜ)
+    @views function f(zₜ, zₜ₊₁)
         xₜ₊₁ = zₜ₊₁[1:sys.nstates]
         xₜ = zₜ[1:sys.nstates]
-        uₜs = zₜ[end - sys.ncontrols + 1:end]
-        return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜs, Δt)
+        uₜ = zₜ[(end - sys.ncontrols + 1):end]
+        return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜ, Δt)
     end
 
-    @views function f(Z)
+    @views function F(Z)
         δxs = zeros(typeof(Z[1]), sys.nstates * (T - 1))
         for t = 1:T-1
-            δxₜ₊₁ = fₜ(Z[slice(t + 1, sys.vardim)], Z[slice(t, sys.vardim)])
-            δxs[slice(t, sys.nstates)] = δxₜ₊₁
+            δxₜ = f(Z[slice(t, sys.vardim)], Z[slice(t + 1, sys.vardim)])
+            δxs[slice(t - 1, sys.nstates)] = δxₜ
         end
         return δxs
     end
 
-    Symbolics.@variables zz[1:(sys.vardim * 2)]
 
-    zz = collect(zz)
+    # TODO: figure out a better way to handle sparsity of block matrices
 
-    f̂ₜ(zₜzₜ₊₁) = fₜ(zₜzₜ₊₁[sys.vardim+1:end], zₜzₜ₊₁[1:sys.vardim])
+    #
+    # ∇ₜf structure list
+    #
 
-    ∇f̂ₜ_symb = Symbolics.sparsejacobian(f̂ₜ(zz), zz)
+    ∇ₜf_structure = []
 
-    Is = findnz(∇f̂ₜ_symb)[1]
-    Js = findnz(∇f̂ₜ_symb)[2]
 
-    ∇f_structure = []
-    for t = 1:T-1
-        idxs = zip(
-            Is .+ index(t, 0, sys.nstates),
-            Js .+ index(t, 0, sys.vardim)
-        )
-        append!(∇f_structure, collect(idxs))
-    end
+    # ∂Pⁱ_∂ψ̃ⁱₜ blocks
 
-    ∇f̂ₜ_expr = Symbolics.build_function(∇f̂ₜ_symb, zz)
-    ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
-
-    function ∇f(Z)
-        jac = spzeros(sys.nstates*(T-1), sys.vardim*T)
-        for t = 1:T-1
-            var_idxs = slice(t, sys.vardim; stretch=sys.vardim)
-            jac[slice(t, sys.nstates), var_idxs] = ∇f̂ₜ(Z[var_idxs])
+    for i = 1:sys.nqstates
+        for j = 1:sys.isodim     # jth column of ∂Pⁱ_∂ψ̃ⁱₜ
+            for k = 1:sys.isodim # kth row
+                idx = (index(i, k, sys.isodim), index(i, j, sys.isodim))
+                append!(∇ₜf_structure, idx)
+            end
         end
-        return jac
     end
 
-    # TODO: fix this
+
+    # ∂Pⁱ_∂aʲₜ blocks
+
+    for i = 1:sys.nqstates
+        for j = 1:sys.ncontrols  # jth column, corresponding to ∂Pⁱ_∂aʲₜ
+            for k = 1:sys.isodim # kth row, corresponding to ψ̃ⁱₜ
+                idx = (index(i, k, sys.isodim), sys.n_wfn_states + sys.ncontrols + j)
+                append!(∇ₜf_structure, idx)
+            end
+        end
+    end
+
+
+    # -I blocks on main diagonal
+
+    for k = 1:sys.n_aug_states
+        idx = (k, k) .+ sys.n_wfn_states
+        append!(∇ₜf_structure, idx)
+    end
+
+
+    # -Δt⋅I blocks on shifted diagonal
+
+    for k = 1:sys.n_aug_states
+        idx = (k, k + sys.ncontrols) .+ sys.n_wfn_states
+        append!(∇ₜf_structure, idx)
+    end
+
+
+    #
+    # Jacobian of f w.r.t. zₜ (see eq. 7)
+    #
+
+    ∇P = Jacobian(integrator)
+
+    @views function ∇ₜf(zₜ::Vector, zₜ₊₁::Vector)
+        Js = []
+
+        a_slice = sys.n_wfn_states .+ slice(2, sys.ncontrols)
+        aₜ = zₜ[a_slice]
+
+        for i = 1:sys.nqstates
+
+            ∂ψ̃ⁱₜPⁱ = ∇P(aₜ, Δt, false)
+
+            for ∂ψ̃ⁱʲₜPⁱᵏ in ∂ψ̃ⁱₜPⁱ
+                append!(Js, ∂ψ̃ⁱʲₜPⁱᵏ)
+            end
+
+            ∂aₜPⁱ = zeros(sys.n_wfn_states, sys.ncontrols)
+
+            ψ̃ⁱ_slice = slice(i, sys.isodim)
+
+            for j = 1:sys.ncontrols
+
+                ∂aʲₜPⁱ = ∇P(zₜ₊₁[ψ̃ⁱ_slice], zₜ[ψ̃ⁱ_slice], aₜ, Δt, j)
+
+                ∂aₜPⁱ[:, j] = ∂aʲₜPⁱ
+            end
+
+            for ∂aʲₜPⁱᵏ in ∂aₜPⁱ
+                append!(Js, ∂aʲₜPⁱᵏ)
+            end
+        end
+
+        for _ = 1:sys.n_aug_states
+            append!(Js, -1.0)
+        end
+
+        for _ = 1:sys.n_aug_states
+            append!(Js, -Δt)
+        end
+
+        return Js
+    end
+
+
+    #
+    # ∇ₜ₊₁f structure list
+    #
+
+    ∇ₜ₊₁f_structure = []
+
+
+    # ∂Pⁱ_∂ψ̃ⁱₜ blocks
+
+    for i = 1:sys.nqstates
+        for j = 1:sys.isodim     # jth column of ∂Pⁱ_∂ψ̃ⁱₜ
+            for k = 1:sys.isodim # kth row
+                idx = (index(i, k, sys.isodim), index(i, j, sys.isodim))
+                append!(∇ₜ₊₁f_structure, idx)
+            end
+        end
+    end
+
+
+    # I for controls on main diagonal
+
+    for k = 1:sys.n_aug_states
+        idx = sys.n_wfn_states .+ (k, k)
+        append!(∇ₜ₊₁f_structure, idx)
+    end
+
+
+    #
+    # Jacobian of f w.r.t. zₜ₊₁ (see eq. 8)
+    #
+
+    @views function ∇ₜ₊₁f(zₜ::Vector)
+        Js = []
+
+        aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+
+        for i = 1:sys.nqstates
+
+            ∂ψ̃ⁱₜ₊₁Pⁱ = ∇P(aₜ, Δt, true)
+
+            for ∂ψ̃ⁱʲₜ₊₁Pⁱᵏ in ∂ψ̃ⁱₜ₊₁Pⁱ
+                append!(Js, ∂ψ̃ⁱʲₜ₊₁Pⁱᵏ)
+            end
+
+            ψ̃ⁱ_slice = slice(i, sys.isodim)
+
+            J[ψ̃ⁱ_slice, ψ̃ⁱ_slice] = ∂Pⁱ_∂ψ̃ⁱₜ₊₁
+        end
+
+        for _ = 1:sys.n_aug_states
+            append!(Js, 1.0)
+        end
+
+        return Js
+    end
+
+
+    #
+    # full system Jacobian
+    #
+
+
+    # ∇F structure list
+
+    ∇F_structure = []
+
+    for t = 1:T-1
+
+        for (i, j) in ∇ₜf_structure
+            i += index(t, 0, sys.nstates)
+            j += index(t, 0, sys.vardim)
+            append!(∇F_structure, (i, j))
+        end
+
+        for (i, j) in ∇ₜ₊₁f_structure
+            i += index(t, 0, sys.nstates)
+            j += sys.vardim + index(t, 0, sys.vardim)
+            append!(∇F_structure, (i, j))
+        end
+    end
+
+
+    # full Jacobian
+
+    @views function ∇F(Z::Vector)
+        Js = []
+        for t = 1:T-1
+            zₜ = Z[slice(t, sys.vardim)]
+            zₜ₊₁ = Z[slice(t + 1, sys.vardim)]
+            append!(Js, ∇ₜf(zₜ, zₜ₊₁))
+            append!(Js, ∇ₜ₊₁f(zₜ))
+        end
+        return Js
+    end
+
+
+    #
+    # dynamics Hessian
+    #
+
     if eval_hessian
-        Symbolics.@variables μ[1:sys.nstates * (T - 1)]
-        μ = collect(μ)
-        ∇²f_symb = Symbolics.sparsehessian(dot(μ, f(y)), [y; μ])
-        I, J, _ = findnz(∇²f_symb)
-        ∇²f_structure = collect(zip(I, J))
-        ∇²f_expr = Symbolics.build_function(∇²f_symb, [y; μ])
-        ∇²f_eval = eval(∇²f_expr[1])
-        ∇²f = (ŷ, μ̂) -> ∇²f_eval([ŷ; μ̂])
+
+        if isa(integrator, FourthOrderPade)
+
+            ∇²F_structure = []
+
+            for t = 1:T-1
+                for j = 1:sys.ncontrols
+                    for k = 1:j
+                        idx = (
+                            index(t, sys.n_wfn_states + sys.ncontrols + k),
+                            index(t, sys.n_wfn_states + sys.ncontrols + j)
+                        )
+                        append!(∇²F_structure, idx)
+                    end
+                end
+            end
+
+            H = FourthOrderPadeHessian(sys)
+
+            function ∇²F(Z::Vector, μ::Vector)
+                Hᵏʲs = []
+                for t = 1:T-1
+                    ψ̃ₜ₊₁ = Z[slice(t, 1, sys.n_wfn_states, sys.vardim)]
+                    ψ̃ₜ = Z[slice(t, 1, sys.n_wfn_states, sys.vardim)]
+                    μₜ = μ[slice(t, sys.nstates)] # pretty sure dim(μ) = nstates * (T - 1)
+                    for j = 1:sys.ncontrols
+                        for k = 1:j
+                            Hᵏʲ = H(ψ̃ₜ₊₁, ψ̃ₜ, μₜ, Δt, k, j)
+                            append!(Hᵏʲs, Hᵏʲ)
+                        end
+                    end
+                end
+            end
+        else
+
+            ∇²F = Z -> []
+            ∇²F_structure = []
+        end
     else
-        ∇²f = (_, _) -> nothing
-        ∇²f_structure = []
+
+        ∇²F = nothing
+        ∇²F_structure = nothing
     end
 
-    return SystemDynamics(f, ∇f, ∇f_structure, ∇²f, ∇²f_structure)
+    return SystemDynamics(f, ∇F, ∇F_structure, ∇²F, ∇²F_structure)
 end
 
+
+
+#
+#
 # min time sys dynamics (dynamical Δts)
+#
+#
+
+# TODO: reimplement
+
 function MinTimeSystemDynamics(
     sys::AbstractQubitSystem,
-    integrator::Function,
+    integrator::AbstractQuantumIntegrator,
     T::Int,
     eval_hessian::Bool
 )
 
-    function sys_integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt)
-        return integrator(ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δt, sys.G_drift, sys.G_drives)
-    end
+    sys_integrator = integrator(sys)
 
     @views function fₜ(xuₜ₊₁, xuₜ, Δt)
         xₜ₊₁ = xuₜ₊₁[1:sys.nstates]
@@ -187,16 +374,15 @@ function MinTimeSystemDynamics(
     Is = findnz(∇f̂ₜ_symb)[1]
     Js = findnz(∇f̂ₜ_symb)[2]
 
-    ∇f_structure = vcat(
-        [
-            collect(
-                zip(
-                    Is .+ (t - 1) * sys.nstates,
-                    Js .+ (t - 1) * (sys.vardim + 1)
-                )
-            ) for t = 1:T-1
-        ]...
-    )
+    ∇f_structure = []
+
+    for t = 1:T-1
+        idxs = zip(
+            Is .+ index(t, 0, sys.nstates),
+            Js .+ index(t, 0, sys.vardim + 1)
+        )
+        append!(∇f_structure, collect(idxs))
+    end
 
     ∇f̂ₜ_expr = Symbolics.build_function(∇f̂ₜ_symb, zΔtz)
     ∇f̂ₜ = eval(∇f̂ₜ_expr[1])
@@ -210,21 +396,6 @@ function MinTimeSystemDynamics(
             jac[slice(t, sys.nstates), zₜΔtzₜ₊₁_idxs] = ∇fₜ
         end
         return jac
-    end
-
-    # TODO: redo hessian
-    if eval_hessian
-        Symbolics.@variables μ[1:sys.nstates * (T - 1)]
-        μ = collect(μ)
-        ∇²f_symb = Symbolics.sparsehessian(dot(μ, f(y)), [y; μ])
-        I, J, _ = findnz(∇²f_symb)
-        ∇²f_structure = collect(zip(I, J))
-        ∇²f_expr = Symbolics.build_function(∇²f_symb, [y; μ])
-        ∇²f_eval = eval(∇²f_expr[1])
-        ∇²f = (ŷ, μ̂) -> ∇²f_eval([ŷ; μ̂])
-    else
-        ∇²f = (_, _) -> nothing
-        ∇²f_structure = []
     end
 
     return SystemDynamics(f, ∇f, ∇f_structure, ∇²f, ∇²f_structure)

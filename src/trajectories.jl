@@ -62,7 +62,7 @@ function Trajectory(
         state = [wfns; augs]
         push!(states, state)
     end
-    push!(states, [system.ψ̃f; zeros(system.n_aug_states)])
+    push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
 
     actions = [actions_matrix[:, t] for t = 1:T]
 
@@ -78,7 +78,7 @@ function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
         state = [wfns; augs]
         push!(states, state)
     end
-    push!(states, [system.ψ̃f; zeros(system.n_aug_states)])
+    push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
 
     actions = [[randn(system.ncontrols) for t = 1:T-1]..., zeros(system.ncontrols)]
 
