@@ -79,7 +79,7 @@ function SingleQubitSystem(
         G_drive = G.(H_drive)
     end
 
-    augdim = ncontrols * (control_order + 1)
+    augdim = control_order + 1
 
     n_wfn_states = nqstates * isodim
     n_aug_states = ncontrols * augdim

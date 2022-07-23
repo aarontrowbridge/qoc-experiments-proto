@@ -3,7 +3,7 @@ module Constraints
 export AbstractConstraint
 export EqualityConstraint
 export BoundsConstraint
-export constrain!
+export constrain
 
 using ..Utils
 
@@ -154,7 +154,7 @@ function (con::BoundsConstraint)(opt::Ipopt.Optimizer, vars::Vector{MOI.Variable
     end
 end
 
-function constrain!(
+function constrain(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
     cons::Vector{AbstractConstraint}
@@ -162,6 +162,7 @@ function constrain!(
     for con in cons
         con(opt, vars)
     end
+    return opt
 end
 
 end
