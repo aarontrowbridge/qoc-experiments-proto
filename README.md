@@ -101,16 +101,23 @@ $$
 
 ## TODO: 
 
-- [x] min time problem
-- [ ] implement Hessian methods
+- [ ] min time problem reimplementation
+- [ ] analytic derivatives
+  - [ ] integrators
+    - [x] 2nd order Pade
+    - [x] 4th order Pade
+    - [ ] exponential
+  - [ ] objective
 - [x] document solver options (kinda completed, see `options.jl`)
-- [ ] integrator functor type
-  - [ ] higher order Pade integrators
-  - [ ] exponential integrator
+- [x] integrator functor type
+  - [x] higher order Pade integrators
+  - [x] exponential integrator
 - [x] add constraints on a(t)
 - [ ] write documentation 
-- [ ] constraint types
-- [ ] multimode system with specified control limits
+- [x] constraint types
+- [ ] systems
+  - [ ] multimode system with specified control limits
+  - [ ] two qubit system (try CNOT)
 - [ ] implicit $\ddot a(t)$
 - [ ] add ability to change linear solver
   - [ ] mac
