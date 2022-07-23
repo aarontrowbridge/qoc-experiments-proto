@@ -4,6 +4,10 @@ export GATES
 export apply
 export ket_to_iso
 export iso_to_ket
+export annihilate
+export create
+export quad
+export number
 
 using LinearAlgebra
 
@@ -33,6 +37,23 @@ function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
     @assert size(U)[2] == size(ψ)[1] "gate size does not match ket dim"
     return ComplexF64.(normalize(U * ψ))
 end
+
+function annihilate(levels)
+       diagm(1 => map(sqrt, 1:levels - 1))
+end
+
+function create(levels)
+       (annihilate(levels))'
+end
+
+function number(levels)
+       create(levels)*annihilate(levels)
+end
+
+function quad(levels)
+       number(levels)*(number(levels) - I(levels))
+end
+
 
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]
 

@@ -205,5 +205,34 @@ function MultiModeQubitSystem(hf_path::String)
     end
 end
 
+struct TransmonSystem <: AbstractQubitSystem
+    n_wfn_states::Int
+    n_aug_states::Int
+    nstates::Int
+    nqstates::Int
+    isodim::Int
+    augdim::Int
+    vardim::Int
+    ncontrols::Int
+    control_order::Int
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
+    ψ̃i::Vector{Float64}
+    ψ̃f::Vector{Float64}
+end
+
+function TransmonSystem(
+    H_drift::Matrix, 
+    H_drive::Union{Matrix{T, Vector{Matrix{T}}}};
+    ψ1::Union{Vector{C}, Vector{Vector{C}}},
+    ψ_f::Union{Vector{C}, Vector{Vector{C}}},
+    control_order = 2
+) where {C <: Number, T<:Number}
+
+    if isa()
+
+
+end
+
 
 end
