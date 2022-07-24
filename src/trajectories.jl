@@ -118,6 +118,17 @@ function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int)
     end
 end
 
+#get rid of the 2 because no ∫a
+function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
+    @assert j ∈ -1:sys.control_order
+    if j != sys.control_order
+        jth_order_slice = slice(j, sys.ncontrols)
+        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice] for t = 1:traj.T]
+    else
+        return traj.actions
+    end
+end
+
 function jth_order_controls_matrix(traj, sys, j)
     return hcat(jth_order_controls(traj, sys, j)...)
 end

@@ -1,9 +1,12 @@
+WDIR = joinpath(@__DIR__, "../../")
 using QubitControl
 using HDF5
 
 hf_path = "notebooks/g0_to_g1_multimode_system_data.h5"
 
 hf = h5open(hf_path, "r")
+
+print(keys(hf))
 
 H_drift = copy(transpose(hf["H_drift"][:, :]))
 H_drives = [copy(transpose(hf["H_drives"][:, :, i])) for i = 1:size(hf["H_drives"], 3)]

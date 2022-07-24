@@ -4,6 +4,7 @@ export AbstractQubitSystem
 
 export SingleQubitSystem
 export MultiModeQubitSystem
+export TransmonSystem
 
 using ..QuantumLogic
 
@@ -216,7 +217,7 @@ struct TransmonSystem <: AbstractQubitSystem
     control_order::Int
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
-    ψ̃i::Vector{Float64}
+    ψ̃1::Vector{Float64}
     ψ̃f::Vector{Float64}
 end
 
@@ -225,11 +226,10 @@ function TransmonSystem(;
     rotating_frame::Bool,
     ω::Float64,
     α::Float64,
-    #H_drive::Union{Matrix{T}, Vector{Matrix{T}}}
     ψ1::Union{Vector{C}, Vector{Vector{C}}},
     ψf::Union{Vector{C}, Vector{Vector{C}}},
     control_order = 2
-) where {C <: Number, T<:Number}
+) where C <: Number
     # if it is just one state
     if isa(ψ1, Vector{C})
         nqstates = 1
@@ -257,7 +257,7 @@ function TransmonSystem(;
     ncontrols = 2 
 
     H_drive = [create(levels) + annihilate(levels), 
-              1im * (create(levels) - annihilate(levels))]
+              1*im * (create(levels) - annihilate(levels))]
     G_drive = G.(H_drive)
 
 
@@ -266,6 +266,26 @@ function TransmonSystem(;
 
     n_wfn_states = nqstates * isodim
     n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+
+    return TransmonSystem(
+        n_wfn_states,
+        n_aug_states,
+        nstates, 
+        nqstates,
+        isodim,
+        augdim,
+        vardim,
+        ncontrols,
+        control_order,
+        G_drift,
+        G_drive,
+        ψ̃1,
+        ψ̃f
+    )
 
 
 end

@@ -7,8 +7,8 @@ using QubitControl
 H_drift = σz / 2
 H_drive = [σx / 2, σy / 2]
 
-gate = Symbol(ARGS[1])
-iter = parse(Int, ARGS[2])
+gate = :X
+iter = 1000
 
 plot_path = "plots/single_qubit/test/$(gate)_gate_2_controls_test_iter_$(iter).png"
 
@@ -29,6 +29,7 @@ system = SingleQubitSystem(
     control_order=2
 )
 
+#T is number of time steps, not total Time
 T    = 1000
 Δt   = 0.01
 Q    = 0.0
