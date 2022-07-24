@@ -1,6 +1,6 @@
 using QubitControl 
 
-iter = 2000
+iter = 900
 
 const EXPERIMENT_NAME = "transmon"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/transmon/")

@@ -123,7 +123,7 @@ function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
     @assert j ∈ -1:sys.control_order
     if j != sys.control_order
         jth_order_slice = slice(j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice] for t = 1:traj.T]
+        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
     else
         return traj.actions
     end
