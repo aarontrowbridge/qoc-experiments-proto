@@ -6,6 +6,7 @@ export plot_single_qubit_2_qstate_with_seperated_controls
 export plot_multimode_qubit
 export plot_single_qubit
 export plot_transmon
+export plot_transmon_population
 
 using ..Utils
 using ..Trajectories
@@ -360,7 +361,7 @@ function plot_transmon(
     fig = Figure(resolution=(1200, 1500))
 
     ψs = wfn_components_matrix(traj, system)
-
+    #need to rewrite this for arbitrary number of levels
     ψax = Axis(fig[1:2, :]; title="qubit components", xlabel=L"t")
     series!(ψax, traj.times, ψs;
         labels=[
@@ -404,6 +405,46 @@ function plot_transmon(
     save(path, fig)
 end
 
+function plot_transmon_population(
+    system::TransmonSystem,
+    traj::Trajectory,
+    path::String;
+    fig_title=nothing
+    )
 
+
+
+    axislegend(ψax; position=:lb)
+
+    for j = 0:system.control_order
+
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+
+        series!(
+            ax_j,
+            traj.times,
+            jth_order_controls_matrix(traj, system, j);
+            labels = [
+                j == 0 ?
+                latexstring("a_$k (t)") :
+                latexstring(
+                    "\\mathrm{d}^{",
+                    j == 1 ? "" : "$j",
+                    "}_t a_$k"
+                )
+                for k = 1:system.ncontrols
+            ]
+        )
+
+        axislegend(ax_j; position=:lt)
+    end
+
+    # if !isnothing(fig_title)
+    #     Label(fig[0,:], fig_title; textsize=30)
+    # end
+
+    save(path, fig)
+
+end
 
 end

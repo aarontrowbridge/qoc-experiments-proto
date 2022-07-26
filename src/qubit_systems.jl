@@ -145,7 +145,8 @@ function MultiModeQubitSystem(
     H_drives::Vector{Matrix{C}} where C,
     ψ1::Vector,
     ψf::Vector;
-    control_order=2
+    control_order=2,
+    integral = false 
 )
     isodim = 2 * length(ψ1)
 
@@ -161,7 +162,12 @@ function MultiModeQubitSystem(
     nqstates = 1
     n_wfn_states = nqstates * isodim
 
-    augdim = control_order + 1
+    if integral
+        augdim = control_order + 1
+    else
+        augdim = control_order
+    end
+    
     n_aug_states = ncontrols * augdim
 
     nstates = n_wfn_states + n_aug_states

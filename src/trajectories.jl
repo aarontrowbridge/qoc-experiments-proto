@@ -11,6 +11,8 @@ export controls_matrix
 export actions_matrix
 export wfn_components
 export wfn_components_matrix
+export final_state
+export final_state2
 
 
 struct Trajectory
@@ -120,7 +122,17 @@ end
 
 #get rid of the 2 because no ∫a
 function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
-    @assert j ∈ -1:sys.control_order
+    @assert j ∈ 0:sys.control_order
+    if j != sys.control_order
+        jth_order_slice = slice(j, sys.ncontrols)
+        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
+    else
+        return traj.actions
+    end
+end
+
+function jth_order_controls(traj::Trajectory, sys::MultimodeSystem, j::Int)
+    @assert j ∈ 0:sys.control_order
     if j != sys.control_order
         jth_order_slice = slice(j, sys.ncontrols)
         return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
@@ -150,6 +162,27 @@ function wfn_components(
     end
     return ψs
 end
+
+function final_state2(
+    traj::Trajectory,
+    sys::AbstractQubitSystem;
+)
+    return traj.states[traj.T][slice(1, sys.isodim + 1, 2*sys.isodim, sys.isodim)]
+end
+
+function final_state(
+    traj::Trajectory,
+    sys::AbstractQubitSystem;
+)
+    return traj.states[traj.T][slice(1, sys.isodim)]
+end
+
+# function populations(
+#     traj::Trajectory,
+#     sys::AbstractQubitSystem,
+#     i = 1,
+#     components=nothing
+# )
 
 wfn_components_matrix(args...; kwargs...) = hcat(wfn_components(args...; kwargs...)...)
 
