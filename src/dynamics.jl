@@ -63,14 +63,20 @@ function SystemDynamics(
     @views function f(zₜ::AbstractVector, zₜ₊₁::AbstractVector)
         xₜ₊₁ = zₜ₊₁[1:sys.nstates]
         xₜ = zₜ[1:sys.nstates]
-        uₜ = zₜ[(end - sys.ncontrols + 1):end]
+        uₜ = zₜ[
+            sys.n_wfn_states .+
+            slice(sys.augdim + 1, sys.ncontrols)
+        ]
         return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜ, Δt)
     end
 
     @views function F(Z::AbstractVector{F}) where F
         δxs = zeros(F, sys.nstates * (T - 1))
         for t = 1:T-1
-            δxₜ = f(Z[slice(t, sys.vardim)], Z[slice(t + 1, sys.vardim)])
+            δxₜ = f(
+                Z[slice(t, sys.vardim)],
+                Z[slice(t + 1, sys.vardim)]
+            )
             δxs[slice(t, sys.nstates)] = δxₜ
         end
         return δxs

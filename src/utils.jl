@@ -4,6 +4,42 @@ export index
 export generate_file_path
 export slice
 
+"""
+this module contains helper functions for indexing and taking slices of the full problem variable vector
+
+definitions:
+
+the problem vector: Z = [z₁, z₂, ..., zT]
+
+    knot point:
+        zₜ = [xₜ, uₜ]
+
+    augmented state vector:
+        xₜ = [ψ̃ₜ, ψ̃²ₜ, ..., ψ̃ⁿₜ, ∫aₜ, aₜ, daₜ, ..., dᶜ⁻¹aₜ]
+
+    where:
+        c = control_order
+
+
+also, below, we use dim(zₜ) = dim
+
+examples:
+
+Z[index(t, pos, dim)] = zₜ[pos]
+Z[index(t, dim)]      = zₜ[dim]
+
+Z[slice(t, pos1, pos2, dim)]      = zₜ[pos1:pos2]
+Z[slice(t, pos, dim)]             = zₜ[1:pos]
+Z[slice(t, dim)]                  = zₜ[1:dim]
+Z[slice(t, dim; stretch=stretch)] = zₜ[1:(dim + stretch)]
+
+the functions are also used to access the zₜ vectors, e.g.
+
+zₜ[slice(i, isodim)]                             = ψ̃ⁱₜ
+zₜ[n_wfn_states .+ slice(1, ncontrols)]          = ∫aₜ
+zₜ[n_wfn_states .+ slice(2, ncontrols)]          = aₜ
+zₜ[n_wfn_states .+ slice(augdim + 1, ncontrols)] = uₜ = ddaₜ
+"""
 
 index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
 
