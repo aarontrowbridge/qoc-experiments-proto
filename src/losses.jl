@@ -33,8 +33,14 @@ struct QuantumStateLoss
     ls::Vector{Function}
     isodim::Int
 
-    function QuantumStateLoss(sys::AbstractQubitSystem; loss=amplitude_loss)
-        ls = [ψ̃ -> loss(ψ̃, sys.ψ̃goal[slice(i, sys.isodim)]) for i = 1:sys.nqstates]
+    function QuantumStateLoss(
+        sys::AbstractQubitSystem;
+        loss=amplitude_loss
+    )
+        ls = [
+            ψ̃ -> loss(ψ̃, sys.ψ̃goal[slice(i, sys.isodim)])
+                for i = 1:sys.nqstates
+        ]
         return new(ls, sys.isodim)
     end
 end
@@ -56,20 +62,40 @@ struct QuantumStateLossGradient
         simplify=true
     )
         Symbolics.@variables ψ̃[1:loss.isodim]
+
         ψ̃ = collect(ψ̃)
-        ∇ls_symbs = [Symbolics.gradient(l(ψ̃), ψ̃; simplify=simplify) for l in loss.ls]
-        ∇ls_exprs = [Symbolics.build_function(∇l, ψ̃) for ∇l in ∇ls_symbs]
-        ∇ls = [eval(∇l_expr[1]) for ∇l_expr in ∇ls_exprs]
+
+        ∇ls_symbs = [
+            Symbolics.gradient(l(ψ̃), ψ̃; simplify=simplify)
+                for l in loss.ls
+        ]
+
+        ∇ls_exprs = [
+            Symbolics.build_function(∇l, ψ̃)
+                for ∇l in ∇ls_symbs
+        ]
+
+        ∇ls = [
+            eval(∇l_expr[1])
+                for ∇l_expr in ∇ls_exprs
+        ]
+
         return new(∇ls, loss.isodim)
     end
 end
 
-function (∇l::QuantumStateLossGradient)(ψ̃::AbstractVector)
+@views function (∇l::QuantumStateLossGradient)(
+    ψ̃::AbstractVector
+)
     ∇ = similar(ψ̃)
+
     for (i, ∇lⁱ) in enumerate(∇l.∇ls)
+
         ψ̃ⁱ_slice = slice(i, ∇l.isodim)
+
         ∇[ψ̃ⁱ_slice] = ∇lⁱ(ψ̃[ψ̃ⁱ_slice])
     end
+
     return ∇
 end
 
@@ -111,7 +137,10 @@ struct QuantumStateLossHessian
                 for ∇²l_symb in ∇²l_symbs
         ]
 
-        ∇²ls = [eval(∇²l_expr[1]) for ∇²l_expr in ∇²l_exprs]
+        ∇²ls = [
+            eval(∇²l_expr[1])
+                for ∇²l_expr in ∇²l_exprs
+        ]
 
         return new(∇²ls, ∇²l_structures, loss.isodim)
     end
@@ -123,25 +152,37 @@ function structure(
     vardim::Int
 )
     H_structure = []
+
     T_offset = index(T, 0, vardim)
+
     for (i, KJⁱ) in enumerate(H.∇²l_structures)
+
         i_offset = index(i, 0, H.isodim)
+
         for kj in KJⁱ
             push!(H_structure, (T_offset + i_offset) .+ kj)
         end
     end
+
     return H_structure
 end
 
-function (H::QuantumStateLossHessian)(ψ̃::AbstractVector)
+@views function (H::QuantumStateLossHessian)(ψ̃::AbstractVector)
+
     Hs = []
+
     for (i, ∇²lⁱ) in enumerate(H.∇²ls)
+
+        ψ̃ⁱ = ψ̃[slice(i, H.isodim)]
+
         for (k, j) in H.∇²l_structures[i]
-            ψ̃ⁱ = ψ̃[slice(i, H.isodim)]
+
             Hⁱᵏʲ = ∇²lⁱ(ψ̃ⁱ)[k, j]
+
             append!(Hs, Hⁱᵏʲ)
         end
     end
+
     return Hs
 end
 
