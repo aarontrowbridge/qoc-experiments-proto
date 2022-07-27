@@ -1,8 +1,12 @@
 module Utils
 
-export slice
 export index
+<<<<<<< HEAD
 export generate_file_path
+=======
+export slice
+
+>>>>>>> origin
 
 index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
 

@@ -107,7 +107,7 @@ $$
     - [x] 2nd order Pade
     - [x] 4th order Pade
     - [ ] exponential
-  - [ ] objective
+  - [x] objective
 - [x] document solver options (kinda completed, see `options.jl`)
 - [x] integrator functor type
   - [x] higher order Pade integrators
