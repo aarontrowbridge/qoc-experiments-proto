@@ -31,9 +31,10 @@ system = SingleQubitSystem(
     gate, ψ
 )
 
-T = 2
+T = 10
 Q = 200.0
 R = 2.0
+
 eval_hessian = true
 
 loss_fn = amplitude_loss
@@ -52,10 +53,13 @@ const ATOL = 1e-2
 # convert sparse data to dense matrix
 
 function dense(vals, structure, shape)
+
     M = zeros(shape)
+
     for (v, (k, j)) in zip(vals, structure)
         M[k, j] += v
     end
+
     if shape[1] == shape[2]
         return Symmetric(M)
     else
@@ -63,6 +67,10 @@ function dense(vals, structure, shape)
     end
 end
 
+
+# initializing state vector
+
+Z = 2 * rand(system.vardim * T) .- 1
 
 
 #
@@ -81,29 +89,30 @@ obj = SystemObjective(
     eval_hessian
 )
 
-
-# initializing state vector
-
-Z = 2 * rand(system.vardim * T) .- 1
+# getting analytic gradient
 
 ∇ = obj.∇L(Z)
 
 
 # test gradient of objective with FiniteDiff
 
-@test isapprox(
-    ∇,
-    FiniteDiff.finite_difference_gradient(obj.L, Z),
-    atol=ATOL
+@test all(
+    isapprox.(
+        ∇,
+        FiniteDiff.finite_difference_gradient(obj.L, Z),
+        atol=ATOL
+    )
 )
 
 
 # test gradient of objective with ForwardDiff
 
-@test isapprox(
-    ∇,
-    ForwardDiff.gradient(obj.L, Z),
-    atol=ATOL
+@test all(
+    isapprox.(
+        ∇,
+        ForwardDiff.gradient(obj.L, Z),
+        atol=ATOL
+    )
 )
 
 
@@ -120,8 +129,8 @@ H = dense(
 
 @test all(
     isapprox.(
-        FiniteDiff.finite_difference_hessian(obj.L, Z),
         H,
+        FiniteDiff.finite_difference_hessian(obj.L, Z),
         atol=ATOL
     )
 )
@@ -131,8 +140,8 @@ H = dense(
 
 @test all(
     isapprox.(
-        ForwardDiff.hessian(obj.L, Z),
         H,
+        ForwardDiff.hessian(obj.L, Z),
         atol=ATOL
     )
 )
@@ -147,6 +156,9 @@ H = dense(
 integrators = [:SecondOrderPade, :FourthOrderPade]
 
 for integrator in integrators
+
+    # setting up dynamics struct
+
     dyns = SystemDynamics(
         system,
         integrator,
@@ -165,13 +177,12 @@ for integrator in integrators
     )
 
 
-
     # test dynamics Jacobian vs finite diff
 
     @test all(
         isapprox.(
-            FiniteDiff.finite_difference_jacobian(dyns.F, Z),
             J,
+            FiniteDiff.finite_difference_jacobian(dyns.F, Z),
             atol=ATOL
         )
     )
@@ -181,8 +192,8 @@ for integrator in integrators
 
     @test all(
         isapprox.(
-            ForwardDiff.jacobian(dyns.F, Z),
             J,
+            ForwardDiff.jacobian(dyns.F, Z),
             atol=ATOL
         )
     )
@@ -200,14 +211,14 @@ for integrator in integrators
 
     HofL(Z) = dot(μ, dyns.F(Z))
 
-    for (H_analytic, H_numerical) in zip(
-        μ∇²F,
-        FiniteDiff.finite_difference_hessian(HofL, Z)
-    )
-        if !isapprox(H_analytic, H_numerical, atol=ATOL)
-            println((H_analytic, H_numerical))
-        end
-    end
+    # for (H_analytic, H_numerical) in zip(
+    #     μ∇²F,
+    #     FiniteDiff.finite_difference_hessian(HofL, Z)
+    # )
+    #     if !isapprox(H_analytic, H_numerical, atol=ATOL)
+    #         println((H_analytic, H_numerical))
+    #     end
+    # end
 
 
     # test dynamics Hessian of Lagrangian vs finite diff
