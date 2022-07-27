@@ -148,15 +148,6 @@ function jth_order_controls(
 <<<<<<< HEAD
 <<<<<<< HEAD
         return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)] for t = 1:traj.T]
-=======
-=======
->>>>>>> origin
-        return [
-            traj.states[t][sys.n_wfn_states .+ jth_order_slice]
-                for t = 1:traj.T
-        ]
-<<<<<<< HEAD
->>>>>>> f9337fce0a96c359ec24ad16007509c494bbc156
     else
         # returns same value for T-1 and T to make plots cleaner
         return [traj.actions[1:end-1]..., traj.actions[end-1]]
@@ -169,8 +160,6 @@ function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
     if j != sys.control_order
         jth_order_slice = slice(1 + j, sys.ncontrols)
         return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(2π) for t = 1:traj.T]
-=======
->>>>>>> origin
     else
         # returns same value for T-1 and T to make plots cleaner
         return [traj.actions[1:end-1]..., traj.actions[end-1]]
