@@ -185,8 +185,6 @@ function MultiModeQubitSystem(
     )
 end
 
-# TODO: make sure HDF5 doesn't permute matrix dims b/w python and julia
-
 function MultiModeQubitSystem(hf_path::String)
     h5open(hf_path, "r") do hf
 
