@@ -255,7 +255,7 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        system.n_wfn_states .+ 1:system.ncontrols,
+        system.n_wfn_states .+ (1:system.ncontrols),
         a_bound,
         system.vardim
     )
@@ -372,7 +372,7 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        system.n_wfn_states .+ 1:system.ncontrols,
+        system.n_wfn_states .+ (1:system.ncontrols),
         a_bound,
         system.vardim
     )

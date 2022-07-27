@@ -114,7 +114,7 @@ function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int)
     @assert j ∈ -1:sys.control_order
     if j != sys.control_order
         jth_order_slice = slice(2 + j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice] for t = 1:traj.T]
+        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)] for t = 1:traj.T]
     else
         return traj.actions
     end
@@ -124,22 +124,22 @@ end
 function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
     @assert j ∈ 0:sys.control_order
     if j != sys.control_order
-        jth_order_slice = slice(j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
+        jth_order_slice = slice(1 + j, sys.ncontrols)
+        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(2π) for t = 1:traj.T]
     else
         return traj.actions
     end
 end
 
-function jth_order_controls(traj::Trajectory, sys::MultimodeSystem, j::Int)
-    @assert j ∈ 0:sys.control_order
-    if j != sys.control_order
-        jth_order_slice = slice(j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
-    else
-        return traj.actions
-    end
-end
+# function jth_order_controls(traj::Trajectory, sys::MultiModeSystem, j::Int)
+#     @assert j ∈ 0:sys.control_order
+#     if j != sys.control_order
+#         jth_order_slice = slice(j + 1, sys.ncontrols)
+#         return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
+#     else
+#         return traj.actions
+#     end
+# end
 
 function jth_order_controls_matrix(traj, sys, j)
     return hcat(jth_order_controls(traj, sys, j)...)
