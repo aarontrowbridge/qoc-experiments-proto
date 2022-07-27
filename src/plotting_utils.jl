@@ -345,6 +345,8 @@ function plot_single_qubit(
         axislegend(ax_j; position=:lt)
     end
 
+    # TODO: weird plotting behavior, fix this
+
     # if !isnothing(fig_title)
     #     Label(fig[0,:], fig_title; textsize=30)
     # end

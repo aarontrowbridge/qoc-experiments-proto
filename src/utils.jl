@@ -5,10 +5,15 @@ export index
 export generate_file_path
 
 index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
+
 index(t, dim) = index(t, dim, dim)
 
-slice(t, pos1, pos2, dim) = index(t, pos1, dim):index(t, pos2, dim)
+
+slice(t, pos1, pos2, dim) =
+    index(t, pos1, dim):index(t, pos2, dim)
+
 slice(t, pos, dim) = slice(t, 1, pos, dim)
+
 slice(t, dim; stretch=0) = slice(t, 1, dim + stretch, dim)
 
 function generate_file_path(extension, file_name, path)

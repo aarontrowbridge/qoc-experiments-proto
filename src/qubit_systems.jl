@@ -35,7 +35,7 @@ struct SingleQubitSystem <: AbstractQubitSystem
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
     ψ̃1::Vector{Float64}
-    ψ̃f::Vector{Float64}
+    ψ̃goal::Vector{Float64}
     gate::Union{Symbol, Nothing}
 end
 
@@ -52,19 +52,19 @@ function SingleQubitSystem(
         nqstates = 1
         isodim = 2 * length(ψ1)
         if isnothing(ψf)
-            ψ̃f = ket_to_iso(apply(gate, ψ1))
+            ψ̃goal = ket_to_iso(apply(gate, ψ1))
         else
-            ψ̃f = ket_to_iso(ψf)
+            ψ̃goal = ket_to_iso(ψf)
         end
         ψ̃1 = ket_to_iso(ψ1)
     else
         nqstates = length(ψ1)
         isodim = 2 * length(ψ1[1])
         if isnothing(ψf)
-            ψ̃f = vcat(ket_to_iso.(apply.(gate, ψ1))...)
+            ψ̃goal = vcat(ket_to_iso.(apply.(gate, ψ1))...)
         else
             @assert isa(ψf, Vector{Vector{C}})
-            ψ̃f = vcat(ket_to_iso.(ψf)...)
+            ψ̃goal = vcat(ket_to_iso.(ψf)...)
         end
         ψ̃1 = vcat(ket_to_iso.(ψ1)...)
     end
@@ -101,7 +101,7 @@ function SingleQubitSystem(
         G_drift,
         G_drive,
         ψ̃1,
-        ψ̃f,
+        ψ̃goal,
         gate
     )
 end
@@ -137,7 +137,7 @@ struct MultiModeQubitSystem <: AbstractQubitSystem
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
     ψ̃1::Vector{Float64}
-    ψ̃f::Vector{Float64}
+    ψ̃goal::Vector{Float64}
 end
 
 function MultiModeQubitSystem(
@@ -151,7 +151,7 @@ function MultiModeQubitSystem(
     isodim = 2 * length(ψ1)
 
     ψ̃1 = ket_to_iso(ψ1)
-    ψ̃f = ket_to_iso(ψf)
+    ψ̃goal = ket_to_iso(ψf)
 
     G_drift = G(H_drift)
 
@@ -187,7 +187,7 @@ function MultiModeQubitSystem(
         G_drift,
         G_drives,
         ψ̃1,
-        ψ̃f
+        ψ̃goal
     )
 end
 
