@@ -222,7 +222,7 @@ struct TransmonSystem <: AbstractQubitSystem
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
     ψ̃1::Vector{Float64}
-    ψ̃f::Vector{Float64}
+    ψ̃goal::Vector{Float64}
 end
 
 function TransmonSystem(;
@@ -246,7 +246,7 @@ function TransmonSystem(;
         isodim = 2 * length(ψ1[1])
         @assert isa(ψf, Vector{Vector{C}})
         # takes care of real-to-complex isomorphism and stacks the states
-        ψ̃f = vcat(ket_to_iso.(ψf)...)
+        ψ̃goal = vcat(ket_to_iso.(ψf)...)
         ψ̃1 = vcat(ket_to_iso.(ψ1)...)
     end
 
@@ -288,7 +288,7 @@ function TransmonSystem(;
         G_drift,
         G_drive,
         ψ̃1,
-        ψ̃f
+        ψ̃goal
     )
 
 

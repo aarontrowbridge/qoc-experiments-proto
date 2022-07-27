@@ -48,8 +48,7 @@ prob = QubitProblem(
     system,
     T;
     Δt = Δt,
-    Q = Q,
-    Qf = Qf,
+    Q = Qf,
     R = R,
     eval_hessian = hess,
     loss = loss,

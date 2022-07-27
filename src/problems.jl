@@ -181,12 +181,11 @@ function QubitProblem(
     integrator=:FourthOrderPade,
     loss=amplitude_loss,
     Δt=0.01,
-    Q=0.0,
-    Qf=200.0,
+    Q=200.0,
     R=0.1,
     eval_hessian=true,
     pin_first_qstate=true,
-    a_bound=1.0,
+    a_bound=2π*19e-3,
     init_traj=Trajectory(system, Δt, T),
     options=Options(),
 )
@@ -215,7 +214,7 @@ function QubitProblem(
         loss,
         eval_hessian,
         T, Δt,
-        Q, Qf, R
+        Q, R
     )
 
     cons = AbstractConstraint[]
@@ -234,7 +233,7 @@ function QubitProblem(
         pin_con = EqualityConstraint(
             T,
             1:system.isodim,
-            system.ψ̃f[1:system.isodim],
+            system.ψ̃goal[1:system.isodim],
             system.vardim
         )
         push!(cons, pin_con)
@@ -262,7 +261,7 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        system.n_wfn_states .+ 1:system.ncontrols,
+        system.n_wfn_states .+ (1:system.ncontrols),
         a_bound,
         system.vardim
     )
@@ -352,7 +351,7 @@ function QubitProblem(
         pin_con = EqualityConstraint(
             T,
             1:system.isodim,
-            system.ψ̃f[1:system.isodim],
+            system.ψ̃goal[1:system.isodim],
             system.vardim
         )
         push!(cons, pin_con)
