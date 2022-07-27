@@ -177,8 +177,6 @@ function iso_infidelity(ψ̃, ψ̃f)
     return 1 - abs2(ψ'ψf)
 end
 
-function quaternionic_loss(ψ̃, ψ̃f)
-    return min(abs(1 - dot(ψ̃, ψ̃f)), abs(1 + dot(ψ̃, ψ̃f)))
 
 function quaternionic_loss(ψ̃, ψ̃goal)
     return min(
