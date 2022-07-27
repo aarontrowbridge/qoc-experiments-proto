@@ -5,7 +5,9 @@ using ..Evaluators
 using MathOptInterface
 const MOI = MathOptInterface
 
+
 MOI.initialize(::AbstractPICOEvaluator, features) = nothing
+
 
 function MOI.features_available(evaluator::AbstractPICOEvaluator)
     if evaluator.eval_hessian
@@ -15,53 +17,87 @@ function MOI.features_available(evaluator::AbstractPICOEvaluator)
     end
 end
 
+
 # objective and gradient
 
-function MOI.eval_objective(evaluator::AbstractPICOEvaluator, z)
-    return evaluator.objective.L(z)
+function MOI.eval_objective(
+    evaluator::AbstractPICOEvaluator,
+    Z::AbstractVector
+)
+    return evaluator.objective.L(Z)
 end
 
-function MOI.eval_objective_gradient(evaluator::AbstractPICOEvaluator, ∇, z)
-    ∇ .= evaluator.objective.∇L(z)
+function MOI.eval_objective_gradient(
+    evaluator::AbstractPICOEvaluator,
+    ∇::AbstractVector,
+    Z::AbstractVector
+)
+    ∇ .= evaluator.objective.∇L(Z)
     return nothing
 end
+
 
 # constraints and Jacobian
 
-function MOI.eval_constraint(evaluator::AbstractPICOEvaluator, g, z)
-    g .= evaluator.dynamics.f(z)
-    return nothing
-end
-
-function MOI.eval_constraint_jacobian(evaluator::AbstractPICOEvaluator, J, z)
-    ∇f = evaluator.dynamics.∇f(z)
-    for (k, (i, j)) in enumerate(evaluator.dynamics.∇f_structure)
-        J[k] = ∇f[i, j]
-    end
+function MOI.eval_constraint(
+    evaluator::AbstractPICOEvaluator,
+    g::AbstractVector,
+    Z::AbstractVector
+)
+    g .= evaluator.dynamics.F(Z)
     return nothing
 end
 
 function MOI.jacobian_structure(evaluator::AbstractPICOEvaluator)
-    return evaluator.dynamics.∇f_structure
+    return evaluator.dynamics.∇F_structure
 end
 
-# Hessian of the Lagrangian
+function MOI.eval_constraint_jacobian(
+    evaluator::AbstractPICOEvaluator,
+    J::AbstractVector,
+    Z::AbstractVector
+)
 
-function MOI.eval_hessian_lagrangian(evaluator::AbstractPICOEvaluator, H, z, σ, μ)
-    σ∇²L = σ * evaluator.objective.∇²L(z)
-    for (k, (i, j)) in enumerate(evaluator.objective.∇²L_structure)
-        H[k] = σ∇²L[i, j]
-    end
-    μ∇²f = evaluator.dynamics.∇²f(z, μ)
-    for (k, (i, j)) in enumerate(evaluator.dynamics.∇²f_structure)
-        H[length(evaluator.objective.∇²L_structure) + k] = μ∇²f[i, j]
+    ∇s = evaluator.dynamics.∇F(Z)
+    for (k, ∇ₖ) in enumerate(∇s)
+        J[k] = ∇ₖ
     end
     return nothing
 end
 
-function MOI.hessian_lagrangian_structure(evaluator::AbstractPICOEvaluator)
-    structure = vcat(evaluator.objective.∇²L_structure, evaluator.dynamics.∇²f_structure)
+
+# Hessian of the Lagrangian
+
+function MOI.hessian_lagrangian_structure(
+    evaluator::AbstractPICOEvaluator
+)
+    structure = vcat(evaluator.objective.∇²L_structure, evaluator.dynamics.μ∇²F_structure)
     return structure
+end
+
+function MOI.eval_hessian_lagrangian(
+    evaluator::AbstractPICOEvaluator,
+    H::AbstractVector{T},
+    Z::AbstractVector{T},
+    σ::T,
+    μ::AbstractVector{T}
+) where T
+
+    σ∇²Ls = σ * evaluator.objective.∇²L(Z)
+
+    for (k, σ∇²Lₖ) in enumerate(σ∇²Ls)
+        H[k] = σ∇²Lₖ
+    end
+
+    μ∇²Fs = evaluator.dynamics.μ∇²F(Z, μ)
+
+    offset = length(evaluator.objective.∇²L_structure)
+
+    for (k, μ∇²Fₖ) in enumerate(μ∇²Fs)
+        H[offset + k] = μ∇²Fₖ
+    end
+
+    return nothing
 end
 
 end

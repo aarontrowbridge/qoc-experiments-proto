@@ -54,20 +54,21 @@ end
 function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
-    integrator=pade_schroedinger,
+    integrator=:FourthOrderPade,
     loss=amplitude_loss,
     Δt=0.01,
-    Q=0.0,
-    Qf=200.0,
+    Q=200.0,
     R=0.1,
-    eval_hessian=false,
+    eval_hessian=true,
     pin_first_qstate=true,
     a_bound=1.0,
     init_traj=Trajectory(system, Δt, T),
     options=Options(),
 )
 
-    if getfield(options, :linear_solver) == "pardiso"
+    if getfield(options, :linear_solver) == "pardiso" &&
+        !Sys.isapple()
+
         Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
         Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
     end
@@ -85,13 +86,17 @@ function QubitProblem(
 
     variables = MOI.add_variables(optimizer, total_vars)
 
+    # TODO: this is super hacky, I know; it should be fixed
+    # subtype(::Type{Type{T}}) where T <: AbstractQuantumIntegrator = T
+    # integrator = subtype(integrator)
+
     evaluator = QubitEvaluator(
         system,
         integrator,
         loss,
         eval_hessian,
         T, Δt,
-        Q, Qf, R
+        Q, R
     )
 
     cons = AbstractConstraint[]
@@ -110,7 +115,7 @@ function QubitProblem(
         pin_con = EqualityConstraint(
             T,
             1:system.isodim,
-            system.ψ̃f[1:system.isodim],
+            system.ψ̃goal[1:system.isodim],
             system.vardim
         )
         push!(cons, pin_con)
@@ -138,13 +143,16 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        (system.n_wfn_states + system.ncontrols) .+ 1:system.ncontrols,
+        system.n_wfn_states + system.ncontrols .+
+            (1:system.ncontrols),
         a_bound,
         system.vardim
     )
     push!(cons, a_bound_con)
 
-    constrain!(optimizer, variables, cons)
+    # TODO: fix constraints: a_bounds not working
+
+    optimizer = constrain(optimizer, variables, cons)
 
     dynamics_constraints = fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
 
@@ -181,8 +189,16 @@ end
 initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
 
 @views function update_traj_data!(prob::QubitProblem)
-    z = MOI.get(prob.optimizer, MOI.VariablePrimal(), prob.variables)
-    xs = [z[slice(t, 1, prob.system.nstates, prob.system.vardim)] for t = 1:prob.T]
+    z = MOI.get(
+        prob.optimizer,
+        MOI.VariablePrimal(),
+        prob.variables
+    )
+
+    xs = [
+        z[slice(t, 1, prob.system.nstates, prob.system.vardim)]
+            for t = 1:prob.T
+    ]
     us = [
         z[
             slice(
@@ -193,6 +209,7 @@ initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
             )
         ] for t = 1:prob.T
     ]
+
     prob.trajectory.states .= xs
     prob.trajectory.actions .= us
 end
@@ -221,7 +238,7 @@ function MinTimeProblem(
     T::Int;
     Rᵤ=0.001,
     Rₛ=0.001,
-    integrator=pade_schroedinger,
+    integrator=FourthOrderPade,
     eval_hessian=false,
     bound_a=true,
     a_bound=1.0,

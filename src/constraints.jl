@@ -3,7 +3,7 @@ module Constraints
 export AbstractConstraint
 export EqualityConstraint
 export BoundsConstraint
-export constrain!
+export constrain
 
 using ..Utils
 
@@ -77,7 +77,7 @@ function BoundsConstraint(
     vardim::Int
 ) where R <: Real
 
-    @assert !(isa(val, Vector{Tuple{R,R}}) && isa(j, Int))
+    @assert !(isa(val, Vector{Tuple{R, R}}) && isa(j, Int))
         "if val is an array, var must be an array of integers"
 
     if isa(val, Tuple{R,R}) && isa(j, AbstractArray{Int})
@@ -139,22 +139,22 @@ end
 
 function (con::BoundsConstraint)(opt::Ipopt.Optimizer, vars::Vector{MOI.VariableIndex})
     for t in con.ts
-        for (j, val) in zip(con.js, con.vals)
+        for (j, (lb, ub)) in zip(con.js, con.vals)
             MOI.add_constraints(
                 opt,
                 vars[index(t, j, con.vardim)],
-                MOI.GreaterThan(val[1])
+                MOI.GreaterThan(lb)
             )
             MOI.add_constraints(
                 opt,
                 vars[index(t, j, con.vardim)],
-                MOI.LessThan(val[2])
+                MOI.LessThan(ub)
             )
-       end
+        end
     end
 end
 
-function constrain!(
+function constrain(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
     cons::Vector{AbstractConstraint}
@@ -162,6 +162,7 @@ function constrain!(
     for con in cons
         con(opt, vars)
     end
+    return opt
 end
 
 end

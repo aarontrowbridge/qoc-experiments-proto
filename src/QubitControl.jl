@@ -14,14 +14,14 @@ include("quantum_logic.jl")
 include("ipopt_options.jl")
 @reexport using .IpoptOptions
 
-include("integrators.jl")
-@reexport using .Integrators
+include("qubit_systems.jl")
+@reexport using .QubitSystems
 
 include("losses.jl")
 @reexport using .Losses
 
-include("qubit_systems.jl")
-@reexport using .QubitSystems
+include("integrators.jl")
+@reexport using .Integrators
 
 include("dynamics.jl")
 @reexport using .Dynamics
