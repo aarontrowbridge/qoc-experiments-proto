@@ -13,7 +13,10 @@ iter = 1000
 =======
 gate = Symbol(ARGS[1])
 iter = parse(Int, ARGS[end])
+<<<<<<< HEAD
 >>>>>>> f9337fce0a96c359ec24ad16007509c494bbc156
+=======
+>>>>>>> origin
 
 
 ψ0 = [1, 0]
@@ -33,11 +36,15 @@ system = SingleQubitSystem(
 )
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 #T is number of time steps, not total Time
 T    = 1000
 =======
 T    = parse(Int, ARGS[2])
 >>>>>>> f9337fce0a96c359ec24ad16007509c494bbc156
+=======
+T    = parse(Int, ARGS[2])
+>>>>>>> origin
 Δt   = 0.01
 Q    = 200.0
 R    = 2.0

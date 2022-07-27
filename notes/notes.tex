@@ -1,0 +1,390 @@
+\documentclass{article}
+
+\usepackage[bookmarks]{hyperref}
+\usepackage{amsmath}
+\usepackage{mathrsfs}
+\usepackage{physics}
+
+\newcommand{\isopsi}{\tilde \psi}
+
+
+\title{Optimal control of quantum systems with Pad\'e integrators and direct collocation: PICO.jl}
+\author{Aaron Trowbridge}
+\date{}
+
+\setcounter{section}{-1}
+
+\setlength\parindent{0pt}
+
+\begin{document}
+\maketitle
+
+\pagenumbering{roman}
+
+\begin{abstract}
+  Here we present a novel approach to the problem of quantum optimal control which takes advantage of a relationship between the implicit midpoint method and the Pad\'e approximation of the matrix exponential function. We demonstrate this approach, using an accompanying Julia package, on an assortment of quantum systems including a single qubit system, two qubit system, and a system composed of a qubit coupled to an array of harmonic oscillators.
+\end{abstract}
+
+\tableofcontents
+
+\newpage
+
+\pagenumbering{arabic}
+
+\section{Introduction}
+
+% \newpage
+\section{Problem Formulation}
+
+Given a quantum system with a Hamiltonian of the form
+
+$$
+H(\vb{{a}}(t), t ) = H_{\text{drift}} + \sum_{j=1}^c a^j(t) H_{\text{drive}}^j
+$$
+
+we solve the optimization problem
+
+\begin{align*}
+  \underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}} \quad
+    & \sum_{i=1}^n Q_T \cdot \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \vb{u}_t^2 \\ 
+  \text{subject to} \quad 
+    & \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t) = \vb{0}  \\
+    &  \isopsi^i_1 = \isopsi^i_\text{init} \\
+    & \isopsi^1_T = \isopsi^1_\text{goal} \quad \text{if }\ \textsf{pin\_first\_qstate = true}\\
+    & \smallint \vb{a}_1 = \vb{a}_1 = \dd_t \vb{a}_1 = \vb{0} \\  
+    & \smallint \vb{a}_T = \vb{a}_T = \dd_t \vb{a}_T = \vb{0} \\
+    & |a^j_t| \leq a^j_\text{bound} \\
+\end{align*}
+
+
+The *state* vector $\vb{x}_t$ contains both the $n$ (\textsf{nqstates}) quantum isomorphism states $\isopsi^i_t$ (each of dimension \textsf{isodim = 2*ketdim}) and the augmented control states $\smallint \vb{a}_t$, $\vb{a}_t$, and $\dd_t \vb{a}_t$ (the number of augmented state vector is \textsf{augdim}). The \textit{action} vector $\vb{u}_t$ contains the second derivative of the \textit{control} vector $\vb{a}_t$, which has dimension \textsf{ncontrols}. Thus, we have:
+
+\begin{equation}
+  \vb{x}_t = \mqty(
+    \isopsi^1_t \\ 
+    \vdots \\ 
+    \isopsi^n_t \\ 
+    \smallint \vb{a}_t \\ 
+    \vb{a}_t \\ 
+    \dd_t \vb{a}_t 
+  )
+  \quad \text{and} \quad 
+  \vb{u}_t = \mqty(
+    \dd^2_t \vb{a}_t
+  )
+\end{equation}
+
+In summary, 
+\begin{align*}
+  \dim(\vb{x}_t) &= \textsf{nstates = nqstates * isodim + ncontrols * augdim} \\
+  \dim(\vb{u}_t) &= \textsf{ncontrols}
+\end{align*}
+
+Additionally the loss function $\ell$ can be chosen somewhat liberally, the default is currently
+
+$$
+\ell(\isopsi, \isopsi_{\text{goal}}) = 1 - \abs{\braket{\psi}{\psi_\text{goal}}}^2
+$$
+
+
+\newpage
+\section{Dynamics}
+
+Finally, $\vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t)$ describes the dynamics of all the variables in the system, where the controls' dynamics are trivial and formally $\isopsi^i_t$ satisfies a discretized version of the isomorphic Schr\"oedinger equation:
+
+$$
+\dv{\isopsi^i}{t} = \widetilde{(- i H)}(\vb{a}(t), t) \isopsi^i
+$$
+
+I will the use the notation $G(H)(\vb{a}(t), t) = \widetilde{(- i H)}(\vb{a}(t), t)$, to describe this operator (the Generator of time translation), which acts on the isomorphic quantum state vectors 
+
+$$
+\isopsi = \begin{pmatrix} \psi^{\mathrm{Re}} \\ \psi^{\mathrm{Im}} \end{pmatrix}
+$$ 
+
+It can be shown that
+
+$$
+G(H) =  - \begin{pmatrix} 0 & -1 \\ 1 & 0 \end{pmatrix} \otimes H^{\mathrm{Re}} + \begin{pmatrix} 1 & 0 \\ 0 &1 \end{pmatrix} \otimes H^{\mathrm{Im}}
+$$
+
+where $\otimes$ is the Kronecker product.  We then have the linear isomorphism dynamics equation:
+
+$$
+\dv{\isopsi}{t} = G(\vb{a}(t),t) \isopsi
+$$
+
+where
+
+$$
+G(\vb{a}(t),t) = G(H_{\text{drift}}) + \sum_j a^j(t) G(H_{\text{drive}}^j) 
+$$
+
+The implicit dynamics constraint function $\vb{f}$ can be decomposed as follows:
+
+$$
+\vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t) 
+= \begin{pmatrix} 
+  \vb{P}^{(m)} (\isopsi^1_{t+1}, \isopsi^1_t, \vb{a}_t) \\ 
+  \vdots \\
+  \vb{P}^{(m)} (\isopsi^n_{t+1}, \isopsi^n_t, \vb{a}_t) \\
+  \smallint \vb{a}_{t+1} - \left(\smallint \vb{a}_t + \vb{a}_t \cdot \Delta t_t  \right) \\
+  \vb{a}_{t+1} - \left(\vb{a}_t + \dd_t \vb{a}_t \cdot \Delta t_t  \right) \\
+  \dd_t \vb{a}_{t+1} - \left(\dd_t \vb{a}_t + \vb{u}_t \cdot \Delta t_t \right)
+  \end{pmatrix}
+$$
+
+\newpage
+\subsection{Pad\'e integrators}
+
+We define (and implement) just the $m \in \{2, 4\}$ order Pad\'e integrators $\vb{P}^{(m)}$:
+
+\begin{align*}
+  \vb{P}^{(2)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) \right) \isopsi^i_{t+1} -  \left(I + \frac{\Delta t}{2} G(\vb{a}_t) \right) \isopsi^i_{t}\\   
+  \vb{P}^{(4)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2\right) \isopsi^i_{t+1} \\ 
+  &- \left(I + \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2\right) \isopsi^i_t 
+\end{align*}
+
+Where again 
+
+$$
+G(\vb{a}_t) = G_{\text{drift}} + \vb{a}_t \vdot \vb{G}_{\text{drive}}
+$$
+
+with $\vb{G}_{\text{drive}} = (G^1_{\text{drive}}, \dots, G^c_{\text{drive}})^\top$, where $c = \textsf{ncontrols}$
+
+\newpage
+\section{Differentiation}
+
+Our problem consists of $Z_{\dim}=$ \textsf{(nstates + ncontrols) $\times$ T} total variables, arranged into a vector
+
+\begin{equation}
+  \vb{Z} = \mqty(
+    \vb{x}_1 \\
+    \vb{u}_1 \\
+    \vdots \\
+    \vb{x}_T \\
+    \vb{u}_T \\
+  ) =
+  \mqty(
+    \vb{z}_1 \\
+    \vdots \\ 
+    \vb{z}_T
+  )
+\end{equation}
+
+where $\vb{z}_t = \mqty( \vb{x}_t \\ \vb{u}_t)$ is referred to as a \textit{knot point} and has dimension 
+$$
+z_{\dim} = \textsf{vardim} = \textsf{nstates + ncontrols}.
+$$ 
+
+Also, as of right now, $\vb{u}_T$ is included in $\vb{Z}$ but is ignored in calculations. 
+
+\subsection{Objective Gradient}
+
+Given the objective
+
+\begin{equation}
+  J(\vb{Z}) = \sum_{i=1}^n Q \cdot \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \vb{u}_t^2 
+\end{equation}
+
+we arrive at the gradient
+
+\begin{equation}
+  \grad_{\vb{Z}} J(\vb{Z}) = \mqty(
+    \vb{0}_{x_{\dim}} \\
+    R_1 \cdot \vb{u}_1 \\
+    \vdots \\
+    \vb{0}_{x_{\dim}} \\
+    R_t \cdot \vb{u}_t \\
+    \vdots \\
+    \vb{0}_{x_{\dim}} \\
+    R_{T-1} \cdot \vb{u}_{T-1} \\
+    Q \cdot \grad_{\isopsi^1} \ell^1 \\
+    \vdots \\
+    Q \cdot \grad_{\isopsi^n} \ell^n \\
+    \vb{0}_{c \cdot (\textsf{augdim} + 1)}
+  ) 
+\end{equation}
+
+where $\ell^i = \ell(\isopsi^i_T, \isopsi^i_{\text{goal}})$. $\grad_{\isopsi^i}\ell^i$ is currently not calculated by hand, but at compile time via \textsf{Symbolics.jl}.
+
+\subsection{Dynamics Jacobian}
+
+Writing, $\vb{f}(\vb{z}_{t}, \vb{z}_{t+1}) = \vb{f}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t)$, we can arrange the dynamics constraints into a vector
+
+\begin{equation}
+  \vb{F} = \mqty(
+    \vb{f}(\vb{z}_{1}, \vb{z}_{2}) \\
+    \vdots \\
+    \vb{f}(\vb{z}_{T-1}, \vb{z}_{T}) \\
+  ) = \mqty(
+    \vb{f}_1 \\
+    \vdots \\
+    \vb{f}_{T-1}
+  )
+\end{equation}
+
+where we have defined $\vb{f}_t = \vb{f}(\vb{z}_t, \vb{z}_{t+1})$.
+
+\hfill
+
+The dynamics Jacobian matrix $\pdv{\vb{F}}{\vb{Z}}$ then has dimensions 
+$$
+F_{\dim} \times Z_{\dim} = (f_{\dim} \cdot (T-1)) \times (z_{\dim} \cdot T)
+$$
+
+This matrix has a block diagonal structure:
+
+\begin{equation}
+  \pdv{\vb{F}}{\vb{Z}} = \mqty(
+    \pdv{\vb{f}_1}{\vb{z}_1} & \pdv{\vb{f}_1}{\vb{z}_2} & \\
+    & \ddots & \ddots & \\
+    & & \pdv{\vb{f}_t}{\vb{z}_t} & \pdv{\vb{f}_t}{\vb{z}_{t+1}} \\
+    & & & \ddots & \ddots \\
+    & & & & \pdv{\vb{f}_T}{\vb{z}_{T-1}} & \pdv{\vb{f}_T}{\vb{z}_{T}}
+  )
+\end{equation}
+
+We just need the $f_{\dim} \times z_{\dim}$ Jacobian matrices $\pdv{\vb{f}_t}{\vb{z}_{t}}$ and $\pdv{\vb{f}_t}{\vb{z}_{t+1}}$.
+
+\subsubsection*{$\vb{f}_t$ Jacobian expressions}
+
+With $\vb{P}^{(m),i}_t = \vb{P}^{(m)}(\isopsi^i_{t+1}, \isopsi^i_{t}, \vb{a}_t)$, we first have
+
+\begin{equation}
+  \pdv{\vb{f}_t}{\vb{z}_t} = \mqty(
+    \ddots & & & & \vdots \\
+    & \pdv{\vb{P}_t^{(m),i}}{\isopsi^i_t} & & & \pdv{\vb{P}_t^{(m),i}}{\vb{a}_t} \\
+    & & \ddots & & \vdots \\ 
+    & & & -I_{c}^{\smallint \vb{a}_t} & -\Delta t I_{c}^{\vb{a}_t} & \\
+    & & & & -I_{c}^{\vb{a}_t} & -\Delta t I_{c}^{\dd_t\vb{a}_t} \\
+    & & & & & \ddots & \ddots \\ 
+    & & & & & & -I_{c}^{\dd_t^{c-1}\vb{a}_t} & -\Delta tI_{c}^{\vb{u}_t} \\ 
+  )
+\end{equation}
+
+where, $c = \textsf{ncontrols}$, and the diagonal dots in the bottom right indicate that the number of $-I_c$ blocks on the diagonal should equal \textsf{augdim}, which is set to 3 by default.
+
+\newpage
+
+Lastly,
+
+\begin{equation}
+   \pdv{\vb{f}_t}{\vb{z}_{t+1}} = \mqty(
+    \pdv{\vb{P}_t^{(m),1}}{\isopsi^1_{t+1}} & & & \\
+    & \ddots & & \\
+    & & \pdv{\vb{P}_t^{(m),n}}{\isopsi^n_{t+1}} & \\ 
+    & & & I_{c \cdot \textsf{augdim}} \\
+  )
+\end{equation}
+
+\subsubsection*{$\vb{P}^{(m),i}_t$ Jacobian expressions}
+
+For the $\isopsi^i$ components, we have, for $m = 2$,
+
+\begin{align}
+  \pdv{\vb{P}_t^{(2),i}}{\isopsi^i_t} &= -\qty(I + \frac{\Delta t}{2}G(\vb{a}_t)) \\
+  \pdv{\vb{P}_t^{(2),i}}{\isopsi^i_{t+1}} &= I - \frac{\Delta t}{2}G(\vb{a}_t)
+\end{align}
+
+and, for $m = 4$,
+
+\begin{align}
+  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_t} &= -\qty(I + \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2) \\
+  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_{t+1}} &= I - \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2.
+\end{align}
+
+
+Now, for the $\vb{a}_t$ components, we have, for $m = 2$,
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(2),i}}{a^j_t} 
+    = \frac{-\Delta t}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t})
+\end{equation}
+
+and, for $m = 4$,
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(4),i}}{a^j_t} 
+    = \frac{-\Delta t}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) + \frac{\qty(\Delta t)^2}{9} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
+\end{equation}
+
+where $\qty{A, B} = AB + BA$ is the anticommutator. 
+
+
+\newpage
+
+\subsection{Hessian of the Lagrangian}
+
+The Lagrangian function is defined to be
+
+\begin{equation}
+  \mathscr{L}(\vb{Z}; \sigma, \vb*{\mu}) = \sigma \cdot J(\vb{Z}) + \vb*{\mu} \vdot \vb{F}(\vb{Z})
+\end{equation}
+
+where $\vb*{\mu}$ is a $Z_{\dim}$-dimensional vector provided by the solver.
+
+\hfill
+
+For the Hessian we have 
+
+\begin{equation}
+  \laplacian \mathscr{L} = \sigma \cdot \laplacian J + \vb*{\mu} \vdot \laplacian \vb{F}.
+\end{equation}
+
+We will look at $\laplacian J$ and $\vb*{\mu} \vdot \laplacian \vb{F}$ separately.
+
+\subsubsection*{Objective Hessian}
+
+With $\ell^i = \ell(\isopsi^i_T, \isopsi^i_{\text{goal}})$, we have
+
+\begin{equation}
+  \laplacian J(\vb{Z}) = \mqty(
+    \ddots \\
+    & \vb{0} \\
+    & & R_t I_c \\
+    & & & \ddots \\
+    & & & & \ddots \\
+    & & & & & Q \cdot \laplacian \ell^i \\
+    & & & & & & \ddots \\
+    & & & & & & & \vb{0}
+  ) 
+\end{equation}
+
+where $\laplacian \ell^i$ is again calculated using \textsf{Symbolics.jl}.
+
+\newpage
+\subsubsection*{Dynamics Hessian}
+
+With $\vb*{\mu} = \qty(\vec \mu_1, \dots, \vec \mu_T)$, $\vec\mu_t = \qty(\mu_t^1, \dots, \mu_t^{z_{\text{dim}}})$, and using
+
+\begin{equation*}
+\vec\mu_t^{\isopsi^i} = \qty(\mu_t^{(i - 1)\cdot \isopsi_{\dim} + 1}, \dots, \mu_t^{i\cdot\isopsi_{\dim}})
+\end{equation*}
+
+we have, for $m = 4$ (if $m = 2$ the Hessian is $\vb{0}$),
+
+\begin{equation}
+  \vb*{\mu} \vdot \laplacian \vb{F} = \mqty(
+    \ddots \\
+    & \vb{0} \\
+    & & \displaystyle\sum_{i=1}^n \vec\mu_t^{\isopsi^i} \vdot \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j} \\
+    & & & \vb{0} \\
+    & & & & \ddots \\
+  )
+\end{equation}
+
+with
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j} = \frac{\qty(\Delta t)^2}{9}\qty{G^j_{\text{drive}}, G^k_{\text{drive}}} \qty(\isopsi^i_{t+1} - \isopsi^i_t)
+\end{equation}
+
+\hfill
+
+with, again, $\qty{A, B} = AB + BA$, being the anticommutator.
+
+
+    
+\end{document}
