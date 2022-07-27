@@ -51,7 +51,10 @@ struct QuantumStateLossGradient
     ∇ls::Vector{Function}
     isodim::Int
 
-    function QuantumStateLossGradient(loss::QuantumStateLoss; simplify=true)
+    function QuantumStateLossGradient(
+        loss::QuantumStateLoss;
+        simplify=true
+    )
         Symbolics.@variables ψ̃[1:loss.isodim]
         ψ̃ = collect(ψ̃)
         ∇ls_symbs = [Symbolics.gradient(l(ψ̃), ψ̃; simplify=simplify) for l in loss.ls]
@@ -75,19 +78,26 @@ struct QuantumStateLossHessian
     ∇²l_structures::Vector{Vector{Tuple{Int, Int}}}
     isodim::Int
 
-    function QuantumStateLossHessian(loss::QuantumStateLoss; simplify=true)
+    function QuantumStateLossHessian(
+        loss::QuantumStateLoss;
+        simplify=true
+    )
 
         Symbolics.@variables ψ̃[1:loss.isodim]
         ψ̃ = collect(ψ̃)
 
         ∇²l_symbs = [
-            Symbolics.sparsehessian(l(ψ̃), ψ̃; simplify=simplify) for l in loss.ls
+            Symbolics.sparsehessian(
+                l(ψ̃),
+                ψ̃;
+                simplify=simplify
+            ) for l in loss.ls
         ]
 
         ∇²l_structures = []
 
         for ∇²l_symb in ∇²l_symbs
-            K, J = findnz(∇²l_symb)
+            K, J, _ = findnz(∇²l_symb)
 
             KJ = collect(zip(K, J))
 
@@ -96,7 +106,10 @@ struct QuantumStateLossHessian
             push!(∇²l_structures, KJ)
         end
 
-        ∇²l_exprs = [Symbolics.build_function(∇²l_symb, ψ̃) for ∇²l_symb in ∇²l_symbs]
+        ∇²l_exprs = [
+            Symbolics.build_function(∇²l_symb, ψ̃)
+                for ∇²l_symb in ∇²l_symbs
+        ]
 
         ∇²ls = [eval(∇²l_expr[1]) for ∇²l_expr in ∇²l_exprs]
 
@@ -104,12 +117,17 @@ struct QuantumStateLossHessian
     end
 end
 
-function structure(H::QuantumStateLossHessian, T::Int, vardim::Int)
+function structure(
+    H::QuantumStateLossHessian,
+    T::Int,
+    vardim::Int
+)
     H_structure = []
-    for (i, KJ) in enumerate(H.∇²l_structures)
-        for kj in KJ
-            offset = index(T, i, vardim)
-            push!(H_structure, kj .+ offset)
+    T_offset = index(T, 0, vardim)
+    for (i, KJⁱ) in enumerate(H.∇²l_structures)
+        i_offset = index(i, 0, H.isodim)
+        for kj in KJⁱ
+            push!(H_structure, (T_offset + i_offset) .+ kj)
         end
     end
     return H_structure
@@ -152,7 +170,10 @@ function amplitude_loss(ψ̃, ψ̃goal)
 end
 
 function quaternionic_loss(ψ̃, ψ̃goal)
-    return min(abs(1 - dot(ψ̃, ψ̃goal)), abs(1 + dot(ψ̃, ψ̃goal)))
+    return min(
+        abs(1 - dot(ψ̃, ψ̃goal)),
+        abs(1 + dot(ψ̃, ψ̃goal))
+    )
 end
 
 end

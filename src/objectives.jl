@@ -24,17 +24,18 @@ end
 
 function SystemObjective(
     system::AbstractQubitSystem,
-    loss::QuantumStateLoss,
+    loss_fn::Function,
     T::Int,
     Q::Float64,
     R::Float64,
     eval_hessian::Bool
 )
+    loss = QuantumStateLoss(system; loss=loss_fn)
 
-    @views function L(Z)
+    @views function L(Z::AbstractVector{F}) where F
         ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
-        us = zeros(system.ncontrols * T)
-        for t = 1:T
+        us = zeros(F, system.ncontrols * T)
+        for t = 1:T-1
             us[slice(t, system.ncontrols)] =
                 Z[slice(t, system.nstates + 1, system.vardim, system.vardim)]
         end
@@ -44,11 +45,16 @@ function SystemObjective(
     ∇l = QuantumStateLossGradient(loss)
 
     # this version of ∇L removes intermediate Qs from objective
-    @views function ∇L(Z)
-        ∇ = zeros(system.vardim * T)
+    @views function ∇L(Z::AbstractVector{F}) where F
+        ∇ = zeros(F, system.vardim * T)
 
         for t = 1:T-1
-            uₜ_slice = slice(t, system.nstates + 1, system.vardim, system.vardim)
+            uₜ_slice = slice(
+                t,
+                system.nstates + 1,
+                system.vardim,
+                system.vardim
+            )
             uₜ = Z[uₜ_slice]
             ∇[uₜ_slice] = R * uₜ
         end
@@ -67,18 +73,31 @@ function SystemObjective(
 
         # uₜ Hessian structure (eq. 17)
         for t = 1:T-1
-            offset = index(t, system.nstates, system.vardim)
-            KK = (1:system.ncontrols) .+ offset
-            append!(∇²L_structure, collect(zip(KK, KK)))
+            uₜ_slice = slice(
+                t,
+                system.nstates + 1,
+                system.vardim,
+                system.vardim
+            )
+            append!(
+                ∇²L_structure,
+                collect(zip(uₜ_slice, uₜ_slice))
+            )
         end
 
         # ℓⁱs Hessian structure (eq. 17)
-        append!(∇²L_structure, structure(∇²l, T, system.vardim))
+        append!(
+            ∇²L_structure,
+            structure(∇²l, T, system.vardim)
+        )
 
         function ∇²L(Z::AbstractVector)
             Hs = fill(R, system.ncontrols * (T - 1))
-            ψ̃T = view(Z, slice(T, system.n_wfn_states, system.vardim))
-            append!(Hs, ∇²l(ψ̃T))
+            ψ̃T = view(
+                Z,
+                slice(T, system.n_wfn_states, system.vardim)
+            )
+            append!(Hs, Q * ∇²l(ψ̃T))
             return Hs
         end
     else

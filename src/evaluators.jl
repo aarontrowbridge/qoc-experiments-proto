@@ -6,7 +6,6 @@ export MinTimeEvaluator
 
 using ..QubitSystems
 using ..Integrators
-using ..Losses
 using ..Dynamics
 using ..Objectives
 
@@ -26,7 +25,7 @@ end
 function QubitEvaluator(
     system::AbstractQubitSystem,
     integrator::Symbol,
-    qloss::QuantumStateLoss,
+    loss_fn::Function,
     eval_hessian::Bool,
     T::Int,
     Δt::Float64,
@@ -44,7 +43,7 @@ function QubitEvaluator(
 
     objective = SystemObjective(
         system,
-        qloss,
+        loss_fn,
         T,
         Q,
         R,

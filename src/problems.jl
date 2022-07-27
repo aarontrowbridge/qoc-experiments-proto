@@ -55,7 +55,7 @@ function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
     integrator=:FourthOrderPade,
-    loss_fn=amplitude_loss,
+    loss=amplitude_loss,
     Δt=0.01,
     Q=200.0,
     R=0.1,
@@ -66,7 +66,9 @@ function QubitProblem(
     options=Options(),
 )
 
-    if getfield(options, :linear_solver) == "pardiso"
+    if getfield(options, :linear_solver) == "pardiso" &&
+        !Sys.isapple()
+
         Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
         Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
     end
@@ -84,8 +86,6 @@ function QubitProblem(
 
     variables = MOI.add_variables(optimizer, total_vars)
 
-    qloss = QuantumStateLoss(system; loss=loss_fn)
-
     # TODO: this is super hacky, I know; it should be fixed
     # subtype(::Type{Type{T}}) where T <: AbstractQuantumIntegrator = T
     # integrator = subtype(integrator)
@@ -93,7 +93,7 @@ function QubitProblem(
     evaluator = QubitEvaluator(
         system,
         integrator,
-        qloss,
+        loss,
         eval_hessian,
         T, Δt,
         Q, R
@@ -143,7 +143,8 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        (system.n_wfn_states + system.ncontrols) .+ 1:system.ncontrols,
+        system.n_wfn_states + system.ncontrols .+
+            (1:system.ncontrols),
         a_bound,
         system.vardim
     )
@@ -188,8 +189,16 @@ end
 initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
 
 @views function update_traj_data!(prob::QubitProblem)
-    z = MOI.get(prob.optimizer, MOI.VariablePrimal(), prob.variables)
-    xs = [z[slice(t, 1, prob.system.nstates, prob.system.vardim)] for t = 1:prob.T]
+    z = MOI.get(
+        prob.optimizer,
+        MOI.VariablePrimal(),
+        prob.variables
+    )
+
+    xs = [
+        z[slice(t, 1, prob.system.nstates, prob.system.vardim)]
+            for t = 1:prob.T
+    ]
     us = [
         z[
             slice(
@@ -200,6 +209,7 @@ initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
             )
         ] for t = 1:prob.T
     ]
+
     prob.trajectory.states .= xs
     prob.trajectory.actions .= us
 end

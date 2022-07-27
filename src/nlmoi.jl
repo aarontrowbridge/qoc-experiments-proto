@@ -20,11 +20,18 @@ end
 
 # objective and gradient
 
-function MOI.eval_objective(evaluator::AbstractPICOEvaluator, Z)
+function MOI.eval_objective(
+    evaluator::AbstractPICOEvaluator,
+    Z::AbstractVector
+)
     return evaluator.objective.L(Z)
 end
 
-function MOI.eval_objective_gradient(evaluator::AbstractPICOEvaluator, ∇, Z)
+function MOI.eval_objective_gradient(
+    evaluator::AbstractPICOEvaluator,
+    ∇::AbstractVector,
+    Z::AbstractVector
+)
     ∇ .= evaluator.objective.∇L(Z)
     return nothing
 end
@@ -32,7 +39,11 @@ end
 
 # constraints and Jacobian
 
-function MOI.eval_constraint(evaluator::AbstractPICOEvaluator, g, Z)
+function MOI.eval_constraint(
+    evaluator::AbstractPICOEvaluator,
+    g::AbstractVector,
+    Z::AbstractVector
+)
     g .= evaluator.dynamics.F(Z)
     return nothing
 end
@@ -41,7 +52,12 @@ function MOI.jacobian_structure(evaluator::AbstractPICOEvaluator)
     return evaluator.dynamics.∇F_structure
 end
 
-function MOI.eval_constraint_jacobian(evaluator::AbstractPICOEvaluator, J, Z)
+function MOI.eval_constraint_jacobian(
+    evaluator::AbstractPICOEvaluator,
+    J::AbstractVector,
+    Z::AbstractVector
+)
+
     ∇s = evaluator.dynamics.∇F(Z)
     for (k, ∇ₖ) in enumerate(∇s)
         J[k] = ∇ₖ
@@ -52,12 +68,20 @@ end
 
 # Hessian of the Lagrangian
 
-function MOI.hessian_lagrangian_structure(evaluator::AbstractPICOEvaluator)
-    structure = vcat(evaluator.objective.∇²L_structure, evaluator.dynamics.∇²F_structure)
+function MOI.hessian_lagrangian_structure(
+    evaluator::AbstractPICOEvaluator
+)
+    structure = vcat(evaluator.objective.∇²L_structure, evaluator.dynamics.μ∇²F_structure)
     return structure
 end
 
-function MOI.eval_hessian_lagrangian(evaluator::AbstractPICOEvaluator, H, Z, σ, μ)
+function MOI.eval_hessian_lagrangian(
+    evaluator::AbstractPICOEvaluator,
+    H::AbstractVector{T},
+    Z::AbstractVector{T},
+    σ::T,
+    μ::AbstractVector{T}
+) where T
 
     σ∇²Ls = σ * evaluator.objective.∇²L(Z)
 
@@ -65,7 +89,7 @@ function MOI.eval_hessian_lagrangian(evaluator::AbstractPICOEvaluator, H, Z, σ,
         H[k] = σ∇²Lₖ
     end
 
-    μ∇²Fs = evaluator.dynamics.∇²F(Z, μ)
+    μ∇²Fs = evaluator.dynamics.μ∇²F(Z, μ)
 
     offset = length(evaluator.objective.∇²L_structure)
 

@@ -8,7 +8,7 @@ H_drift = σz / 2
 H_drive = [σx / 2, σy / 2]
 
 gate = Symbol(ARGS[1])
-iter = parse(Int, ARGS[2])
+iter = parse(Int, ARGS[end])
 
 
 ψ0 = [1, 0]
@@ -27,18 +27,22 @@ system = SingleQubitSystem(
     gate, ψ
 )
 
-T    = 500
+T    = parse(Int, ARGS[2])
 Δt   = 0.01
 Q    = 200.0
 R    = 2.0
 loss = amplitude_loss
 hess = true
 
-plot_path = "plots/single_qubit/test/$(gate)_gate_2_controls_test_R_$(R)_T_$(T)_iter_$(iter).png"
+plot_dir = "plots/single_qubit/test"
+plot_file = "$(gate)_gate_2_controls_test_R_$(R)_T_$(T)_iter_$(iter).png"
+
+plot_path = joinpath(plot_dir, plot_file)
 
 options = Options(
     max_iter = iter,
-    tol = 1e-5
+    tol = 1e-5,
+    # linear_solver="pardiso",
 )
 
 prob = QubitProblem(
@@ -48,7 +52,7 @@ prob = QubitProblem(
     Q=Q,
     R=R,
     eval_hessian=hess,
-    loss_fn=loss,
+    loss=loss,
     options=options
 )
 

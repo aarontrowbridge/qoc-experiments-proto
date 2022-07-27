@@ -47,8 +47,8 @@ struct SystemDynamics
     F::Function
     ∇F::Function
     ∇F_structure::Vector{Tuple{Int, Int}}
-    ∇²F::Union{Function, Nothing}
-    ∇²F_structure::Union{Vector{Tuple{Int, Int}}, Nothing}
+    μ∇²F::Union{Function, Nothing}
+    μ∇²F_structure::Union{Vector{Tuple{Int, Int}}, Nothing}
 end
 
 function SystemDynamics(
@@ -67,8 +67,8 @@ function SystemDynamics(
         return dynamics(sys, sys_integrator, xₜ₊₁, xₜ, uₜ, Δt)
     end
 
-    @views function F(Z::AbstractVector)
-        δxs = zeros(typeof(Z[1]), sys.nstates * (T - 1))
+    @views function F(Z::AbstractVector{F}) where F
+        δxs = zeros(F, sys.nstates * (T - 1))
         for t = 1:T-1
             δxₜ = f(Z[slice(t, sys.vardim)], Z[slice(t + 1, sys.vardim)])
             δxs[slice(t, sys.nstates)] = δxₜ
@@ -92,7 +92,10 @@ function SystemDynamics(
     for i = 1:sys.nqstates
         for j = 1:sys.isodim     # jth column of ∂ψ̃ⁱₜPⁱ
             for k = 1:sys.isodim # kth row
-                kj = (index(i, k, sys.isodim), index(i, j, sys.isodim))
+                kj = (
+                    index(i, k, sys.isodim),
+                    index(i, j, sys.isodim)
+                )
                 push!(∇ₜf_structure, kj)
             end
         end
@@ -102,9 +105,12 @@ function SystemDynamics(
     # ∂aʲₜPⁱ blocks
 
     for i = 1:sys.nqstates
-        for j = 1:sys.ncontrols  # jth column, corresponding to ∂aʲₜPⁱ
-            for k = 1:sys.isodim # kth row, corresponding to ψ̃ⁱₜ
-                kj = (index(i, k, sys.isodim), sys.n_wfn_states + sys.ncontrols + j)
+        for j = 1:sys.ncontrols  # jth column of ∂aʲₜPⁱ
+            for k = 1:sys.isodim # kth row of ψ̃ⁱᵏₜ
+                kj = (
+                    index(i, k, sys.isodim),
+                    sys.n_wfn_states + sys.ncontrols + j
+                )
                 push!(∇ₜf_structure, kj)
             end
         end
@@ -183,7 +189,10 @@ function SystemDynamics(
     for i = 1:sys.nqstates
         for j = 1:sys.isodim     # jth column: ∂ψ̃ⁱʲₜPⁱ
             for k = 1:sys.isodim # kth row: ∂ψ̃ⁱʲₜPⁱᵏ
-                kj = (index(i, k, sys.isodim), index(i, j, sys.isodim))
+                kj = (
+                    index(i, k, sys.isodim),
+                    index(i, j, sys.isodim)
+                )
                 push!(∇ₜ₊₁f_structure, kj)
             end
         end
@@ -270,7 +279,7 @@ function SystemDynamics(
 
         if isa(integrator, FourthOrderPade)
 
-            ∇²F_structure = []
+            μ∇²F_structure = []
 
             for t = 1:T-1
                 for j = 1:sys.ncontrols
@@ -279,19 +288,36 @@ function SystemDynamics(
                             index(t, sys.n_wfn_states + sys.ncontrols + k),
                             index(t, sys.n_wfn_states + sys.ncontrols + j)
                         )
-                        push!(∇²F_structure, kj)
+                        push!(μ∇²F_structure, kj)
                     end
                 end
             end
 
             H = FourthOrderPadeHessian(sys)
 
-            @views function ∇²F(Z::Vector, μ::Vector)
+            @views function μ∇²F(Z::Vector, μ::Vector)
                 Hᵏʲs = []
                 for t = 1:T-1
-                    ψ̃ₜ₊₁ = Z[slice(t + 1, sys.n_wfn_states, sys.vardim)]
-                    ψ̃ₜ = Z[slice(t, sys.n_wfn_states, sys.vardim)]
-                    μₜ = μ[slice(t, sys.nstates)] # pretty sure dim(μ) = nstates * (T - 1)
+
+                    ψ̃ₜ₊₁ = Z[
+                        slice(
+                            t + 1,
+                            sys.n_wfn_states,
+                            sys.vardim
+                        )
+                    ]
+
+                    ψ̃ₜ = Z[
+                        slice(
+                            t,
+                            sys.n_wfn_states,
+                            sys.vardim
+                        )
+                    ]
+
+                    # dim(μ) = sys.nstates * (T - 1)
+                    μₜ = μ[slice(t, sys.nstates)]
+
                     for j = 1:sys.ncontrols
                         for k = 1:j
                             Hᵏʲ = H(ψ̃ₜ₊₁, ψ̃ₜ, μₜ, Δt, k, j)
@@ -302,15 +328,15 @@ function SystemDynamics(
                 return Hᵏʲs
             end
         else
-            ∇²F = (Z, μ) -> []
-            ∇²F_structure = []
+            μ∇²F = (Z, μ) -> []
+            μ∇²F_structure = []
         end
     else
-        ∇²F = nothing
-        ∇²F_structure = nothing
+        μ∇²F = nothing
+        μ∇²F_structure = nothing
     end
 
-    return SystemDynamics(F, ∇F, ∇F_structure, ∇²F, ∇²F_structure)
+    return SystemDynamics(F, ∇F, ∇F_structure, μ∇²F, μ∇²F_structure)
 end
 
 
@@ -389,7 +415,7 @@ end
 #         return jac
 #     end
 
-#     return SystemDynamics(f, ∇f, ∇f_structure, ∇²f, ∇²f_structure)
+#     return SystemDynamics(f, ∇f, ∇f_structure, μ∇²F, μ∇²F_structure)
 # end
 
 
