@@ -46,7 +46,7 @@ we solve the optimization problem
 
 \begin{align*}
   \underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}} \quad
-    & \sum_{i=1}^n Q_T \cdot \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \vb{u}_t^2 \\ 
+    & \sum_{i=1}^n Q \cdot \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \vb{u}_t^2 \\ 
   \text{subject to} \quad 
     & \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t) = \vb{0}  \\
     &  \isopsi^i_1 = \isopsi^i_\text{init} \\
