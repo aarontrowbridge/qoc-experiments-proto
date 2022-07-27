@@ -1,7 +1,8 @@
 module Utils
 
-export slice
 export index
+export slice
+
 
 index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
 

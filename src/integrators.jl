@@ -100,7 +100,8 @@ function (integrator::FourthOrderPade)(
     Id = I(size(Gₜ, 1))
     # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
     #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
-    return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) - Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
+    return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
+        Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
 end
 
 
@@ -131,7 +132,11 @@ end
 
 # Jacobian of 2nd order Pade integrator with respect to ψ̃ⁱₜ
 
-function (J::SecondOrderPadeJacobian)(aₜ::AbstractVector, Δt::Real, ψ̃ⁱₜ₊₁::Bool)
+function (J::SecondOrderPadeJacobian)(
+    aₜ::AbstractVector,
+    Δt::Real,
+    ψ̃ⁱₜ₊₁::Bool
+)
     Gₜ = G(aₜ, J.G_drift, J.G_drives)
     Id = I(size(Gₜ, 1))
     if ψ̃ⁱₜ₊₁
@@ -164,8 +169,9 @@ struct FourthOrderPadeJacobian
     G_drift_anticoms::Vector{Matrix}
     G_drive_anticoms::Symmetric
 
-    function FourthOrderPadeJacobian(integrator::AbstractQuantumIntegrator)
-
+    function FourthOrderPadeJacobian(
+        integrator::AbstractQuantumIntegrator
+    )
         ncontrols = length(integrator.G_drives)
 
         drive_anticoms = fill(
@@ -177,7 +183,8 @@ struct FourthOrderPadeJacobian
         for j = 1:ncontrols
             for k = 1:j
                 if k == j
-                    drive_anticoms[k, k] = 2 * integrator.G_drives[k]^2
+                    drive_anticoms[k, k] =
+                        2 * integrator.G_drives[k]^2
                 else
                     drive_anticoms[k, j] = anticom(
                         integrator.G_drives[k],
@@ -188,7 +195,8 @@ struct FourthOrderPadeJacobian
         end
 
         drift_anticoms = [
-            anticom(G_drive, integrator.G_drift) for G_drive in integrator.G_drives
+            anticom(G_drive, integrator.G_drift)
+                for G_drive in integrator.G_drives
         ]
 
         return new(
@@ -205,7 +213,11 @@ anticom(A::Matrix, B::Matrix) = A * B + B * A
 
 # Jacobian of 4th order Pade integrator with respect to ψ̃ⁱₜ
 
-function (J::FourthOrderPadeJacobian)(aₜ::AbstractVector, Δt::Real, ψ̃ⁱₜ₊₁::Bool)
+function (J::FourthOrderPadeJacobian)(
+    aₜ::AbstractVector,
+    Δt::Real,
+    ψ̃ⁱₜ₊₁::Bool
+)
     Gₜ = G(aₜ, J.G_drift, J.G_drives)
     Id = I(size(Gₜ, 1))
     if ψ̃ⁱₜ₊₁
@@ -239,24 +251,35 @@ struct FourthOrderPadeHessian
     isodim::Int
 
     function FourthOrderPadeHessian(sys::AbstractQubitSystem)
-        drive_anticoms = fill(zeros(size(sys.G_drift)), sys.ncontrols, sys.ncontrols)
+        drive_anticoms = fill(
+            zeros(size(sys.G_drift)),
+            sys.ncontrols,
+            sys.ncontrols
+        )
+
         for j = 1:sys.ncontrols
             for k = 1:j
-                if j == k
-                    drive_anticoms[j, j] = 2 * sys.G_drives[j]^2
+                if k == j
+                    drive_anticoms[k, k] = 2 * sys.G_drives[k]^2
                 else
-                    drive_anticoms[k, j] = anticom(sys.G_drives[j], sys.G_drives[k])
+                    drive_anticoms[k, j] =
+                        anticom(sys.G_drives[k], sys.G_drives[j])
                 end
             end
         end
-        return new(Symmetric(drive_anticoms), sys.nqstates, sys.isodim)
+
+        return new(
+            Symmetric(drive_anticoms),
+            sys.nqstates,
+            sys.isodim
+        )
     end
 end
 
 
 # Hessian of the 4th order Pade integrator with respect to aʲₜ and aᵏₜ
 
-function (H::FourthOrderPadeHessian)(
+@views function (H::FourthOrderPadeHessian)(
     ψ̃ₜ₊₁::AbstractVector,
     ψ̃ₜ::AbstractVector,
     μₜ::AbstractVector,
@@ -264,13 +287,24 @@ function (H::FourthOrderPadeHessian)(
     k::Int,
     j::Int
 )
-    Ĝᵏʲ = Δt^2 / 9 * H.G_drive_anticoms[k, j]
     Hᵏʲₜ = 0.0
+
+    Ĝᵏʲ = Δt^2 / 9 * H.G_drive_anticoms[k, j]
+
     for i = 1:H.nqstates
+
         ψ̃ⁱ_slice = slice(i, H.isodim)
-        Hᵏʲₜ += dot(μₜ[ψ̃ⁱ_slice], Ĝᵏʲ * (ψ̃ₜ₊₁[ψ̃ⁱ_slice] - ψ̃ₜ[ψ̃ⁱ_slice]))
+
+        μⁱₜ = μₜ[ψ̃ⁱ_slice]
+
+        ψ̃ⁱₜ = ψ̃ₜ[ψ̃ⁱ_slice]
+
+        ψ̃ⁱₜ₊₁ = ψ̃ₜ₊₁[ψ̃ⁱ_slice]
+
+        Hᵏʲₜ += dot(μⁱₜ, Ĝᵏʲ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ))
     end
-    return Hʲᵏₜ
+
+    return Hᵏʲₜ
 end
 
 
