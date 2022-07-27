@@ -19,8 +19,12 @@ using LinearAlgebra
 
 # G(a) helper function
 
-function G(a::AbstractVector, G_drift::AbstractMatrix, G_drives::Vector{<:AbstractMatrix})
-    return G_drift + sum([aʲ * Gʲ_drive for (aʲ, Gʲ_drive) in zip(a, G_drives)])
+function G(
+    a::AbstractVector,
+    G_drift::AbstractMatrix,
+    G_drives::Vector{<:AbstractMatrix}
+)
+    return G_drift + sum(a .* G_drives)
 end
 
 
