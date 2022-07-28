@@ -176,9 +176,11 @@ function MinTimeObjective(
         return 0.5 * Rᵤ * ∑u²
     end
 
-    L = z -> total_time(z) +
-             u_smoothness_regulator(z) +
-             u_amplitude_regulator(z)
+    L = z -> +(
+        total_time(z),
+        u_smoothness_regulator(z),
+        u_amplitude_regulator(z)
+    )
 
 
     #

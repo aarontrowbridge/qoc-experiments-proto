@@ -242,3 +242,71 @@ for integrator in integrators
         )
     )
 end
+
+
+#
+# test mintime objective derivatives
+#
+
+Z_mintime = 2 * rand(system.vardim * T + T - 1) .- 1
+
+Rᵤ = 1e-3
+Rₛ = 1e-3
+
+mintime_obj = MinTimeObjective(
+    system,
+    T,
+    Rᵤ,
+    Rₛ,
+    true
+)
+
+# getting analytic gradient
+
+∇L = mintime_obj.∇L(Z_mintime)
+
+
+# test gradient of mintime objective with FiniteDiff
+
+∇L_finite_diff =
+    FiniteDiff.finite_difference_gradient(
+        mintime_obj.L,
+        Z_mintime
+    )
+
+@test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
+
+
+# test gradient of mintime objective with ForwardDiff
+
+∇L_forward_diff =
+    ForwardDiff.gradient(mintime_obj.L, Z_mintime)
+
+@test all(isapprox.(∇L, ∇L_forward_diff, atol=ATOL))
+
+
+# sparse mintime objective Hessian data
+
+∇²L = dense(
+    mintime_obj.∇²L(Z_mintime),
+    mintime_obj.∇²L_structure,
+    (system.vardim * T + T - 1, system.vardim * T + T - 1)
+)
+
+# test hessian of mintime objective with FiniteDiff
+
+∇²L_finite_diff =
+    FiniteDiff.finite_difference_hessian(
+        mintime_obj.L,
+        Z_mintime
+    )
+
+@test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+
+
+# test hessian of mintime objective with ForwardDiff
+
+∇²L_forward_diff =
+    ForwardDiff.hessian(mintime_obj.L, Z_mintime)
+
+@test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
