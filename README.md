@@ -102,6 +102,8 @@ $$
 ## TODO: 
 
 - [ ] min time problem reimplementation
+  - [x] implementation
+  - [ ] tests
 - [ ] analytic derivatives
   - [ ] integrators
     - [x] 2nd order Pade
