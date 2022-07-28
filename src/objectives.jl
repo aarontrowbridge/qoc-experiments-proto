@@ -114,58 +114,250 @@ end
 struct MinTimeObjective
     L::Function
     ∇L::Function
+    ∇²L::Union{Function, Nothing}
+    ∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
 end
 
-function MinTimeObjective(sys::AbstractQubitSystem, T::Int, Rᵤ::Float64, Rₛ::Float64)
+function MinTimeObjective(
+    sys::AbstractQubitSystem,
+    T::Int,
+    Rᵤ::Float64,
+    Rₛ::Float64,
+    eval_hessian::Bool
+)
 
-    total_time(z) = sum([z[index(t, sys.vardim + 1)] for t = 1:T-1])
+    total_time(Z::AbstractVector) =
+        sum(Z[(end - (T - 1) + 1):end])
 
-    # TODO: chase down variables and remove end control variable
-
-    @views function u_smoothness_regulator(z)
+    @views function u_smoothness_regulator(Z::AbstractVector)
         ∑Δu² = 0.0
+
         for t = 1:T-2
-            uₜ₊₁ = z[slice(t + 1, sys.nstates + 1, sys.vardim, sys.vardim + 1)]
-            uₜ = z[slice(t, sys.nstates + 1, sys.vardim, sys.vardim + 1)]
+
+            uₜ₊₁ = Z[
+                slice(
+                    t + 1,
+                    sys.nstates + 1,
+                    sys.vardim,
+                    sys.vardim
+                )
+            ]
+
+            uₜ = Z[
+                slice(
+                    t,
+                    sys.nstates + 1,
+                    sys.vardim,
+                    sys.vardim
+                )
+            ]
+
             Δu = uₜ₊₁ - uₜ
+
             ∑Δu² += dot(Δu, Δu)
         end
+
         return 0.5 * Rₛ * ∑Δu²
     end
 
-    @views function u_amplitude_regulator(z)
+    @views function u_amplitude_regulator(Z::AbstractVector)
         ∑u² = 0.0
         for t = 1:T-1
-            uₜ = z[slice(t, sys.nstates + 1, sys.vardim, sys.vardim + 1)]
+            uₜ = Z[
+                slice(
+                    t,
+                    sys.nstates + 1,
+                    sys.vardim,
+                    sys.vardim
+                )
+            ]
             ∑u² += dot(uₜ, uₜ)
         end
         return 0.5 * Rᵤ * ∑u²
     end
 
-    L = z -> total_time(z) + u_smoothness_regulator(z) + u_amplitude_regulator(z)
+    L = z -> total_time(z) +
+             u_smoothness_regulator(z) +
+             u_amplitude_regulator(z)
 
-    @views function ∇L(z)
 
-        ∇ = zeros((sys.vardim + 1) * (T - 1) + sys.vardim)
+    #
+    # gradient of min time objective
+    #
+
+    @views function ∇L(Z::AbstractVector{F}) where F
+
+        ∇ = zeros(F, sys.vardim * T + T - 1)
+
+        ∇[end - (T - 1) + 1:end] .= 1.0
+
+        # u amplitude regulator gradient
 
         for t = 1:T-1
-            ∇[index(t, sys.vardim + 1)] = 1.0
-            ∇[slice(t, sys.nstates + 1, sys.vardim, sys.vardim + 1)] =
-                Rᵤ * z[slice(t, sys.nstates + 1, sys.vardim, sys.vardim + 1)]
+            uₜ_slice = slice(
+                t,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+            ∇[uₜ_slice] = Rᵤ * Z[uₜ_slice]
         end
 
+
+        # u smoothness regulator gradient
+
         for t = 1:T-2
-            uₜ₊₁ = z[slice(t + 1, sys.nstates + 1, sys.vardim, sys.vardim + 1)]
-            uₜ = z[slice(t, sys.nstates + 1, sys.vardim, sys.vardim + 1)]
+
+            uₜ_slice = slice(
+                t,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+
+            uₜ₊₁_slice = slice(
+                t + 1,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+
+            uₜ₊₁ = Z[uₜ₊₁_slice]
+
+            uₜ = Z[uₜ_slice]
+
             Δu = uₜ₊₁ - uₜ
-            ∇[slice(t, sys.nstates + 1, sys.vardim, sys.vardim + 1)] += -Rₛ * Δu
-            ∇[slice(t + 1, sys.nstates + 1, sys.vardim, sys.vardim + 1)] += Rₛ * Δu
+
+            ∇[uₜ_slice] += -Rₛ * Δu
+
+            ∇[uₜ₊₁_slice] += Rₛ * Δu
         end
 
         return ∇
     end
 
-    return MinTimeObjective(L, ∇L)
+
+    #
+    # Hessian of min time objective
+    #
+
+    if eval_hessian
+
+        ∇²L_structure = []
+
+
+        # u amplitude regulator Hessian structure
+
+        for t = 1:T-1
+
+            uₜ_slice = slice(
+                t,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+
+            append!(
+                ∇²L_structure,
+                collect(zip(uₜ_slice, uₜ_slice))
+            )
+        end
+
+
+        # u smoothness regulator Hessian main diagonal structure
+
+        for t = 1:T-1
+
+            uₜ_slice = slice(
+                t,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+
+            # main diagonal (2 if t ≂̸ 1 or T-1) * Rₛ I
+            # components: ∂²uₜSₜ
+            append!(
+                ∇²L_structure,
+                collect(
+                    zip(
+                        uₜ_slice,
+                        uₜ_slice
+                    )
+                )
+            )
+        end
+
+
+        # u smoothness regulator Hessian off diagonal structure
+
+        for t = 1:T-2
+
+            uₜ_slice = slice(
+                t,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+
+            uₜ₊₁_slice = slice(
+                t + 1,
+                sys.nstates + 1,
+                sys.vardim,
+                sys.vardim
+            )
+
+
+            # off diagonal -Rₛ I components: ∂uₜ₊₁∂uₜSₜ
+
+            append!(
+                ∇²L_structure,
+                collect(
+                    zip(
+                        uₜ_slice,
+                        uₜ₊₁_slice
+                    )
+                )
+            )
+        end
+
+        function ∇²L(Z::AbstractVector)
+
+            H = []
+
+
+            # u amplitude regulator Hessian values
+
+            for t = 1:T-1
+                append!(H, Rᵤ * ones(sys.ncontrols))
+            end
+
+
+            # u smoothness regulator Hessian main diagonal values
+
+            append!(H, Rₛ * ones(sys.ncontrols))
+
+            for t = 2:T-2
+                append!(H, 2 * Rₛ * ones(sys.ncontrols))
+            end
+
+            append!(H, Rₛ * ones(sys.ncontrols))
+
+
+            # u smoothness regulator Hessian off diagonal values
+
+            for t = 1:T-2
+                append!(H, -Rₛ * ones(sys.ncontrols))
+            end
+
+            return H
+        end
+    else
+        ∇²L = nothing
+        ∇²L_structure = nothing
+    end
+
+    return MinTimeObjective(L, ∇L, ∇²L, ∇²L_structure)
 end
 
 

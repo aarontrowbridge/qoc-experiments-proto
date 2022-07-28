@@ -1,9 +1,11 @@
 module Constraints
 
+export constrain!
+
 export AbstractConstraint
 export EqualityConstraint
 export BoundsConstraint
-export constrain
+export TimeStepBoundsConstraint
 
 using ..Utils
 
@@ -11,7 +13,19 @@ using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
 
+
 abstract type AbstractConstraint end
+
+function constrain!(
+    opt::Ipopt.Optimizer,
+    vars::Vector{MOI.VariableIndex},
+    cons::Vector{AbstractConstraint}
+)
+    for con in cons
+        con(opt, vars)
+    end
+end
+
 
 struct EqualityConstraint <: AbstractConstraint
     ts::AbstractArray{Int}
@@ -51,7 +65,10 @@ function EqualityConstraint(
 end
 
 
-function (con::EqualityConstraint)(opt::Ipopt.Optimizer, vars::Vector{MOI.VariableIndex})
+function (con::EqualityConstraint)(
+    opt::Ipopt.Optimizer,
+    vars::Vector{MOI.VariableIndex}
+)
     for t in con.ts
         for (j, val) in zip(con.js, con.vals)
             MOI.add_constraints(
@@ -136,8 +153,10 @@ function BoundsConstraint(
     )
 end
 
-
-function (con::BoundsConstraint)(opt::Ipopt.Optimizer, vars::Vector{MOI.VariableIndex})
+function (con::BoundsConstraint)(
+    opt::Ipopt.Optimizer,
+    vars::Vector{MOI.VariableIndex}
+)
     for t in con.ts
         for (j, (lb, ub)) in zip(con.js, con.vals)
             MOI.add_constraints(
@@ -154,15 +173,27 @@ function (con::BoundsConstraint)(opt::Ipopt.Optimizer, vars::Vector{MOI.Variable
     end
 end
 
-function constrain(
+struct TimeStepBoundsConstraint <: AbstractConstraint
+    bounds::Tuple{R, R} where R <: Real
+    T::Int
+end
+
+function (con::TimeStepBoundsConstraint)(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
-    cons::Vector{AbstractConstraint}
 )
-    for con in cons
-        con(opt, vars)
+    for t = 1:(con.T - 1)
+        MOI.add_constraints(
+            opt,
+            vars[end - (con.T - 1) + t],
+            MOI.GreaterThan(con.bounds[1])
+        )
+        MOI.add_constraints(
+            opt,
+            vars[end - (con.T - 1) + t],
+            MOI.LessThan(con.bounds[2])
+        )
     end
-    return opt
 end
 
 end

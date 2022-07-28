@@ -65,7 +65,7 @@ end
 
 function MinTimeEvaluator(
     system::AbstractQubitSystem,
-    integrator::Function,
+    integrator::Symbol,
     T::Int,
     Rᵤ::Float64,
     Rₛ::Float64,
@@ -83,7 +83,8 @@ function MinTimeEvaluator(
         system,
         T,
         Rᵤ,
-        Rₛ
+        Rₛ,
+        eval_hessian
     )
 
     return MinTimeEvaluator(
