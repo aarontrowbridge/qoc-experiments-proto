@@ -2,6 +2,7 @@ module Trajectories
 
 using ..Utils
 using ..QubitSystems
+using ..QuantumLogic
 
 export Trajectory
 
@@ -46,25 +47,44 @@ function Trajectory(
 
     for j = 1:system.control_order
         for k = 1:system.ncontrols
-            augmented_controls[index(2 + j, k, system.ncontrols), :] = derivative(
-                augmented_controls[index(2 + j - 1, k, system.ncontrols), :],
+
+            aug_j_idx = index(
+                2 + j,
+                k,
+                system.ncontrols
+            )
+
+            aug_j_minus_1_idx = index(
+                2 + j - 1,
+                k,
+                system.ncontrols
+            )
+
+            augmented_controls[aug_j_idx, :] = derivative(
+                augmented_controls[aug_j_minus_1_idx, :],
                 times
             )
         end
     end
 
-    augs_matrix = augmented_controls[1:system.ncontrols*system.augdim, :]
-    actions_matrix = augmented_controls[end-system.ncontrols+1:end, :]
+    augs_matrix =
+        augmented_controls[1:system.ncontrols*system.augdim, :]
+
+    actions_matrix =
+        augmented_controls[end-system.ncontrols+1:end, :]
 
     states = []
+
     push!(states, [system.ψ̃1; zeros(system.n_aug_states)])
+
     for t = 2:T-1
         augs = augs_matrix[:, t]
-        wfns = 2 * rand(system.n_wfn_states) .- 1
+        wfns = zeros(system.n_wfn_states)
         state = [wfns; augs]
         push!(states, state)
     end
-    push!(states, [system.ψ̃f; zeros(system.n_aug_states)])
+
+    push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
 
     actions = [actions_matrix[:, t] for t = 1:T]
 
@@ -75,14 +95,18 @@ function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
     states = []
     push!(states, [system.ψ̃1; zeros(system.n_aug_states)])
     for t = 2:T-1
-        wfns = 2 * rand(system.n_wfn_states) .- 1
+        state1 = normalize([1. - t/T, 0, 0, 0, -t/T, 0])
+        print(state1)
+        state2 = normalize([0, 1 - t/T, 0, -t/T, 0, 0])
+        wfns = vcat(state1, state2)
+        #wfns = zeros(system.n_wfn_states)
         augs = randn(system.n_aug_states)
         state = [wfns; augs]
         push!(states, state)
     end
-    push!(states, [system.ψ̃f; zeros(system.n_aug_states)])
+    push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
 
-    actions = [[randn(system.ncontrols) for t = 1:T-1]..., zeros(system.ncontrols)]
+    actions = [[0.1*randn(system.ncontrols) for t = 1:T-1]..., zeros(system.ncontrols)]
 
     times = [Δt * t for t = 1:T]
 

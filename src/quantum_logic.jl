@@ -8,6 +8,7 @@ export annihilate
 export create
 export quad
 export number
+export normalize 
 
 using LinearAlgebra
 
@@ -59,5 +60,7 @@ ket_to_iso(ψ) = [real(ψ); imag(ψ)]
 
 iso_to_ket(ψ̃) = ψ̃[1:div(length(ψ̃), 2)] + im * ψ̃[(div(length(ψ̃), 2) + 1):end]
 
-
+function normalize(state::Vector{C} where C <: Number)
+       return state/norm(state)
+end
 end

@@ -1,7 +1,7 @@
 using QubitControl 
 using HDF5
 
-iter = 3000
+iter = 1000
 
 const EXPERIMENT_NAME = "transmon"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/transmon/")
@@ -29,13 +29,13 @@ system = TransmonSystem(
 )
 
 #T is number of time steps, not total time
-T = 400
-Δt = 0.1 
-Q = 0.0
-Qf = 200.0
+T = 1200
+Δt = 0.01 
+Q = 2.
 R = 0.1
 loss = amplitude_loss
-hess = false
+hess = true
+pinqstate = true
 
 time = T * Δt
 
@@ -48,23 +48,28 @@ prob = QubitProblem(
     system,
     T;
     Δt = Δt,
-    Q = Qf,
+    Q = Q,
     R = R,
     eval_hessian = hess,
     loss = loss,
     a_bound = 2π * 19e-3,
-    pin_first_qstate = true,
+    pin_first_qstate = pinqstate,
     options = options
 )
 
+display(prob.trajectory.states[2])
 
 solve!(prob)
+
+display(prob.trajectory)
 
 raw_controls = jth_order_controls(prob.trajectory, system, 0)
 controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
 
 infidelity = iso_infidelity(final_state2(prob.trajectory, system), ket_to_iso(-im*ψg))
-final_state2(prob.trajectory, system)
+println(infidelity)
+
+display(final_state2(prob.trajectory, system))
 
 result = Dict(
     "Q" => Q,
@@ -75,7 +80,7 @@ result = Dict(
     "eval_hessian" => hess,
     "a_bound" => 19e-3,
     # "trajectory" => prob.trajectory,
-    "pin_first_qstate" => true,
+    "pin_first_qstate" => pinqstate,
     "controls" => controls,
     "infidelity" => infidelity
 )

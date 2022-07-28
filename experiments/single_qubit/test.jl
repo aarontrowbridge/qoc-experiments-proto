@@ -7,16 +7,8 @@ using QubitControl
 H_drift = σz / 2
 H_drive = [σx / 2, σy / 2]
 
-<<<<<<< HEAD
 gate = :X
 iter = 1000
-=======
-gate = Symbol(ARGS[1])
-iter = parse(Int, ARGS[end])
-<<<<<<< HEAD
->>>>>>> f9337fce0a96c359ec24ad16007509c494bbc156
-=======
->>>>>>> origin
 
 
 ψ0 = [1, 0]
@@ -35,16 +27,7 @@ system = SingleQubitSystem(
     gate, ψ
 )
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-#T is number of time steps, not total Time
 T    = 1000
-=======
-T    = parse(Int, ARGS[2])
->>>>>>> f9337fce0a96c359ec24ad16007509c494bbc156
-=======
-T    = parse(Int, ARGS[2])
->>>>>>> origin
 Δt   = 0.01
 Q    = 200.0
 R    = 2.0
@@ -70,6 +53,7 @@ prob = QubitProblem(
     R=R,
     eval_hessian=hess,
     loss=loss,
+    pin_first_qstate = true,
     options=options
 )
 
@@ -88,3 +72,6 @@ plot_single_qubit(
     plot_path,
     fig_title="$gate gate on basis states"
 )
+
+infidelity = iso_infidelity(final_state2(prob.trajectory, system), ket_to_iso(apply(:X, ψ1)))
+println(infidelity)

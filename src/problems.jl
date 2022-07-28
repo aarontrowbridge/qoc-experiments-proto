@@ -267,7 +267,7 @@ function QubitProblem(
     )
     push!(cons, a_bound_con)
 
-    constrain!(optimizer, variables, cons)
+    constrain(optimizer, variables, cons)
 
     dynamics_constraints = fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
 

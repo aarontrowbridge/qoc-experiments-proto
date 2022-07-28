@@ -238,7 +238,7 @@ function TransmonSystem(;
     if isa(ψ1, Vector{C})
         nqstates = 1
         isodim = 2 * length(ψ1)
-        ψ̃f = ket_to_iso(ψf)
+        ψ̃goal = ket_to_iso(ψf)
         ψ̃1 = ket_to_iso(ψ1)
     # otherwise it is multiple states and we are defining an (partial) isometry
     else 
