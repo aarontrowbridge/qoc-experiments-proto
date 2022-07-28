@@ -104,6 +104,7 @@ $$
 - [ ] min time problem reimplementation
   - [x] implementation
   - [ ] tests
+  - [ ] add details to notes
 - [ ] analytic derivatives
   - [ ] integrators
     - [x] 2nd order Pade
@@ -120,6 +121,7 @@ $$
 - [ ] systems
   - [ ] multimode system with specified control limits
   - [ ] two qubit system (try CNOT)
+  - [ ] transmon system
 - [ ] implicit $\ddot a(t)$
 - [ ] add ability to change linear solver
   - [ ] mac
