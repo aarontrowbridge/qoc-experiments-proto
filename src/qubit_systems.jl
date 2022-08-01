@@ -240,7 +240,7 @@ function TransmonSystem(;
         isodim = 2 * length(ψ1)
         ψ̃goal = ket_to_iso(ψf)
         ψ̃1 = ket_to_iso(ψ1)
-    # otherwise it is multiple states and we are defining an (partial) isometry
+    # otherwise it is multiple states and we are defining a (partial) isometry
     else 
         nqstates = length(ψ1)
         isodim = 2 * length(ψ1[1])
@@ -261,12 +261,12 @@ function TransmonSystem(;
     ncontrols = 2 
 
     H_drive = [create(levels) + annihilate(levels), 
-              1*im * (create(levels) - annihilate(levels))]
+              1im * (create(levels) - annihilate(levels))]
     G_drive = G.(H_drive)
 
 
     # just need da and a, no ∫a
-    augdim = control_order + 1
+    augdim = control_order 
 
     n_wfn_states = nqstates * isodim
     n_aug_states = ncontrols * augdim

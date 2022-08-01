@@ -3,7 +3,7 @@ using HDF5
 
 iter = 3000
 
-const EXPERIMENT_NAME = "transmon"
+const EXPERIMENT_NAME = "transmon_no_int_a"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/transmon/")
 
 #system parameters
@@ -35,7 +35,7 @@ Q = 200.
 R = 0.1
 loss = amplitude_loss
 hess = true
-pinqstate = false
+pinqstate = true
 
 time = T * Δt
 

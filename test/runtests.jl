@@ -93,6 +93,7 @@ obj = SystemObjective(
 
 ∇ = obj.∇L(Z)
 
+display(∇)
 
 # test gradient of objective with FiniteDiff
 
@@ -123,6 +124,7 @@ H = dense(
     obj.∇²L_structure,
     (system.vardim * T, system.vardim * T)
 )
+
 
 
 # test hessian of objective with FiniteDiff
@@ -176,6 +178,7 @@ for integrator in integrators
         (system.nstates * (T - 1), system.vardim * T)
     )
 
+    display(J)
 
     # test dynamics Jacobian vs finite diff
 

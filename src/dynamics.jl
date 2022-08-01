@@ -35,8 +35,8 @@ using SparseArrays
 
     δψ̃s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
 
-    aₜ = augsₜ[slice(2, sys.ncontrols)]
-    #aₜ = augsₜ[slice(1, sys.ncontrols)]
+    #aₜ = augsₜ[slice(2, sys.ncontrols)]
+    aₜ = augsₜ[slice(1, sys.ncontrols)]
 
     for i = 1:sys.nqstates
         ψ̃ⁱslice = slice(i, sys.isodim)
@@ -153,8 +153,8 @@ function SystemDynamics(
 
         ∇s = []
 
-        aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
-        #aₜ = zₜ[sys.n_wfn_states .+ slice(1, sys.ncontrols)]
+        #aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+        aₜ = zₜ[sys.n_wfn_states .+ slice(1, sys.ncontrols)]
 
         ∂ψ̃ⁱₜPⁱ = ∇P(aₜ, Δt, false)
 
@@ -226,9 +226,9 @@ function SystemDynamics(
 
         ∇s = []
 
-        aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+        #aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
 
-        #aₜ = zₜ[sys.n_wfn_states .+ slice(1, sys.ncontrols)]
+        aₜ = zₜ[sys.n_wfn_states .+ slice(1, sys.ncontrols)]
 
         ∂ψ̃ⁱₜ₊₁Pⁱ = ∇P(aₜ, Δt, true)
 
