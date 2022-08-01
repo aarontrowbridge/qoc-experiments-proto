@@ -118,7 +118,7 @@ function SystemDynamics(
             for k = 1:sys.isodim # kth row of ψ̃ⁱᵏₜ
                 kj = (
                     index(i, k, sys.isodim),
-                    sys.n_wfn_states + sys.ncontrols + j
+                    sys.n_wfn_states + j #+sys.ncontrols
                 )
                 push!(∇ₜf_structure, kj)
             end
@@ -289,16 +289,16 @@ function SystemDynamics(
 
     if eval_hessian
 
-        if isa(integrator, FourthOrderPade)
-
+        if isa(sys_integrator, FourthOrderPade)
+            print("entered")
             μ∇²F_structure = []
 
             for t = 1:T-1
                 for j = 1:sys.ncontrols
                     for k = 1:j
                         kj = (
-                            index(t, sys.n_wfn_states + sys.ncontrols + k),
-                            index(t, sys.n_wfn_states + sys.ncontrols + j)
+                            index(t, sys.n_wfn_states  + k, sys.vardim), #+ sys.ncontrols
+                            index(t, sys.n_wfn_states  + j, sys.vardim) # + sys.ncontrols
                         )
                         push!(μ∇²F_structure, kj)
                     end

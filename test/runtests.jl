@@ -42,7 +42,7 @@ loss_fn = amplitude_loss
 
 # absolulte tolerance for approximate tests
 
-const ATOL = 1e-2
+const ATOL = 1e-5
 
 
 #

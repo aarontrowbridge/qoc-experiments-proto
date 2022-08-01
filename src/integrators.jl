@@ -13,6 +13,7 @@ export FourthOrderPadeJacobian
 export FourthOrderPadeHessian
 
 using ..QubitSystems
+using ..Utils
 
 using LinearAlgebra
 
@@ -246,7 +247,7 @@ end
 # 4th order Pade integrator Jacobian struct
 
 struct FourthOrderPadeHessian
-    G_drive_anticoms::Symmetric{AbstractMatrix, Matrix{Matrix}}
+    G_drive_anticoms::Symmetric
     nqstates::Int
     isodim::Int
 
