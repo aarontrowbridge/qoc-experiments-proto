@@ -95,11 +95,11 @@ function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
     states = []
     push!(states, [system.ψ̃1; zeros(system.n_aug_states)])
     for t = 2:T-1
-        state1 = normalize([1. - t/T, 0, 0, 0, -t/T, 0])
-        print(state1)
-        state2 = normalize([0, 1 - t/T, 0, -t/T, 0, 0])
-        wfns = vcat(state1, state2)
-        #wfns = zeros(system.n_wfn_states)
+        # state1 = normalize([1. - t/T, 0, 0, 0, -t/T, 0])
+        # #print(state1)
+        # state2 = normalize([0, 1 - t/T, 0, -t/T, 0, 0])
+        # wfns = vcat(state1, state2)
+        wfns = 2*rand(system.n_wfn_states) .- 1
         augs = randn(system.n_aug_states)
         state = [wfns; augs]
         push!(states, state)
@@ -146,15 +146,15 @@ function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int)
 end
 
 #get rid of the 2 because no ∫a
-function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
-    @assert j ∈ 0:sys.control_order
-    if j != sys.control_order
-        jth_order_slice = slice(1 + j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(2π) for t = 1:traj.T]
-    else
-        return traj.actions
-    end
-end
+# function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
+#     @assert j ∈ 0:sys.control_order
+#     if j != sys.control_order
+#         jth_order_slice = slice(1 + j, sys.ncontrols)
+#         return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(2π) for t = 1:traj.T]
+#     else
+#         return traj.actions
+#     end
+# end
 
 # function jth_order_controls(traj::Trajectory, sys::MultiModeSystem, j::Int)
 #     @assert j ∈ 0:sys.control_order

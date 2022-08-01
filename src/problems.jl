@@ -242,7 +242,7 @@ function QubitProblem(
     # initial a(t = 1) constraints: ∫a, a, da = 0
     aug1_con = EqualityConstraint(
         1,
-        system.n_wfn_states .+ (1:system.n_aug_states),
+        system.n_wfn_states .+ (3:system.n_aug_states),
         0.0,
         system.vardim
     )
@@ -251,7 +251,7 @@ function QubitProblem(
     # final a(t = T) constraints: ∫a, a, da = 0
     augT_con = EqualityConstraint(
         T,
-        system.n_wfn_states .+ (1:system.n_aug_states),
+        system.n_wfn_states .+ (3:system.n_aug_states),
         0.0,
         system.vardim
     )
@@ -261,7 +261,7 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        system.n_wfn_states .+ (1:system.ncontrols),
+        system.n_wfn_states .+ (3:4),
         a_bound,
         system.vardim
     )

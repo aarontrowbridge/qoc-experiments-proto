@@ -266,7 +266,7 @@ function TransmonSystem(;
 
 
     # just need da and a, no ∫a
-    augdim = control_order
+    augdim = control_order + 1
 
     n_wfn_states = nqstates * isodim
     n_aug_states = ncontrols * augdim

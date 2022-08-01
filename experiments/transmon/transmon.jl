@@ -1,7 +1,7 @@
 using QubitControl 
 using HDF5
 
-iter = 1000
+iter = 3000
 
 const EXPERIMENT_NAME = "transmon"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/transmon/")
@@ -29,13 +29,13 @@ system = TransmonSystem(
 )
 
 #T is number of time steps, not total time
-T = 1200
-Δt = 0.01 
-Q = 2.
+T = 400
+Δt = 0.1 
+Q = 200.
 R = 0.1
 loss = amplitude_loss
 hess = true
-pinqstate = true
+pinqstate = false
 
 time = T * Δt
 
