@@ -34,17 +34,21 @@ function SystemObjective(
 
     @views function L(Z::AbstractVector{F}) where F
         ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
-        us = zeros(F, system.ncontrols * T)
+        obj = 0.0
         for t = 1:T-1
-            us[slice(t, system.ncontrols)] =
-                Z[slice(t, system.nstates + 1, system.vardim, system.vardim)]
+            uₜ = Z[slice(
+                t,
+                system.nstates + 1,
+                system.vardim,
+                system.vardim
+            )]
+            obj += R / 2 * sum(uₜ.^2)
         end
-        return Q * loss(ψ̃T) + R / 2 * dot(us, us)
+        return Q * loss(ψ̃T) + obj
     end
 
     ∇l = QuantumStateLossGradient(loss)
 
-    # this version of ∇L removes intermediate Qs from objective
     @views function ∇L(Z::AbstractVector{F}) where F
         ∇ = zeros(F, system.vardim * T)
 
@@ -65,6 +69,9 @@ function SystemObjective(
 
         return ∇
     end
+
+    ∇²L = nothing
+    ∇²L_structure = nothing
 
     if eval_hessian
         ∇²l = QuantumStateLossHessian(loss)
@@ -91,7 +98,7 @@ function SystemObjective(
             structure(∇²l, T, system.vardim)
         )
 
-        function ∇²L(Z::AbstractVector)
+        ∇²L = Z::AbstractVector -> begin
             Hs = fill(R, system.ncontrols * (T - 1))
             ψ̃T = view(
                 Z,
@@ -100,16 +107,15 @@ function SystemObjective(
             append!(Hs, Q * ∇²l(ψ̃T))
             return Hs
         end
-    else
-        ∇²L = nothing
-        ∇²L_structure = nothing
     end
 
     return SystemObjective(L, ∇L, ∇²L, ∇²L_structure)
 end
 
 
-# TODO: implement Hessian for MinTimeObjective
+#
+# min time objective hessian
+#
 
 struct MinTimeObjective
     L::Function
@@ -187,9 +193,9 @@ function MinTimeObjective(
     # gradient of min time objective
     #
 
-    @views function ∇L(Z::AbstractVector{F}) where F
+    ∇L = (Z::AbstractVector) -> begin
 
-        ∇ = zeros(F, sys.vardim * T + T - 1)
+        ∇ = zeros(typeof(Z[1]), sys.vardim * T + T - 1)
 
         ∇[end - (T - 1) + 1:end] .= 1.0
 
@@ -242,6 +248,9 @@ function MinTimeObjective(
     #
     # Hessian of min time objective
     #
+
+    ∇²L = nothing
+    ∇²L_structure = nothing
 
     if eval_hessian
 
@@ -323,7 +332,8 @@ function MinTimeObjective(
             )
         end
 
-        function ∇²L(Z::AbstractVector)
+
+        ∇²L = Z::AbstractVector -> begin
 
             H = []
 
@@ -354,9 +364,6 @@ function MinTimeObjective(
 
             return H
         end
-    else
-        ∇²L = nothing
-        ∇²L_structure = nothing
     end
 
     return MinTimeObjective(L, ∇L, ∇²L, ∇²L_structure)

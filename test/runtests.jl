@@ -23,7 +23,8 @@ gate = :X
 ψ0 = [1, 0]
 ψ1 = [0, 1]
 
-ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
+# ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
+ψ = [ψ0, ψ1]
 
 system = SingleQubitSystem(
     H_drift,
@@ -31,7 +32,7 @@ system = SingleQubitSystem(
     gate, ψ
 )
 
-T = 10
+T = 5
 Q = 200.0
 R = 2.0
 
@@ -42,7 +43,7 @@ loss_fn = amplitude_loss
 
 # absolulte tolerance for approximate tests
 
-const ATOL = 1e-2
+const ATOL = 1e-6
 
 
 #
@@ -68,6 +69,20 @@ function dense(vals, structure, shape)
 end
 
 
+# show differences between arrays
+
+function show_diffs(A, B)
+    for (i, (a, b)) in enumerate(zip(A, B))
+        inds = Tuple(CartesianIndices(A)[i])
+        if !isapprox(a, b, atol=ATOL) && inds[1] ≤ inds[2]
+            @info "values" (a, b)
+            @info "indices" inds
+        end
+    end
+end
+
+
+
 # initializing state vector
 
 Z = 2 * rand(system.vardim * T) .- 1
@@ -91,34 +106,26 @@ obj = SystemObjective(
 
 # getting analytic gradient
 
-∇ = obj.∇L(Z)
+∇L = obj.∇L(Z)
 
 
 # test gradient of objective with FiniteDiff
 
-@test all(
-    isapprox.(
-        ∇,
-        FiniteDiff.finite_difference_gradient(obj.L, Z),
-        atol=ATOL
-    )
-)
+∇L_finite_diff = FiniteDiff.finite_difference_gradient(obj.L, Z)
+
+@test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
 
 
 # test gradient of objective with ForwardDiff
 
-@test all(
-    isapprox.(
-        ∇,
-        ForwardDiff.gradient(obj.L, Z),
-        atol=ATOL
-    )
-)
+∇L_forward_diff = ForwardDiff.gradient(obj.L, Z)
+
+@test all(isapprox.(∇L, ∇L_forward_diff, atol=ATOL))
 
 
 # sparse objective Hessian data
 
-H = dense(
+∇²L = dense(
     obj.∇²L(Z),
     obj.∇²L_structure,
     (system.vardim * T, system.vardim * T)
@@ -127,24 +134,18 @@ H = dense(
 
 # test hessian of objective with FiniteDiff
 
-@test all(
-    isapprox.(
-        H,
-        FiniteDiff.finite_difference_hessian(obj.L, Z),
-        atol=ATOL
-    )
-)
+∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
+
+show_diffs(∇²L, ∇²L_finite_diff)
+
+@test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
 
 
 # test hessian of objective with ForwardDiff
 
-@test all(
-    isapprox.(
-        H,
-        ForwardDiff.hessian(obj.L, Z),
-        atol=ATOL
-    )
-)
+∇²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
+
+@test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
 
 
 #
@@ -170,7 +171,7 @@ for integrator in integrators
 
     # dynamics Jacobian
 
-    J = dense(
+    ∇F = dense(
         dyns.∇F(Z),
         dyns.∇F_structure,
         (system.nstates * (T - 1), system.vardim * T)
@@ -179,24 +180,18 @@ for integrator in integrators
 
     # test dynamics Jacobian vs finite diff
 
-    @test all(
-        isapprox.(
-            J,
-            FiniteDiff.finite_difference_jacobian(dyns.F, Z),
-            atol=ATOL
-        )
-    )
+    ∇F_finite_diff =
+        FiniteDiff.finite_difference_jacobian(dyns.F, Z)
+
+    @test all(isapprox.(∇F, ∇F_finite_diff, atol=ATOL))
 
 
     # test dynamics Jacobian vs forward diff
 
-    @test all(
-        isapprox.(
-            J,
-            ForwardDiff.jacobian(dyns.F, Z),
-            atol=ATOL
-        )
-    )
+    ∇F_forward_diff =
+        ForwardDiff.jacobian(dyns.F, Z)
+
+    @test all(isapprox.(∇F, ∇F_forward_diff, atol=ATOL))
 
 
     # Hessian of Lagrangian set up
@@ -211,36 +206,20 @@ for integrator in integrators
 
     HofL(Z) = dot(μ, dyns.F(Z))
 
-    # for (H_analytic, H_numerical) in zip(
-    #     μ∇²F,
-    #     FiniteDiff.finite_difference_hessian(HofL, Z)
-    # )
-    #     if !isapprox(H_analytic, H_numerical, atol=ATOL)
-    #         println((H_analytic, H_numerical))
-    #     end
-    # end
+    # test dynanamics Hessian of Lagrangian vs finite diff
 
+    HofL_finite_diff =
+        FiniteDiff.finite_difference_hessian(HofL, Z)
 
-    # test dynamics Hessian of Lagrangian vs finite diff
-
-    @test all(
-        isapprox.(
-            μ∇²F,
-            FiniteDiff.finite_difference_hessian(HofL, Z),
-            atol=ATOL
-        )
-    )
+    @test all(isapprox.(μ∇²F, HofL_finite_diff, atol=ATOL))
 
 
     # test dynamics Hessian of Lagrangian vs forward diff
 
-    @test all(
-        isapprox.(
-            μ∇²F,
-            ForwardDiff.hessian(HofL, Z),
-            atol=ATOL
-        )
-    )
+    HofL_forward_diff =
+        ForwardDiff.hessian(HofL, Z)
+
+    @test all(isapprox.(μ∇²F, HofL_forward_diff, atol=ATOL))
 end
 
 
@@ -276,7 +255,6 @@ mintime_obj = MinTimeObjective(
 
 @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
 
-
 # test gradient of mintime objective with ForwardDiff
 
 ∇L_forward_diff =
@@ -300,6 +278,8 @@ mintime_obj = MinTimeObjective(
         mintime_obj.L,
         Z_mintime
     )
+
+show_diffs(∇²L, ∇²L_finite_diff)
 
 @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
 

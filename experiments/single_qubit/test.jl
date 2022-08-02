@@ -34,6 +34,8 @@ R    = 2.0
 loss = amplitude_loss
 hess = true
 
+integrator = :FourthOrderPade
+
 plot_dir = "plots/single_qubit/test"
 plot_file = "$(gate)_gate_2_controls_test_R_$(R)_T_$(T)_iter_$(iter).png"
 
@@ -53,7 +55,8 @@ prob = QubitProblem(
     R=R,
     eval_hessian=hess,
     loss=loss,
-    options=options
+    options=options,
+    integrator=integrator,
 )
 
 plot_single_qubit(

@@ -279,28 +279,174 @@ function SystemDynamics(
     # dynamics Hessian
     #
 
+    μ∇²F = nothing
+    μ∇²F_structure = nothing
+
     if eval_hessian
 
-        if isa(integrator, FourthOrderPade)
+        if sys_integrator isa SecondOrderPade
+
+            μ∇²F_structure = []
+
+            # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks
+
+            for t = 1:T-1
+                for i = 1:sys.nqstates
+
+                    # ∂ψ̃ⁱₜ∂aʲₜPⁱ block:
+
+                    for j = 1:sys.ncontrols
+                        for k = 1:sys.isodim
+                            kⁱjₜ = (
+                                # kⁱth row
+                                index(t, 0, sys.vardim) +
+                                index(i, k, sys.isodim),
+
+                                # jth column
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, j, sys.ncontrols)
+                            )
+                            push!(μ∇²F_structure, kⁱjₜ)
+                        end
+                    end
+
+
+                    # ∂aᵏₜ∂ψ̃ⁱₜ₊₁Pⁱ block
+
+                    for k = 1:sys.ncontrols
+                        for j = 1:sys.isodim
+                            jⁱkₜ₊₁ = (
+                                # kth row
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, k, sys.ncontrols),
+
+                                # jⁱth column
+                                index(t + 1, 0, sys.vardim) +
+                                index(i, j, sys.isodim)
+                            )
+                            push!(μ∇²F_structure, jⁱkₜ₊₁)
+                        end
+                    end
+                end
+            end
+
+            H = SecondOrderPadeHessian(sys)
+
+            μ∇²F = @views (
+                Z::AbstractVector, # not used here, but keep!
+                μ::AbstractVector
+            ) -> begin
+
+                Hⁱᵏʲs = []
+
+                for t = 1:T-1
+                    μₜ = μ[slice(t, sys.nstates)]
+                    for i = 1:sys.nqstates
+
+                        # ∂ψ̃ⁱₜ∂aʲₜPⁱ block
+                        for j = 1:sys.ncontrols
+                            append!(
+                                Hⁱᵏʲs,
+                                H(μₜ, Δt, i, j, false)
+                            )
+                        end
+
+                        # ∂ψ̃ⁱₜ₊₁∂aʲₜPⁱ block
+                        for k = 1:sys.ncontrols
+                            append!(
+                                Hⁱᵏʲs,
+                                H(μₜ, Δt, i, k, true)
+                            )
+                        end
+                    end
+                end
+                return Hⁱᵏʲs
+            end
+
+        elseif sys_integrator isa FourthOrderPade
 
             μ∇²F_structure = []
 
             for t = 1:T-1
+
+                # ∂aᵏₜ∂aʲₜPⁱ block
+
                 for j = 1:sys.ncontrols
                     for k = 1:j
-                        kj = (
-                            index(t, sys.n_wfn_states + sys.ncontrols + k),
-                            index(t, sys.n_wfn_states + sys.ncontrols + j)
+                        kjₜ = (
+                            index(t, 0, sys.vardim) +
+                            sys.n_wfn_states +
+                            # FIXME: assumes ∫a exists here
+                            index(2, k, sys.ncontrols),
+
+                            index(t, 0, sys.vardim) +
+                            sys.n_wfn_states +
+                            # FIXME: assumes ∫a exists here
+                            index(2, j, sys.ncontrols),
                         )
-                        push!(μ∇²F_structure, kj)
+                        push!(μ∇²F_structure, kjₜ)
+                    end
+                end
+
+
+                # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks
+
+                for i = 1:sys.nqstates
+
+                    # ∂ψ̃ⁱₜ∂aʲₜPⁱ block:
+
+                    for j = 1:sys.ncontrols
+                        for k = 1:sys.isodim
+                            kⁱjₜ = (
+                                # kⁱth row
+                                index(t, 0, sys.vardim) +
+                                index(i, k, sys.isodim),
+
+                                # jth column
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, j, sys.ncontrols)
+                            )
+                            push!(μ∇²F_structure, kⁱjₜ)
+                        end
+                    end
+
+
+                    # ∂aᵏₜ∂ψ̃ⁱₜ₊₁Pⁱ block
+
+                    for k = 1:sys.ncontrols
+                        for j = 1:sys.isodim
+                            jⁱkₜ₊₁ = (
+                                # kth row
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, k, sys.ncontrols),
+
+                                # jⁱth column
+                                index(t + 1, 0, sys.vardim) +
+                                index(i, j, sys.isodim)
+                            )
+                            push!(μ∇²F_structure, jⁱkₜ₊₁)
+                        end
                     end
                 end
             end
 
             H = FourthOrderPadeHessian(sys)
 
-            @views function μ∇²F(Z::Vector, μ::Vector)
-                Hᵏʲs = []
+            μ∇²F = @views (
+                Z::AbstractVector,
+                μ::AbstractVector
+            ) -> begin
+
+                Hs = []
+
                 for t = 1:T-1
 
                     ψ̃ₜ₊₁ = Z[
@@ -322,22 +468,53 @@ function SystemDynamics(
                     # dim(μ) = sys.nstates * (T - 1)
                     μₜ = μ[slice(t, sys.nstates)]
 
+                    # ∂aᵏₜ∂aʲₜPⁱ block
+
                     for j = 1:sys.ncontrols
                         for k = 1:j
                             Hᵏʲ = H(ψ̃ₜ₊₁, ψ̃ₜ, μₜ, Δt, k, j)
-                            append!(Hᵏʲs, Hᵏʲ)
+                            append!(Hs, Hᵏʲ)
+                        end
+                    end
+
+                    aₜ = Z[
+                        index(
+                            t,
+                            sys.n_wfn_states,
+                            sys.vardim
+                        ) .+
+
+                        # FIXME: assumes ∫a exists here
+                        slice(
+                            2,
+                            sys.ncontrols
+                        )
+                    ]
+
+                    # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks
+
+                    for i = 1:sys.nqstates
+
+                        # ∂ψ̃ⁱₜ∂aʲₜPⁱ block
+                        for j = 1:sys.ncontrols
+                            append!(
+                                Hs,
+                                H(aₜ, μₜ, Δt, i, j, false)
+                            )
+                        end
+
+                        # ∂ψ̃ⁱₜ₊₁∂aʲₜPⁱ block
+                        for k = 1:sys.ncontrols
+                            append!(
+                                Hs,
+                                H(aₜ, μₜ, Δt, i, k, true)
+                            )
                         end
                     end
                 end
-                return Hᵏʲs
+                return Hs
             end
-        else
-            μ∇²F = (Z, μ) -> []
-            μ∇²F_structure = []
         end
-    else
-        μ∇²F = nothing
-        μ∇²F_structure = nothing
     end
 
     return SystemDynamics(
@@ -348,7 +525,6 @@ function SystemDynamics(
         μ∇²F_structure
     )
 end
-
 
 
 #
@@ -599,28 +775,172 @@ function MinTimeSystemDynamics(
     # dynamics Hessian
     #
 
+    μ∇²F = nothing
+    μ∇²F_structure = nothing
+
     if eval_hessian
 
-        if isa(integrator, FourthOrderPade)
+        if sys_integrator isa SecondOrderPade
+
+            μ∇²F_structure = []
+
+
+            for t = 1:T-1
+                for i = 1:sys.nqstates
+
+                    # ∂ψ̃ⁱₜ∂aʲₜPⁱ block:
+
+                    for j = 1:sys.ncontrols
+                        for k = 1:sys.isodim
+                            kⁱjₜ = (
+                                # kⁱth row
+                                index(t, 0, sys.vardim) +
+                                index(i, k, sys.isodim),
+
+                                # jth column
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, j, sys.ncontrols)
+                            )
+                            push!(μ∇²F_structure, kⁱjₜ)
+                        end
+                    end
+
+
+                    # ∂aᵏₜ∂ψ̃ⁱₜ₊₁Pⁱ block
+
+                    for k = 1:sys.ncontrols
+                        for j = 1:sys.isodim
+                            jⁱkₜ₊₁ = (
+                                # kth row
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, k, sys.ncontrols),
+
+                                # jⁱth column
+                                index(t + 1, 0, sys.vardim) +
+                                index(i, j, sys.isodim)
+                            )
+                            push!(μ∇²F_structure, jⁱkₜ₊₁)
+                        end
+                    end
+                end
+            end
+
+
+            H = SecondOrderPadeHessian(sys)
+
+            μ∇²F = @views (
+                Z::AbstractVector,
+                μ::AbstractVector
+            ) -> begin
+                Hⁱᵏʲs = []
+
+                for t = 1:T-1
+                    μₜ = μ[slice(t, sys.nstates)]
+                    Δtₜ = Z[end - (T - 1) + t]
+                    for i = 1:sys.nqstates
+
+                        # ∂ψ̃ⁱₜ∂aʲₜPⁱ block
+                        for j = 1:sys.ncontrols
+                            append!(
+                                Hⁱᵏʲs,
+                                H(μₜ, Δtₜ, i, j, false)
+                            )
+                        end
+
+                        # ∂ψ̃ⁱₜ₊₁∂aʲₜPⁱ block
+                        for k = 1:sys.ncontrols
+                            append!(
+                                Hⁱᵏʲs,
+                                H(μₜ, Δtₜ, i, k, true)
+                            )
+                        end
+                    end
+                end
+                return Hⁱᵏʲs
+            end
+
+        elseif sys_integrator isa FourthOrderPade
 
             μ∇²F_structure = []
 
             for t = 1:T-1
+
+                # ∂aᵏₜ∂aʲₜPⁱ block
+
                 for j = 1:sys.ncontrols
                     for k = 1:j
-                        kj = (
-                            index(t, sys.n_wfn_states + sys.ncontrols + k),
-                            index(t, sys.n_wfn_states + sys.ncontrols + j)
+                        kjₜ = (
+                            index(t, 0, sys.vardim) +
+                            sys.n_wfn_states +
+                            # FIXME: assumes ∫a exists here
+                            index(2, k, sys.ncontrols),
+
+                            index(t, 0, sys.vardim) +
+                            sys.n_wfn_states +
+                            # FIXME: assumes ∫a exists here
+                            index(2, j, sys.ncontrols),
                         )
-                        push!(μ∇²F_structure, kj)
+                        push!(μ∇²F_structure, kjₜ)
+                    end
+                end
+
+
+                # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks
+
+                for i = 1:sys.nqstates
+
+                    # ∂ψ̃ⁱₜ∂aʲₜPⁱ block:
+
+                    for j = 1:sys.ncontrols
+                        for k = 1:sys.isodim
+                            kⁱjₜ = (
+                                # kⁱth row
+                                index(t, 0, sys.vardim) +
+                                index(i, k, sys.isodim),
+
+                                # jth column
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, j, sys.ncontrols)
+                            )
+                            push!(μ∇²F_structure, kⁱjₜ)
+                        end
+                    end
+
+
+                    # ∂aᵏₜ∂ψ̃ⁱₜ₊₁Pⁱ block
+
+                    for k = 1:sys.ncontrols
+                        for j = 1:sys.isodim
+                            jⁱkₜ₊₁ = (
+                                # kth row
+                                index(t, 0, sys.vardim) +
+                                sys.n_wfn_states +
+                                # FIXME: assumes ∫a exists here
+                                index(2, k, sys.ncontrols),
+
+                                # jⁱth column
+                                index(t + 1, 0, sys.vardim) +
+                                index(i, j, sys.isodim)
+                            )
+                            push!(μ∇²F_structure, jⁱkₜ₊₁)
+                        end
                     end
                 end
             end
 
             H = FourthOrderPadeHessian(sys)
 
-            @views function μ∇²F(Z::Vector, μ::Vector)
-                Hᵏʲs = []
+            μ∇²F = @views (
+                Z::AbstractVector,
+                μ::AbstractVector
+            ) -> begin
+                Hs = []
                 for t = 1:T-1
 
                     ψ̃ₜ₊₁ = Z[
@@ -641,24 +961,57 @@ function MinTimeSystemDynamics(
 
                     # dim(μ) = sys.nstates * (T - 1)
                     μₜ = μ[slice(t, sys.nstates)]
+
                     Δtₜ = Z[end - (T - 1) + t]
+
+
+                    # ∂aᵏₜ∂aʲₜPⁱ block
 
                     for j = 1:sys.ncontrols
                         for k = 1:j
                             Hᵏʲ = H(ψ̃ₜ₊₁, ψ̃ₜ, μₜ, Δtₜ, k, j)
-                            append!(Hᵏʲs, Hᵏʲ)
+                            append!(Hs, Hᵏʲ)
+                        end
+                    end
+
+                    aₜ = Z[
+                        index(
+                            t,
+                            sys.n_wfn_states,
+                            sys.vardim
+                        ) .+
+
+                        # FIXME: assumes ∫a exists here
+                        slice(
+                            2,
+                            sys.ncontrols
+                        )
+                    ]
+
+                    # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks
+
+                    for i = 1:sys.nqstates
+
+                        # ∂ψ̃ⁱₜ∂aʲₜPⁱ block
+                        for j = 1:sys.ncontrols
+                            append!(
+                                Hs,
+                                H(aₜ, μₜ, Δtₜ, i, j, false)
+                            )
+                        end
+
+                        # ∂ψ̃ⁱₜ₊₁∂aʲₜPⁱ block
+                        for k = 1:sys.ncontrols
+                            append!(
+                                Hs,
+                                H(aₜ, μₜ, Δtₜ, i, k, true)
+                            )
                         end
                     end
                 end
-                return Hᵏʲs
+                return Hs
             end
-        else
-            μ∇²F = (Z, μ) -> []
-            μ∇²F_structure = []
         end
-    else
-        μ∇²F = nothing
-        μ∇²F_structure = nothing
     end
 
     return SystemDynamics(

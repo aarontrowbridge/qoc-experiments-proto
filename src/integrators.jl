@@ -10,8 +10,11 @@ export Jacobian
 
 export SecondOrderPadeJacobian
 export FourthOrderPadeJacobian
+
+export SecondOrderPadeHessian
 export FourthOrderPadeHessian
 
+using ..Utils
 using ..QubitSystems
 
 using LinearAlgebra
@@ -22,7 +25,7 @@ using LinearAlgebra
 function G(
     a::AbstractVector,
     G_drift::AbstractMatrix,
-    G_drives::Vector{<:AbstractMatrix}
+    G_drives::AbstractVector{<:AbstractMatrix}
 )
     return G_drift + sum(a .* G_drives)
 end
@@ -243,10 +246,46 @@ function (J::FourthOrderPadeJacobian)(
 end
 
 
-# 4th order Pade integrator Jacobian struct
+# 2nd order Pade integrator Hessian struct
+
+struct SecondOrderPadeHessian
+    G_drives::Vector{Matrix}
+    isodim::Int
+
+    function SecondOrderPadeHessian(sys::AbstractQubitSystem)
+        return new(
+            sys.G_drives,
+            sys.isodim
+        )
+    end
+end
+
+
+# Hessian of 2nd order Pade integrator w.r.t. ψ̃ⁱₜ₍₊₁₎ and aʲₜ
+
+@views function (H::SecondOrderPadeHessian)(
+    μₜ::AbstractVector,
+    Δt::Real,
+    i::Int,
+    j::Int,
+    ψ̃ⁱₜ₊₁::Bool
+)
+    Gʲ = H.G_drives[j]
+    μⁱₜ = μₜ[slice(i, H.isodim)]
+    if ψ̃ⁱₜ₊₁
+        return (μⁱₜ)' * (-Δt / 2 * Gʲ)
+    else
+        return -(Δt / 2 * Gʲ)' * μⁱₜ
+    end
+end
+
+
+# 4th order Pade integrator Hessian struct
 
 struct FourthOrderPadeHessian
-    G_drive_anticoms::Symmetric{AbstractMatrix, Matrix{Matrix}}
+    G_drives::Vector{Matrix}
+    G_drive_anticoms::Symmetric
+    G_drift_anticoms::Vector{Matrix}
     nqstates::Int
     isodim::Int
 
@@ -268,8 +307,15 @@ struct FourthOrderPadeHessian
             end
         end
 
+        drift_anticoms = [
+            anticom(G_drive, sys.G_drift)
+                for G_drive in sys.G_drives
+        ]
+
         return new(
+            sys.G_drives,
             Symmetric(drive_anticoms),
+            drift_anticoms,
             sys.nqstates,
             sys.isodim
         )
@@ -277,7 +323,7 @@ struct FourthOrderPadeHessian
 end
 
 
-# Hessian of the 4th order Pade integrator with respect to aʲₜ and aᵏₜ
+# Hessian of the 4th order Pade integrator w.r.t. aᵏₜ and aʲₜ
 
 @views function (H::FourthOrderPadeHessian)(
     ψ̃ₜ₊₁::AbstractVector,
@@ -305,6 +351,27 @@ end
     end
 
     return Hᵏʲₜ
+end
+
+
+# Hessian of 4th order Pade integrator w.r.t. ψ̃ⁱₜ₍₊₁₎  and aʲₜ
+
+@views function (H::FourthOrderPadeHessian)(
+    aₜ::AbstractVector,
+    μₜ::AbstractVector,
+    Δt::Real,
+    i::Int,
+    j::Int,
+    ψ̃ⁱₜ₊₁::Bool
+)
+    Ĝʲ = G(aₜ, H.G_drift_anticoms[j], H.G_drive_anticoms[:, j])
+    Gʲ = H.G_drives[j]
+    μⁱₜ = μₜ[slice(i, H.isodim)]
+    if ψ̃ⁱₜ₊₁
+        return (μⁱₜ)' * (-Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)
+    else
+        return -(Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)' * μⁱₜ
+    end
 end
 
 

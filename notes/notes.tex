@@ -185,7 +185,7 @@ Also, as of right now, $\vb{u}_T$ is included in $\vb{Z}$ but is ignored in calc
 Given the objective
 
 \begin{equation}
-  J(\vb{Z}) = \sum_{i=1}^n Q \cdot \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \vb{u}_t^2 
+  J(\vb{Z}) = Q \sum_{i=1}^n \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{R}{2} \sum_{t=1}^{T-1} \vb{u}_t^2 
 \end{equation}
 
 we arrive at the gradient
@@ -193,17 +193,17 @@ we arrive at the gradient
 \begin{equation}
   \grad_{\vb{Z}} J(\vb{Z}) = \mqty(
     \vb{0}_{x_{\dim}} \\
-    R_1 \cdot \vb{u}_1 \\
+    R \cdot \vb{u}_1 \\
     \vdots \\
     \vb{0}_{x_{\dim}} \\
-    R_t \cdot \vb{u}_t \\
+    R \cdot \vb{u}_t \\
     \vdots \\
     \vb{0}_{x_{\dim}} \\
-    R_{T-1} \cdot \vb{u}_{T-1} \\
+    R \cdot \vb{u}_{T-1} \\
     Q \cdot \grad_{\isopsi^1} \ell^1 \\
     \vdots \\
     Q \cdot \grad_{\isopsi^n} \ell^n \\
-    \vb{0}_{c \cdot (\textsf{augdim} + 1)}
+    \vb{0}
   ) 
 \end{equation}
 
@@ -363,15 +363,16 @@ With $\vb*{\mu} = \qty(\vec \mu_1, \dots, \vec \mu_T)$, $\vec\mu_t = \qty(\mu_t^
 \vec\mu_t^{\isopsi^i} = \qty(\mu_t^{(i - 1)\cdot \isopsi_{\dim} + 1}, \dots, \mu_t^{i\cdot\isopsi_{\dim}})
 \end{equation*}
 
-we have, for $m = 4$ (if $m = 2$ the Hessian is $\vb{0}$),
+we have
 
 \begin{equation}
   \vb*{\mu} \vdot \laplacian \vb{F} = \mqty(
-    \ddots \\
-    & \vb{0} \\
-    & & \displaystyle\sum_{i=1}^n \vec\mu_t^{\isopsi^i} \vdot \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j} \\
-    & & & \vb{0} \\
-    & & & & \ddots \\
+    & \vdots & \\ 
+    & \qty(\pdv{\vb{P}_t^{(m), i}}{\isopsi_t^i}{a^j_t})^\top \vec \mu^{\isopsi^i}_t \\
+    & \vdots \\
+    \ddots & \vb{0}\\
+    & \displaystyle{\sum_{i=1}^n} \textstyle{\vec\mu_t^{\isopsi^i} \vdot \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j}} & \vb{0} & \hdots & \qty(\vec \mu^{\isopsi^i}_t)^\top \pdv{\vb{P}_t^{(m), i}}{a^k_t}{\isopsi_{t+1}^i} & \hdots \\
+    & & \ddots \\
   )
 \end{equation}
 
@@ -385,6 +386,26 @@ with
 
 with, again, $\qty{A, B} = AB + BA$, being the anticommutator.
 
+\hfill
+
+since
+
+$$
+x \vdot (Ay) = x^\top A y = (A^\top x)^\top y
+$$
+
+For the mixed partials we have:
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(2), i}}{\isopsi_t^i}{a^j_t} = \pdv{\vb{P}_t^{(2), i}}{\isopsi_{t+1}^i}{a^j_t} = -\frac{\Delta t}{2} G^j_{\text{drive}}
+\end{equation}
+
+and 
+
+\begin{align}
+  \pdv{\vb{P}_t^{(4), i}}{\isopsi_t^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} - \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)\\
+  \pdv{\vb{P}_t^{(4), i}}{\isopsi_{t+1}^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} + \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)
+\end{align}
 
     
 \end{document}
