@@ -289,8 +289,8 @@ function SystemDynamics(
 
     if eval_hessian
 
-        if isa(sys_integrator, FourthOrderPade)
-            print("entered")
+        if isa(integrator, FourthOrderPade)
+
             μ∇²F_structure = []
 
             for t = 1:T-1
