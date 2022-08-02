@@ -33,6 +33,9 @@ system = SingleQubitSystem(
 )
 
 T = 5
+
+@assert T > 4 "mintime objective Hessian is set up for T > 4"
+
 Q = 200.0
 R = 2.0
 
