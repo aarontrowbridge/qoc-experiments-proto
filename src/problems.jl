@@ -427,7 +427,6 @@ function QubitProblem(
 end
 
 
-function initialize_trajectory!(prob::QubitProblem, traj::Trajectory)
 function initialize_trajectory!(
     prob::QubitProblem,
     traj::Trajectory
