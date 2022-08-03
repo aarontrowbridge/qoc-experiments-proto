@@ -45,7 +45,7 @@ loss_fn = amplitude_loss
 
 # absolulte tolerance for approximate tests
 
-const ATOL = 1e-2
+const ATOL = 1e-6
 
 
 #
@@ -61,6 +61,7 @@ function dense(vals, structure, shape)
 
     for (v, (k, j)) in zip(vals, structure)
         M[k, j] += v
+        
     end
 
     if shape[1] == shape[2]
@@ -159,8 +160,8 @@ obj = SystemObjective(
 
 Δt = 0.1
 
-integrators = [:SecondOrderPade, :FourthOrderPade]
-#integrators = [:FourthOrderPade]
+#ntegrators = [:SecondOrderPade, :FourthOrderPade]
+integrators = [:FourthOrderPade]
 
 for integrator in integrators
 
@@ -217,12 +218,21 @@ for integrator in integrators
     #     )
 
     # display(res)
+
+    # @test all(
+    #     isapprox.(
+    #         J,
+    #         JFd,
+    #         atol = 1e-1
+    #     )
+    # )
     # # Hessian of Lagrangian set up
 
     μ = randn(system.nstates * (T - 1))
 
     m = dyns.μ∇²F(Z, μ)
     struc = dyns.μ∇²F_structure
+    print("test")
     display(m)
     display(struc)
     μ∇²F = dense(
@@ -233,28 +243,28 @@ for integrator in integrators
 
     HofL(Z) = dot(μ, dyns.F(Z))
 
-    # for (H_analytic, H_numerical) in zip(
-    #     μ∇²F,
-    #     FiniteDiff.finite_difference_hessian(HofL, Z)
-    # )
-    #     if !isapprox(H_analytic, H_numerical, atol=ATOL)
-    #         println((H_analytic, H_numerical))
-    #     end
-    # end
+    # # for (H_analytic, H_numerical) in zip(
+    # #     μ∇²F,
+    # #     FiniteDiff.finite_difference_hessian(HofL, Z)
+    # # )
+    # #     if !isapprox(H_analytic, H_numerical, atol=ATOL)
+    # #         println((H_analytic, H_numerical))
+    # #     end
+    # # end
 
 
-    # test dynamics Hessian of Lagrangian vs finite diff
+    # # test dynamics Hessian of Lagrangian vs finite diff
 
-    # @test all(
-    #     isapprox.(
-    #         μ∇²F,
-    #         FiniteDiff.finite_difference_hessian(HofL, Z),
-    #         atol=ATOL
-    #     )
-    # )
+    # # @test all(
+    # #     isapprox.(
+    # #         μ∇²F,
+    # #         FiniteDiff.finite_difference_hessian(HofL, Z),
+    # #         atol=ATOL
+    # #     )
+    # # )
 
 
-    # test dynamics Hessian of Lagrangian vs forward diff
+    # # test dynamics Hessian of Lagrangian vs forward diff
     
     dH = ForwardDiff.hessian(HofL, Z)
     display(μ∇²F[1:18, 1:18])
@@ -266,11 +276,11 @@ for integrator in integrators
         )
     
     display(res2)
-    # @test all(
-    #     isapprox.(
-    #         μ∇²F,
-    #         ForwardDiff.hessian(HofL, Z),
-    #         atol=ATOL
-    #     )
-    # )
+    @test all(
+        isapprox.(
+            μ∇²F,
+            dH,
+            atol=ATOL
+        )
+    )
 end

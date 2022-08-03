@@ -35,7 +35,7 @@ Q = 200.
 R = 0.1
 loss = amplitude_loss
 hess = true
-pinqstate = true
+pinqstate = false
 
 time = T * Δt
 

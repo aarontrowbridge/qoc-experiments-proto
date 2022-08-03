@@ -70,7 +70,7 @@ function QubitProblem(
     R=0.1,
     eval_hessian=true,
     pin_first_qstate=true,
-    a_bound=1.0,
+    a_bound= 2π * 19e-3,
     init_traj=Trajectory(system, Δt, T),
     options=Options(),
     return_constraints = false,
@@ -153,8 +153,7 @@ function QubitProblem(
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
         2:T-1,
-        system.n_wfn_states + system.ncontrols .+
-            (1:system.ncontrols),
+        system.n_wfn_states + ∫a*system.ncontrols .+ (1:system.ncontrols),
         a_bound,
         system.vardim
     )
@@ -285,7 +284,7 @@ function QubitProblem(
     )
     push!(cons, a_bound_con)
 
-    constrain(optimizer, variables, cons)
+    constrain!(optimizer, variables, cons)
 
     dynamics_constraints = fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
 
@@ -350,7 +349,7 @@ function QubitProblem(
         loss,
         eval_hessian,
         T, Δt,
-        Q, Qf, R
+        Q, R
     )
 
     cons = AbstractConstraint[]
