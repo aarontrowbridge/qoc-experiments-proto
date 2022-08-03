@@ -5,7 +5,7 @@ using QubitControl
 σz = GATES[:Z]
 
 H_drift = σz / 2
-H_drive = [σx / 2, σy / 2]
+H_drives = [σx / 2, σy / 2]
 
 gate = Symbol(ARGS[1])
 
@@ -14,31 +14,29 @@ gate = Symbol(ARGS[1])
 
 ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
 
-# ψ = [ψ0, ψ1, im * ψ0, im * ψ1]
+system = SingleQubitSystem(H_drift, H_drives, gate, ψ)
 
+T  = parse(Int, ARGS[2])
+Δt = 0.01
+Q  = 500.0
+R  = 0.001
 
-system = SingleQubitSystem(H_drift, H_drive, gate, ψ)
-
-T    = 1000
-Δt   = 0.01
-Q    = 0.0
-Qf   = 500.0
-R    = 0.001
 loss = amplitude_loss
-hess = false
+
+a_bound = [1.0, 0.5]
 
 options = Options(
-    max_iter = 100,
+    max_iter = parse(Int, ARGS[end-1]),
     tol = 1e-6
 )
 
-iter = parse(Int, ARGS[2])
+iter = parse(Int, ARGS[end])
 
-tol = 1e-8
+tol = 1e-5
 
 plot_dir = "plots/single_qubit/min_time/two_controls"
 
-for Rᵤ in [1e-7, 1e-10]
+for Rᵤ in [1e-3, 1e-5]
 
     Rₛ = Rᵤ
 
@@ -56,11 +54,10 @@ for Rᵤ in [1e-7, 1e-10]
         T;
         Δt=Δt,
         Q=Q,
-        Qf=Qf,
         R=R,
         Rᵤ=Rᵤ,
         Rₛ=Rₛ,
-        eval_hessian=hess,
+        a_bound=a_bound,
         loss=loss,
         options=options,
         min_time_options=min_time_options
@@ -69,8 +66,7 @@ for Rᵤ in [1e-7, 1e-10]
     plot_single_qubit(
         system,
         prob.subprob.trajectory,
-        plot_path;
-        fig_title="min time $gate gate on basis states (iter = $iter; tol = $tol)"
+        plot_path
     )
 
     solve!(prob)
@@ -78,7 +74,6 @@ for Rᵤ in [1e-7, 1e-10]
     plot_single_qubit(
         system,
         prob.subprob.trajectory,
-        plot_path;
-        fig_title="min time $gate gate on basis states (iter = $iter; tol = $tol)"
+        plot_path
     )
 end
