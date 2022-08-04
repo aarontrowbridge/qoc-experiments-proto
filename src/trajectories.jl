@@ -14,6 +14,8 @@ export wfn_components
 export wfn_components_matrix
 export final_state
 export final_state2
+export pop_components
+export pop_matrix
 
 
 struct Trajectory
@@ -136,40 +138,26 @@ function integral(xs::Vector, ts::Vector)
     return ∫xs
 end
 
-function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int)
-    @assert j ∈ -1:sys.control_order
+function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int; d2pi = true)
+    if sys.∫a
+        @assert j ∈ -1:sys.control_order
+    else
+        @assert j ∈ 0:sys.control_order
+    end
+
     if j != sys.control_order
-        jth_order_slice = slice(2 + j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)] for t = 1:traj.T]
+        jth_order_slice = slice(1 + sys.∫a + j, sys.ncontrols)
+        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(1. + (2π - 1.)*d2pi) 
+                for t = 1:traj.T]
     else
         # returns same value for T-1 and T to make plots cleaner
-        return [traj.actions[1:end-1]..., traj.actions[end-1]]
+        return [traj.actions[1:end-1]..., traj.actions[end-1]]/(1. + (2π - 1.)*d2pi)
     end
 end
 
-# get rid of the 2 because no ∫a
-function jth_order_controls(traj::Trajectory, sys::TransmonSystem, j::Int)
-    @assert j ∈ 0:sys.control_order
-    if j != sys.control_order
-        jth_order_slice = slice(1 + j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(2π) for t = 1:traj.T]
-    else
-        return traj.actions
-    end
-end
 
-# function jth_order_controls(traj::Trajectory, sys::MultiModeSystem, j::Int)
-#     @assert j ∈ 0:sys.control_order
-#     if j != sys.control_order
-#         jth_order_slice = slice(j + 1, sys.ncontrols)
-#         return [traj.states[t][sys.n_wfn_states .+ jth_order_slice]/(2π) for t = 1:traj.T]
-#     else
-#         return traj.actions
-#     end
-# end
-
-function jth_order_controls_matrix(traj, sys, j)
-    return hcat(jth_order_controls(traj, sys, j)...)
+function jth_order_controls_matrix(traj, sys, j; kwargs...)
+    return hcat(jth_order_controls(traj, sys, j; kwargs...)...)
 end
 
 controls_matrix(traj, sys) = jth_order_controls_matrix(traj, sys, 0)
@@ -190,6 +178,17 @@ function wfn_components(
     return ψs
 end
 
+function pop_components(
+    traj::Trajectory,
+    sys::AbstractQubitSystem;
+    i = 1
+)
+    pops = [abs.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+    return pops
+end
+
+pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
+# get the second final state
 function final_state2(
     traj::Trajectory,
     sys::AbstractQubitSystem;
@@ -197,6 +196,7 @@ function final_state2(
     return traj.states[traj.T][slice(1, sys.isodim + 1, 2*sys.isodim, sys.isodim)]
 end
 
+#get the first final state
 function final_state(
     traj::Trajectory,
     sys::AbstractQubitSystem;

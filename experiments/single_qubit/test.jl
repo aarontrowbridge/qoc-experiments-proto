@@ -55,13 +55,9 @@ prob = QubitProblem(
     R=R,
     eval_hessian=hess,
     loss=loss,
-<<<<<<< HEAD
     pin_first_qstate = true,
-    options=options
-=======
     options=options,
     integrator=integrator,
->>>>>>> origin
 )
 
 plot_single_qubit(

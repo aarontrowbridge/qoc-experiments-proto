@@ -7,6 +7,7 @@ export plot_multimode_qubit
 export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
+export plot_twoqubit
 
 using ..Utils
 using ..Trajectories
@@ -447,6 +448,58 @@ function plot_transmon_population(
 
     save(path, fig)
 
+end
+
+function plot_twoqubit(
+    system::TwoQubitSystem,
+    traj::Trajectory,
+    path::String;
+    fig_title = nothing
+)
+    fig = Figure(resolution=(1200, 1500))
+    pops = pop_matrix(traj, system, i=3)
+    #need to rewrite this for arbitrary number of levels
+    ψax = Axis(fig[1:2, :]; title="Population", xlabel=L"t")
+    series!(ψax, traj.times, pops;
+        labels=[
+            "|00⟩",
+            "|01⟩",
+            "|10⟩",
+            "|11⟩",
+            ]
+    )
+
+    axislegend(ψax; position=:lb)
+
+    for j = 0:system.control_order
+
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+
+        series!(
+            ax_j,
+            traj.times,
+            jth_order_controls_matrix(traj, system, j);
+            labels = [
+                j == 0 ?
+                latexstring("a_$k (t)") :
+                latexstring(
+                    "\\mathrm{d}^{",
+                    j == 1 ? "" : "$j",
+                    "}_t a_$k"
+                )
+                for k = 1:system.ncontrols
+            ]
+        )
+
+        axislegend(ax_j; position=:lt)
+    end
+
+    # if !isnothing(fig_title)
+    #     Label(fig[0,:], fig_title; textsize=30)
+    # end
+
+    save(path, fig)
+        
 end
 
 end

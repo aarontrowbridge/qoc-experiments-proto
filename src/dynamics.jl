@@ -29,14 +29,13 @@ using SparseArrays
 
     controlsₜ = [augsₜ[(sys.ncontrols + 1):end]; uₜ]
 
-    #controlsₜ = [augsₜ[1:end]; uₜ]
-
+    
     δaugs = augsₜ₊₁ - (augsₜ + controlsₜ * Δt)
 
     δψ̃s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
 
-    #aₜ = augsₜ[slice(2, sys.ncontrols)]
-    aₜ = augsₜ[slice(1, sys.ncontrols)]
+    
+    aₜ = augsₜ[slice(1 + sys.∫a, sys.ncontrols)]
 
     for i = 1:sys.nqstates
         ψ̃ⁱslice = slice(i, sys.isodim)
@@ -116,7 +115,7 @@ function SystemDynamics(
             for k = 1:sys.isodim # kth row of ψ̃ⁱᵏₜ
                 kj = (
                     index(i, k, sys.isodim),
-                    sys.n_wfn_states + j #+sys.ncontrols
+                    sys.n_wfn_states + sys.∫a * sys.ncontrols + j
                 )
                 push!(∇ₜf_structure, kj)
             end
@@ -151,8 +150,7 @@ function SystemDynamics(
 
         ∇s = []
 
-        #aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
-        aₜ = zₜ[sys.n_wfn_states .+ slice(1, sys.ncontrols)]
+        aₜ = zₜ[sys.n_wfn_states .+ slice(1 + sys.∫a, sys.ncontrols)]
 
         ∂ψ̃ⁱₜPⁱ = ∇P(aₜ, Δt, false)
 
@@ -224,9 +222,7 @@ function SystemDynamics(
 
         ∇s = []
 
-        #aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
-
-        aₜ = zₜ[sys.n_wfn_states .+ slice(1, sys.ncontrols)]
+        aₜ = zₜ[sys.n_wfn_states .+ slice(1 + sys.∫a, sys.ncontrols)]
 
         ∂ψ̃ⁱₜ₊₁Pⁱ = ∇P(aₜ, Δt, true)
 
@@ -311,9 +307,7 @@ function SystemDynamics(
                                 # jth column
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, j, sys.ncontrols)
-                                index(1, j, sys.ncontrols)
+                                index(1 + sys.∫a, j, sys.ncontrols)
                             )
                             push!(μ∇²F_structure, kⁱjₜ)
                         end
@@ -328,9 +322,7 @@ function SystemDynamics(
                                 # kth row
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, k, sys.ncontrols),
-                                index(1, k, sys.ncontrols),
+                                index(1 + sys.∫a, k, sys.ncontrols),
 
                                 # jⁱth column
                                 index(t + 1, 0, sys.vardim) +
@@ -388,15 +380,11 @@ function SystemDynamics(
                         kjₜ = (
                             index(t, 0, sys.vardim) +
                             sys.n_wfn_states +
-                            # FIXME: assumes ∫a exists here
-                            #index(2, k, sys.ncontrols),
-                            index(1, k, sys.ncontrols),
+                            index(1 + sys.∫a, k, sys.ncontrols),
 
                             index(t, 0, sys.vardim) +
                             sys.n_wfn_states +
-                            # FIXME: assumes ∫a exists here
-                            # index(2, j, sys.ncontrols),
-                            index(1, j, sys.ncontrols)
+                            index(1 + sys.∫a, j, sys.ncontrols)
                         )
                         push!(μ∇²F_structure, kjₜ)
                     end
@@ -419,9 +407,7 @@ function SystemDynamics(
                                 # jth column
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, j, sys.ncontrols)
-                                index(1, j, sys.ncontrols)
+                                index(1 + sys.∫a, j, sys.ncontrols)
                             )
                             push!(μ∇²F_structure, kⁱjₜ)
                         end
@@ -436,9 +422,7 @@ function SystemDynamics(
                                 # kth row
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, k, sys.ncontrols),
-                                index(1, k, sys.ncontrols),
+                                index(1 + sys.∫a, k, sys.ncontrols),
 
                                 # jⁱth column
                                 index(t + 1, 0, sys.vardim) +
@@ -495,13 +479,9 @@ function SystemDynamics(
                             sys.n_wfn_states,
                             sys.vardim
                         ) .+
-
-                        # FIXME: assumes ∫a exists here
-                        # slice(
-                        #     2,
-                        #     sys.ncontrols
-                        # )
-                        slice(1, sys.ncontrols)
+                        slice(
+                            1 + sys.∫a, 
+                            sys.ncontrols)
                     ]
 
                     # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks
@@ -611,7 +591,7 @@ function MinTimeSystemDynamics(
             for k = 1:sys.isodim # kth row of ψ̃ⁱᵏₜ
                 kj = (
                     index(i, k, sys.isodim),
-                    sys.n_wfn_states + sys.ncontrols + j
+                    sys.n_wfn_states + sys.∫a*sys.ncontrols + j
                 )
                 push!(∇ₜf_structure, kj)
             end
@@ -650,7 +630,7 @@ function MinTimeSystemDynamics(
 
         ∇s = []
 
-        aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+        aₜ = zₜ[sys.n_wfn_states .+ slice(1 + sys.∫a, sys.ncontrols)]
 
         ∂ψ̃ⁱₜPⁱ = ∇P(aₜ, Δtₜ, false)
 
@@ -728,7 +708,7 @@ function MinTimeSystemDynamics(
 
         ∇s = []
 
-        aₜ = zₜ[sys.n_wfn_states .+ slice(2, sys.ncontrols)]
+        aₜ = zₜ[sys.n_wfn_states .+ slice(1 + sys.∫a, sys.ncontrols)]
 
         ∂ψ̃ⁱₜ₊₁Pⁱ = ∇P(aₜ, Δtₜ, true)
 
@@ -815,7 +795,7 @@ function MinTimeSystemDynamics(
                                 sys.n_wfn_states +
                                 # FIXME: assumes ∫a exists here
                                 #index(2, j, sys.ncontrols)
-                                index(1, j, sys.ncontrols)
+                                index(1 + sys.∫a, j, sys.ncontrols)
                             )
                             push!(μ∇²F_structure, kⁱjₜ)
                         end
@@ -832,7 +812,7 @@ function MinTimeSystemDynamics(
                                 sys.n_wfn_states +
                                 # FIXME: assumes ∫a exists here
                                 # index(2, k, sys.ncontrols),
-                                index(1, k, sys.ncontrols),
+                                index(1 + sys.∫a, k, sys.ncontrols),
 
                                 # jⁱth column
                                 index(t + 1, 0, sys.vardim) +
@@ -893,13 +873,13 @@ function MinTimeSystemDynamics(
                             sys.n_wfn_states +
                             # FIXME: assumes ∫a exists here
                             #index(2, k, sys.ncontrols),
-                            index(1, k, sys.ncontrols),
+                            index(1 + sys.∫a, k, sys.ncontrols),
 
                             index(t, 0, sys.vardim) +
                             sys.n_wfn_states +
                             # FIXME: assumes ∫a exists here
                             #index(2, j, sys.ncontrols),
-                            index(1, k, sys.controls)
+                            index(1 + sys.∫a, k, sys.controls)
                         )
                         push!(μ∇²F_structure, kjₜ)
                     end
@@ -924,7 +904,7 @@ function MinTimeSystemDynamics(
                                 sys.n_wfn_states +
                                 # FIXME: assumes ∫a exists here
                                 #index(2, j, sys.ncontrols)
-                                index(1, j, sys.ncontrols)
+                                index(1 + sys.∫a, j, sys.ncontrols)
                             )
                             push!(μ∇²F_structure, kⁱjₜ)
                         end
@@ -941,7 +921,7 @@ function MinTimeSystemDynamics(
                                 sys.n_wfn_states +
                                 # FIXME: assumes ∫a exists here
                                 #index(2, k, sys.ncontrols),
-                                index(1, k, sys.ncontrols),
+                                index(1 + sys.∫a, k, sys.ncontrols),
 
                                 # jⁱth column
                                 index(t + 1, 0, sys.vardim) +
@@ -1005,7 +985,7 @@ function MinTimeSystemDynamics(
                         #     2,
                         #     sys.ncontrols
                         # )
-                        slice(1, sys.ncontrols)
+                        slice(1 + sys.∫a, sys.ncontrols)
                     ]
 
                     # ∂ψ̃ⁱₜ₍₊₁₎∂aʲₜPⁱ blocks

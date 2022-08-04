@@ -34,7 +34,7 @@ system = TransmonSystem(
 )
 
 
-T = 3
+T = 5
 Q = 200.0
 R = 2.0
 
@@ -61,7 +61,6 @@ function dense(vals, structure, shape)
 
     for (v, (k, j)) in zip(vals, structure)
         M[k, j] += v
-        
     end
 
     if shape[1] == shape[2]
@@ -96,7 +95,7 @@ obj = SystemObjective(
 
 # getting analytic gradient
 
-# ∇ = obj.∇L(Z)
+∇ = obj.∇L(Z)
 
 
 # test gradient of objective with FiniteDiff
@@ -112,22 +111,22 @@ obj = SystemObjective(
 
 # # test gradient of objective with ForwardDiff
 
-# @test all(
-#     isapprox.(
-#         ∇,
-#         ForwardDiff.gradient(obj.L, Z),
-#         atol=ATOL
-#     )
-# )
+@test all(
+    isapprox.(
+        ∇,
+        ForwardDiff.gradient(obj.L, Z),
+        atol=ATOL
+    )
+)
 
 
 # sparse objective Hessian data
 
-# H = dense(
-#     obj.∇²L(Z),
-#     obj.∇²L_structure,
-#     (system.vardim * T, system.vardim * T)
-# )
+H = dense(
+    obj.∇²L(Z),
+    obj.∇²L_structure,
+    (system.vardim * T, system.vardim * T)
+)
 
 # display(H)
 
@@ -145,13 +144,13 @@ obj = SystemObjective(
 
 # # test hessian of objective with ForwardDiff
 
-# @test all(
-#     isapprox.(
-#         H,
-#         ForwardDiff.hessian(obj.L, Z),
-#         atol=ATOL
-#     )
-# )
+@test all(
+    isapprox.(
+        H,
+        ForwardDiff.hessian(obj.L, Z),
+        atol=ATOL
+    )
+)
 
 
 #
@@ -178,38 +177,38 @@ for integrator in integrators
 
     # dynamics Jacobian
 
-    # J = dense(
-    #     dyns.∇F(Z),
-    #     dyns.∇F_structure,
-    #     (system.nstates * (T - 1), system.vardim * T)
-    # )
+    J = dense(
+        dyns.∇F(Z),
+        dyns.∇F_structure,
+        (system.nstates * (T - 1), system.vardim * T)
+    )
 
 
 
-    # println("Analytic dynamics Jacobian")
-    # display(J[1:16, 1:18])
+    println("Analytic dynamics Jacobian")
+    display(J[1:16, 1:18])
 
-    # # test dynamics Jacobian vs finite diff
-
-    # # @test all(
-    # #     isapprox.(
-    # #         J,
-    # #         FiniteDiff.finite_difference_jacobian(dyns.F, Z),
-    # #         atol=ATOL
-    # #     )
-    # # )
-    # JFd = ForwardDiff.jacobian(dyns.F, Z)
-    # display(JFd[1:16, 1:18])
-
-    # # test dynamics Jacobian vs forward diff
+    # test dynamics Jacobian vs finite diff
 
     # @test all(
     #     isapprox.(
     #         J,
-    #         ForwardDiff.jacobian(dyns.F, Z),
-    #         atol=1e-1
+    #         FiniteDiff.finite_difference_jacobian(dyns.F, Z),
+    #         atol=ATOL
     #     )
     # )
+    JFd = ForwardDiff.jacobian(dyns.F, Z)
+    display(JFd[1:16, 1:18])
+
+    # # test dynamics Jacobian vs forward diff
+
+    @test all(
+        isapprox.(
+            J,
+            ForwardDiff.jacobian(dyns.F, Z),
+            atol=ATOL
+        )
+    )
 
     # res = isapprox.(
     #         J,

@@ -5,6 +5,7 @@ export AbstractQubitSystem
 export SingleQubitSystem
 export MultiModeQubitSystem
 export TransmonSystem
+export TwoQubitSystem
 
 using ..QuantumLogic
 
@@ -297,5 +298,83 @@ function TransmonSystem(;
 
 end
 
+struct TwoQubitSystem <: AbstractQubitSystem
+    n_wfn_states::Int
+    n_aug_states::Int
+    nstates::Int
+    nqstates::Int
+    isodim::Int
+    augdim::Int
+    vardim::Int
+    ncontrols::Int
+    control_order::Int
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
+    ψ̃1::Vector{Float64}
+    ψ̃goal::Vector{Float64}
+    ∫a::Bool
+end
+
+function TwoQubitSystem(;
+    ω1::Float64,
+    ω2::Float64,
+    gcouple::Float64,
+    ψ1::Union{Vector{C}, Vector{Vector{C}}},
+    ψf::Union{Vector{C}, Vector{Vector{C}}},
+    control_order = 2,
+    ∫a = false
+) where C <: Number
+    if isa(ψ1, Vector{C})
+        nqstates = 1
+        isodim = 2 * length(ψ1)
+        ψ̃goal = ket_to_iso(ψf)
+        ψ̃1 = ket_to_iso(ψ1)
+    else
+        nqstates = length(ψ1)
+        isodim = 2 * length(ψ1[1])
+        @assert isa(ψf, Vector{Vector{C}})
+        # takes care of real-to-complex isomorphism and stacks the states
+        ψ̃goal = vcat(ket_to_iso.(ψf)...)
+        ψ̃1 = vcat(ket_to_iso.(ψ1)...)
+    end
+
+    ncontrols = 1
+
+    H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+               (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
+               gcouple*kron(GATES[:Z], GATES[:Z])
+    
+    G_drift = G(H_drift)
+
+    H_drive = [kron(GATES[:X], I(2)), kron(I(2), GATES[:X])]
+    G_drives = G.(H_drive)
+
+    augdim = control_order + ∫a
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+
+    return TwoQubitSystem(
+        n_wfn_states, 
+        n_aug_states, 
+        nstates,
+        nqstates,
+        isodim,
+        augdim,
+        vardim,
+        ncontrols,
+        control_order,
+        G_drift,
+        G_drives,
+        ψ̃1,
+        ψ̃goal,
+        ∫a
+    )
+
+end
 
 end

@@ -111,13 +111,13 @@ obj = SystemObjective(
 
 ∇L = obj.∇L(Z)
 
-display(∇)
+
 
 # test gradient of objective with FiniteDiff
 
-∇L_finite_diff = FiniteDiff.finite_difference_gradient(obj.L, Z)
+# ∇L_finite_diff = FiniteDiff.finite_difference_gradient(obj.L, Z)
 
-@test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
+# @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
 
 
 # test gradient of objective with ForwardDiff
@@ -139,11 +139,11 @@ display(∇)
 
 # test hessian of objective with FiniteDiff
 
-∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
+# ∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
 
-show_diffs(∇²L, ∇²L_finite_diff)
+# show_diffs(∇²L, ∇²L_finite_diff)
 
-@test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+# @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
 
 
 # test hessian of objective with ForwardDiff
@@ -182,14 +182,14 @@ for integrator in integrators
         (system.nstates * (T - 1), system.vardim * T)
     )
 
-    display(J)
+ 
 
     # test dynamics Jacobian vs finite diff
 
-    ∇F_finite_diff =
-        FiniteDiff.finite_difference_jacobian(dyns.F, Z)
+    # ∇F_finite_diff =
+    #     FiniteDiff.finite_difference_jacobian(dyns.F, Z)
 
-    @test all(isapprox.(∇F, ∇F_finite_diff, atol=ATOL))
+    # @test all(isapprox.(∇F, ∇F_finite_diff, atol=ATOL))
 
 
     # test dynamics Jacobian vs forward diff
@@ -214,10 +214,10 @@ for integrator in integrators
 
     # test dynanamics Hessian of Lagrangian vs finite diff
 
-    HofL_finite_diff =
-        FiniteDiff.finite_difference_hessian(HofL, Z)
+    # HofL_finite_diff =
+    #     FiniteDiff.finite_difference_hessian(HofL, Z)
 
-    @test all(isapprox.(μ∇²F, HofL_finite_diff, atol=ATOL))
+    # @test all(isapprox.(μ∇²F, HofL_finite_diff, atol=ATOL))
 
 
     # test dynamics Hessian of Lagrangian vs forward diff
@@ -253,13 +253,13 @@ mintime_obj = MinTimeObjective(
 
 # test gradient of mintime objective with FiniteDiff
 
-∇L_finite_diff =
-    FiniteDiff.finite_difference_gradient(
-        mintime_obj.L,
-        Z_mintime
-    )
+# ∇L_finite_diff =
+#     FiniteDiff.finite_difference_gradient(
+#         mintime_obj.L,
+#         Z_mintime
+#     )
 
-@test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
+# @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
 
 # test gradient of mintime objective with ForwardDiff
 
@@ -279,15 +279,15 @@ mintime_obj = MinTimeObjective(
 
 # test hessian of mintime objective with FiniteDiff
 
-∇²L_finite_diff =
-    FiniteDiff.finite_difference_hessian(
-        mintime_obj.L,
-        Z_mintime
-    )
+# ∇²L_finite_diff =
+#     FiniteDiff.finite_difference_hessian(
+#         mintime_obj.L,
+#         Z_mintime
+#     )
 
-show_diffs(∇²L, ∇²L_finite_diff)
+# show_diffs(∇²L, ∇²L_finite_diff)
 
-@test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+# @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
 
 
 # test hessian of mintime objective with ForwardDiff
