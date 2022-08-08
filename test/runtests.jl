@@ -41,7 +41,7 @@ R = 2.0
 
 eval_hessian = true
 
-loss_fn = amplitude_loss
+loss_fn = infidelity_loss
 
 
 # absolulte tolerance for approximate tests

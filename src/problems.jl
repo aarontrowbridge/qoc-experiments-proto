@@ -64,7 +64,7 @@ function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
     integrator=:FourthOrderPade,
-    loss=amplitude_loss,
+    loss=infidelity_loss,
     Δt=0.01,
     Q=200.0,
     R=0.1,

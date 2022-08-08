@@ -31,8 +31,12 @@ T    = 1000
 Δt   = 0.01
 Q    = 200.0
 R    = 2.0
-loss = amplitude_loss
+loss = infidelity_loss
 hess = true
+
+a_bounds = [1.0, 0.5]
+
+pin_first_qstate = false
 
 integrator = :FourthOrderPade
 
@@ -54,6 +58,7 @@ prob = QubitProblem(
     Q=Q,
     R=R,
     eval_hessian=hess,
+    a_bound=a_bounds,
     loss=loss,
     pin_first_qstate = true,
     options=options,

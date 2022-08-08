@@ -21,7 +21,7 @@ T  = parse(Int, ARGS[2])
 Q  = 500.0
 R  = 0.001
 
-loss = amplitude_loss
+loss = infidelity_loss
 
 a_bound = [1.0, 0.5]
 

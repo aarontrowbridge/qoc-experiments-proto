@@ -45,7 +45,7 @@ T = parse(Int, ARGS[1])
 Δt = parse(Float64, ARGS[2])
 R = parse(Float64, ARGS[3])
 
-traj_guess = parse(Bool, ARGS[5])
+traj_guess = parse(Bool, ARGS[end])
 
 if traj_guess
     Δt_init_traj = ts[2] - ts[1]
@@ -55,7 +55,7 @@ if traj_guess
     T = length(ts)
 end
 
-pin_first_qstate = parse(Bool, ARGS[6])
+pin_first_qstate = parse(Bool, ARGS[5])
 
 if traj_guess
     prob = QubitProblem(

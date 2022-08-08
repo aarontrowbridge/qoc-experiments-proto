@@ -8,7 +8,7 @@ export structure
 
 export geodesic_loss
 export real_loss
-export amplitude_loss
+export infidelity_loss
 export quaternionic_loss
 export iso_infidelity
 
@@ -36,7 +36,7 @@ struct QuantumStateLoss
 
     function QuantumStateLoss(
         sys::AbstractQubitSystem;
-        loss=amplitude_loss
+        loss=infidelity_loss
     )
         ls = [
             ψ̃ -> loss(ψ̃, sys.ψ̃goal[slice(i, sys.isodim)])
@@ -203,7 +203,7 @@ function real_loss(ψ̃, ψ̃goal)
     return min(abs(1 - real(amp)), abs(1 + real(amp)))
 end
 
-function amplitude_loss(ψ̃, ψ̃goal)
+function infidelity_loss(ψ̃, ψ̃goal)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     amp = ψ'ψgoal

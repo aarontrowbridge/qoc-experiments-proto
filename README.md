@@ -103,7 +103,7 @@ $$
 
 - [ ] min time problem reimplementation
   - [x] implementation
-  - [ ] tests
+  - [x] tests
   - [ ] add details to notes
 - [ ] analytic derivatives
   - [ ] integrators
@@ -119,7 +119,7 @@ $$
 - [ ] write documentation 
 - [x] constraint types
 - [ ] systems
-  - [ ] multimode system with specified control limits
+  - [x] multimode system with specified control limits
   - [ ] two qubit system (try CNOT)
   - [ ] transmon system
 - [ ] implicit $\ddot a(t)$
@@ -127,3 +127,4 @@ $$
   - [ ] mac
   - [ ] ubuntu
   - [ ] arch (manjaro)
+- [ ] add ability to save and load trajectories
