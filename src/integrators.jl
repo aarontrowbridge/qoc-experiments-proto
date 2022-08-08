@@ -16,6 +16,7 @@ export FourthOrderPadeHessian
 
 using ..Utils
 using ..QubitSystems
+using ..Utils
 
 using LinearAlgebra
 

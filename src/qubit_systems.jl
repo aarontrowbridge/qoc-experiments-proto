@@ -4,6 +4,8 @@ export AbstractQubitSystem
 
 export SingleQubitSystem
 export MultiModeQubitSystem
+export TransmonSystem
+export TwoQubitSystem
 
 using ..QuantumLogic
 
@@ -36,6 +38,7 @@ struct SingleQubitSystem <: AbstractQubitSystem
     ψ̃1::Vector{Float64}
     ψ̃goal::Vector{Float64}
     gate::Union{Symbol, Nothing}
+    ∫a::Bool
 end
 
 function SingleQubitSystem(
@@ -44,9 +47,9 @@ function SingleQubitSystem(
     gate::Union{Symbol, Nothing},
     ψ1::Union{Vector{C}, Vector{Vector{C}}};
     ψf=nothing,
-    control_order=2
+    control_order=2,
+    ∫a = true
 ) where {C <: Number, T <: Number}
-
 
     if isa(ψ1, Vector{C})
         nqstates = 1
@@ -79,7 +82,7 @@ function SingleQubitSystem(
         G_drive = G.(H_drive)
     end
 
-    augdim = control_order + 1
+    augdim = control_order + ∫a
 
     n_wfn_states = nqstates * isodim
     n_aug_states = ncontrols * augdim
@@ -102,7 +105,8 @@ function SingleQubitSystem(
         G_drive,
         ψ̃1,
         ψ̃goal,
-        gate
+        gate,
+        ∫a
     )
 end
 
@@ -138,6 +142,7 @@ struct MultiModeQubitSystem <: AbstractQubitSystem
     G_drives::Vector{Matrix{Float64}}
     ψ̃1::Vector{Float64}
     ψ̃goal::Vector{Float64}
+    ∫a::Bool
 end
 
 function MultiModeQubitSystem(
@@ -145,7 +150,8 @@ function MultiModeQubitSystem(
     H_drives::Vector{Matrix{C}} where C,
     ψ1::Vector,
     ψf::Vector;
-    control_order=2
+    control_order=2,
+    ∫a = false 
 )
     isodim = 2 * length(ψ1)
 
@@ -161,7 +167,8 @@ function MultiModeQubitSystem(
     nqstates = 1
     n_wfn_states = nqstates * isodim
 
-    augdim = control_order + 1
+    augdim = control_order + ∫a
+    
     n_aug_states = ncontrols * augdim
 
     nstates = n_wfn_states + n_aug_states
@@ -181,7 +188,8 @@ function MultiModeQubitSystem(
         G_drift,
         G_drives,
         ψ̃1,
-        ψ̃goal
+        ψ̃goal,
+        ∫a
     )
 end
 
@@ -203,5 +211,174 @@ function MultiModeQubitSystem(hf_path::String)
     end
 end
 
+struct TransmonSystem <: AbstractQubitSystem
+    n_wfn_states::Int
+    n_aug_states::Int
+    nstates::Int
+    nqstates::Int
+    isodim::Int
+    augdim::Int
+    vardim::Int
+    ncontrols::Int
+    control_order::Int
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
+    ψ̃1::Vector{Float64}
+    ψ̃goal::Vector{Float64}
+    ∫a::Bool
+end
+
+function TransmonSystem(;
+    levels::Int, 
+    rotating_frame::Bool,
+    ω::Float64,
+    α::Float64,
+    ψ1::Union{Vector{C}, Vector{Vector{C}}},
+    ψf::Union{Vector{C}, Vector{Vector{C}}},
+    control_order = 2,
+    ∫a = false
+) where C <: Number
+    # if it is just one state
+    if isa(ψ1, Vector{C})
+        nqstates = 1
+        isodim = 2 * length(ψ1)
+        ψ̃goal = ket_to_iso(ψf)
+        ψ̃1 = ket_to_iso(ψ1)
+    # otherwise it is multiple states and we are defining a (partial) isometry
+    else 
+        nqstates = length(ψ1)
+        isodim = 2 * length(ψ1[1])
+        @assert isa(ψf, Vector{Vector{C}})
+        # takes care of real-to-complex isomorphism and stacks the states
+        ψ̃goal = vcat(ket_to_iso.(ψf)...)
+        ψ̃1 = vcat(ket_to_iso.(ψ1)...)
+    end
+
+    if rotating_frame
+        H_drift = α/2 * quad(levels)
+    else 
+        H_drift = ω * number(levels) + α/2 * quad(levels)
+    end
+
+    G_drift = G(H_drift)
+
+    ncontrols = 2 
+
+    H_drive = [create(levels) + annihilate(levels), 
+              1im * (create(levels) - annihilate(levels))]
+    G_drive = G.(H_drive)
+
+
+    augdim = control_order + ∫a
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+
+    return TransmonSystem(
+        n_wfn_states,
+        n_aug_states,
+        nstates, 
+        nqstates,
+        isodim,
+        augdim,
+        vardim,
+        ncontrols,
+        control_order,
+        G_drift,
+        G_drive,
+        ψ̃1,
+        ψ̃goal,
+        ∫a
+    )
+
+
+end
+
+struct TwoQubitSystem <: AbstractQubitSystem
+    n_wfn_states::Int
+    n_aug_states::Int
+    nstates::Int
+    nqstates::Int
+    isodim::Int
+    augdim::Int
+    vardim::Int
+    ncontrols::Int
+    control_order::Int
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
+    ψ̃1::Vector{Float64}
+    ψ̃goal::Vector{Float64}
+    ∫a::Bool
+end
+
+function TwoQubitSystem(;
+    ω1::Float64,
+    ω2::Float64,
+    J::Float64,
+    ψ1::Union{Vector{C}, Vector{Vector{C}}},
+    ψf::Union{Vector{C}, Vector{Vector{C}}},
+    control_order = 2,
+    ∫a = false
+) where C <: Number
+    if isa(ψ1, Vector{C})
+        nqstates = 1
+        isodim = 2 * length(ψ1)
+        ψ̃goal = ket_to_iso(ψf)
+        ψ̃1 = ket_to_iso(ψ1)
+    else
+        nqstates = length(ψ1)
+        isodim = 2 * length(ψ1[1])
+        @assert isa(ψf, Vector{Vector{C}})
+        # takes care of real-to-complex isomorphism and stacks the states
+        ψ̃goal = vcat(ket_to_iso.(ψf)...)
+        ψ̃1 = vcat(ket_to_iso.(ψ1)...)
+    end
+
+    ncontrols = 2
+
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
+    #            gcouple*kron(GATES[:Z], GATES[:Z])
+    
+    # H_drift = J*kron(GATES[:Z], GATES[:Z])
+    H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z])
+    G_drift = G(H_drift)
+
+    H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
+               1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2)))]
+
+    G_drives = G.(H_drive)
+
+    augdim = control_order + ∫a
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+
+    return TwoQubitSystem(
+        n_wfn_states, 
+        n_aug_states, 
+        nstates,
+        nqstates,
+        isodim,
+        augdim,
+        vardim,
+        ncontrols,
+        control_order,
+        G_drift,
+        G_drives,
+        ψ̃1,
+        ψ̃goal,
+        ∫a
+    )
+
+end
 
 end
