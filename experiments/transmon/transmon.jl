@@ -3,13 +3,14 @@ using HDF5
 
 iter = 3000
 
-const EXPERIMENT_NAME = "transmon_no_int_a"
+const EXPERIMENT_NAME = "8-5-2022-transmon_no_int_a"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/transmon/")
 
 #system parameters
 
 qubit_frequency = 2π * 4.96 #GHz
 anharmonicity = -2π * 0.143 #GHz
+amax = 2π*19e-3
 
 levels = 3
 
@@ -35,7 +36,7 @@ Q = 200.
 R = 0.1
 loss = amplitude_loss
 hess = true
-pinqstate = false
+pinqstate = true
 
 time = T * Δt
 
@@ -52,7 +53,7 @@ prob = QubitProblem(
     R = R,
     eval_hessian = hess,
     loss = loss,
-    a_bound = 2π * 19e-3,
+    a_bound = amax,
     pin_first_qstate = pinqstate,
     options = options
 )
@@ -61,10 +62,12 @@ display(prob.trajectory.states[2])
 
 solve!(prob)
 
-display(prob.trajectory)
+display(prob.trajectory.states[2])
 
-raw_controls = jth_order_controls(prob.trajectory, system, 0)
+raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)
+display(raw_controls)
 controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
+display(controls)
 
 infidelity = iso_infidelity(final_state2(prob.trajectory, system), ket_to_iso(-im*ψg))
 println(infidelity)
@@ -80,13 +83,14 @@ result = Dict(
     "eval_hessian" => hess,
     "a_bound" => 19e-3,
     # "trajectory" => prob.trajectory,
+    "a_max" => amax,
     "pin_first_qstate" => pinqstate,
     "controls" => controls,
     "infidelity" => infidelity
 )
 
 
-save_file_path = generate_file_path("h5", EXPERIMENT_NAME * "_iter$(iter)" *"_time_$(time)ns", "pulses/transmon")
+save_file_path = generate_file_path("h5", EXPERIMENT_NAME * "_iter$(iter)" * "_time_$(time)ns" * "_pinq_$(pinqstate)", "pulses/transmon/exptry/")
 println("Saving this optimization to $(save_file_path)")
 h5open(save_file_path, "cw") do save_file
     for key in keys(result)

@@ -29,6 +29,16 @@ const GATES = Dict(
             0 1 0 0;
             0 0 0 1;
             0 0 1 0],
+
+    :XI => [0 0 -im 0;
+            0 0 0 -im;
+            -im 0 0 0;
+            0 -im 0 0],
+
+    :sqrtiSWAP => [1 0 0 0;
+                   0 1/sqrt(2) 1im/sqrt(2) 0;
+                   0 1im/sqrt(2) 1/sqrt(2) 0;
+                   0 0 0 1] 
 )
 
 function apply(gate::Symbol, ψ::Vector{T} where T<:Number)

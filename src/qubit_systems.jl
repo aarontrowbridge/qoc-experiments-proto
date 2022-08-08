@@ -318,7 +318,7 @@ end
 function TwoQubitSystem(;
     ω1::Float64,
     ω2::Float64,
-    gcouple::Float64,
+    J::Float64,
     ψ1::Union{Vector{C}, Vector{Vector{C}}},
     ψf::Union{Vector{C}, Vector{Vector{C}}},
     control_order = 2,
@@ -338,15 +338,19 @@ function TwoQubitSystem(;
         ψ̃1 = vcat(ket_to_iso.(ψ1)...)
     end
 
-    ncontrols = 1
+    ncontrols = 2
 
-    H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
-               (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
-               gcouple*kron(GATES[:Z], GATES[:Z])
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
+    #            gcouple*kron(GATES[:Z], GATES[:Z])
     
+    # H_drift = J*kron(GATES[:Z], GATES[:Z])
+    H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z])
     G_drift = G(H_drift)
 
-    H_drive = [kron(GATES[:X], I(2)), kron(I(2), GATES[:X])]
+    H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
+               1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2)))]
+
     G_drives = G.(H_drive)
 
     augdim = control_order + ∫a

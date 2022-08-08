@@ -16,6 +16,7 @@ export final_state
 export final_state2
 export pop_components
 export pop_matrix
+export final_statei 
 
 
 struct Trajectory
@@ -103,7 +104,11 @@ function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
         # #print(state1)
         # state2 = normalize([0, 1 - t/T, 0, -t/T, 0, 0])
         # wfns = vcat(state1, state2)
-        wfns = 2*rand(system.n_wfn_states) .- 1
+        x = vcat(system.ψ̃1...)
+        y = vcat(system.ψ̃goal...)
+        #linear interpolation
+        wfns = x + (y-x)*t/T
+        #wfns = 2*rand(system.n_wfn_states) .- 1
         augs = randn(system.n_aug_states)
         state = [wfns; augs]
         push!(states, state)
@@ -183,7 +188,7 @@ function pop_components(
     sys::AbstractQubitSystem;
     i = 1
 )
-    pops = [abs.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+    pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
     return pops
 end
 
@@ -194,6 +199,14 @@ function final_state2(
     sys::AbstractQubitSystem;
 )
     return traj.states[traj.T][slice(1, sys.isodim + 1, 2*sys.isodim, sys.isodim)]
+end
+
+function final_statei(
+    traj::Trajectory,
+    sys::AbstractQubitSystem;
+    i = 3
+)
+    return traj.states[traj.T][slice(i,sys.isodim)]
 end
 
 #get the first final state
