@@ -11,26 +11,26 @@ using LinearAlgebra
 # setting up simple quantum system
 #
 
-σx = GATES[:X]
-σy = GATES[:Y]
-σz = GATES[:Z]
+ω1 =  2π * 1.0 #GHz
+ω2 = 2π * 1.0 #GHz
+J = 0.1 * 2π
 
-H_drift = σz / 2
-H_drive = [σx / 2, σy / 2]
+ψ1 = [[1.0  + 0im, 0, 0, 0],
+      [0, 1. + 0im, 0, 0],
+      [0, 0, 1 + 0im, 0],
+      [0, 0, 0, 1 + 0im]]
+ψf = apply.(:sqrtiSWAP, ψ1)
 
-gate = :X
 
-ψ0 = [1, 0]
-ψ1 = [0, 1]
-
-# ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
-ψ = [ψ0, ψ1]
-
-system = SingleQubitSystem(
-    H_drift,
-    H_drive,
-    gate, ψ
+system = TwoQubitSystem(
+    ω1 = ω1,
+    ω2 = ω2,
+    J = J,
+    ψ1 = ψ1,
+    ψf = ψf
 )
+
+
 
 T = 5
 

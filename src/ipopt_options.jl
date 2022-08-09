@@ -12,7 +12,7 @@ Base.@kwdef mutable struct Options{T}
     s_max::T = 100.0
     max_iter::Int = 1000
     # max_wall_time = 300.0
-    max_cpu_time = 1000.0
+    max_cpu_time = 4000.0
     dual_inf_tol::T = 1.0
     constr_viol_tol::T = 1.0e-3
     compl_inf_tol::T = 1.0e-3
