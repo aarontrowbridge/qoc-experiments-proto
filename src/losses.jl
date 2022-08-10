@@ -10,8 +10,9 @@ export geodesic_loss
 export real_loss
 export amplitude_loss
 export quaternionic_loss
-export pure_real_loss
 export iso_infidelity
+export element_loss
+export euclidean_loss
 
 using ..Utils
 using ..QuantumLogic
@@ -212,6 +213,14 @@ function amplitude_loss(ψ̃, ψ̃goal)
     return abs(1 - abs2(amp))
 end
 
+function element_loss(ψ̃, ψ̃goal)
+    sum((ψ̃ - ψ̃goal).^2)
+end
+
+function euclidean_loss(ψ̃, ψ̃goal)
+    norm(ψ̃ - ψ̃goal)
+end
+
 
 function iso_infidelity(ψ̃, ψ̃f)
     ψ = iso_to_ket(ψ̃)
@@ -219,13 +228,6 @@ function iso_infidelity(ψ̃, ψ̃f)
     return 1 - abs2(ψ'ψf)
 end
 
-function pure_real_loss(ψ̃, ψ̃goal)
-    ψ = iso_to_ket(ψ̃)
-    ψgoal = iso_to_ket(ψ̃goal)
-    amp = ψ'ψgoal
-    return -real(amp)
-    
-end
 
 function quaternionic_loss(ψ̃, ψ̃goal)
     return min(
