@@ -10,6 +10,7 @@ export geodesic_loss
 export real_loss
 export amplitude_loss
 export quaternionic_loss
+export pure_real_loss
 export iso_infidelity
 
 using ..Utils
@@ -218,6 +219,13 @@ function iso_infidelity(ψ̃, ψ̃f)
     return 1 - abs2(ψ'ψf)
 end
 
+function pure_real_loss(ψ̃, ψ̃goal)
+    ψ = iso_to_ket(ψ̃)
+    ψgoal = iso_to_ket(ψ̃goal)
+    amp = ψ'ψgoal
+    return -real(amp)
+    
+end
 
 function quaternionic_loss(ψ̃, ψ̃goal)
     return min(
