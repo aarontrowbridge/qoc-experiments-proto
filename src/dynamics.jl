@@ -29,12 +29,12 @@ using SparseArrays
 
     controlsₜ = [augsₜ[(sys.ncontrols + 1):end]; uₜ]
 
-    
+
     δaugs = augsₜ₊₁ - (augsₜ + controlsₜ * Δt)
 
     δψ̃s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
 
-    
+
     aₜ = augsₜ[slice(1 + sys.∫a, sys.ncontrols)]
 
     for i = 1:sys.nqstates
@@ -480,7 +480,7 @@ function SystemDynamics(
                             sys.vardim
                         ) .+
                         slice(
-                            1 + sys.∫a, 
+                            1 + sys.∫a,
                             sys.ncontrols)
                     ]
 
@@ -871,15 +871,11 @@ function MinTimeSystemDynamics(
                         kjₜ = (
                             index(t, 0, sys.vardim) +
                             sys.n_wfn_states +
-                            # FIXME: assumes ∫a exists here
-                            #index(2, k, sys.ncontrols),
                             index(1 + sys.∫a, k, sys.ncontrols),
 
                             index(t, 0, sys.vardim) +
                             sys.n_wfn_states +
-                            # FIXME: assumes ∫a exists here
-                            #index(2, j, sys.ncontrols),
-                            index(1 + sys.∫a, k, sys.controls)
+                            index(1 + sys.∫a, k, sys.ncontrols)
                         )
                         push!(μ∇²F_structure, kjₜ)
                     end
@@ -902,8 +898,6 @@ function MinTimeSystemDynamics(
                                 # jth column
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, j, sys.ncontrols)
                                 index(1 + sys.∫a, j, sys.ncontrols)
                             )
                             push!(μ∇²F_structure, kⁱjₜ)
@@ -919,8 +913,6 @@ function MinTimeSystemDynamics(
                                 # kth row
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, k, sys.ncontrols),
                                 index(1 + sys.∫a, k, sys.ncontrols),
 
                                 # jⁱth column
@@ -980,11 +972,6 @@ function MinTimeSystemDynamics(
                             sys.vardim
                         ) .+
 
-                        # FIXME: assumes ∫a exists here
-                        # slice(
-                        #     2,
-                        #     sys.ncontrols
-                        # )
                         slice(1 + sys.∫a, sys.ncontrols)
                     ]
 

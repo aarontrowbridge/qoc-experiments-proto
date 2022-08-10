@@ -3,6 +3,7 @@ module Trajectories
 using ..Utils
 using ..QubitSystems
 using ..QuantumLogic
+using ..Integrators
 
 export Trajectory
 
@@ -16,118 +17,47 @@ export final_state
 export final_state2
 export pop_components
 export pop_matrix
-export final_statei 
+export final_statei
 
+#
+# helper functions
+#
 
-struct Trajectory
-    states::Vector{Vector{Float64}}
-    actions::Vector{Vector{Float64}}
-    times::Vector{Float64}
-    T::Int
+function linear_interpolation(x1, xT, T::Int)
+    X = Vector{typeof(x1)}(undef, T)
+    Δx = xT - x1
+    for t = 1:T
+        X[t] = x1 + Δx * (t - 1) / (T - 1)
+    end
+    return X
 end
 
-# TODO: evaluate integrals of random control variable for augmented state
-
-function Trajectory(
-    system::AbstractQubitSystem,
-    controls::Matrix,
+function rollout(
+    sys::AbstractQubitSystem,
+    A::Vector{<:AbstractVector},
     Δt::Real
 )
-
-    print;n("entered this one")
-    T = size(controls, 2)
-
-    times = [Δt * t for t = 0:T-1]
-
-    ∫controls = similar(controls)
-
-    for k = 1:system.ncontrols
-        ∫controls[k, :] = integral(controls[k, :], times)
+    T = length(A) + 1
+    Ψ̃ = Vector{typeof(sys.ψ̃1)}(undef, T)
+    Ψ̃[1] = sys.ψ̃1
+    for t = 2:T
+        Gₜ = G(A[t - 1], sys.G_drift, sys.G_drives)
+        ψ̃ⁱₜ₋₁s = @views [
+            Ψ̃[t - 1][slice(i, sys.isodim)]
+                for i = 1:sys.nqstates
+        ]
+        Uₜ = exp(Gₜ * Δt)
+        Ψ̃[t] = vcat([Uₜ * ψ̃ⁱₜ₋₁ for ψ̃ⁱₜ₋₁ in ψ̃ⁱₜ₋₁s]...)
     end
-
-    augmented_controls = zeros(system.ncontrols * (system.augdim + 1), T)
-
-    augmented_controls[slice(1, system.ncontrols), :] = ∫controls
-    augmented_controls[slice(2, system.ncontrols), :] = controls
-
-    for j = 1:system.control_order
-        for k = 1:system.ncontrols
-
-            aug_j_idx = index(
-                2 + j,
-                k,
-                system.ncontrols
-            )
-
-            aug_j_minus_1_idx = index(
-                2 + j - 1,
-                k,
-                system.ncontrols
-            )
-
-            augmented_controls[aug_j_idx, :] = derivative(
-                augmented_controls[aug_j_minus_1_idx, :],
-                times
-            )
-        end
-    end
-
-    augs_matrix =
-        augmented_controls[1:system.ncontrols*system.augdim, :]
-
-    actions_matrix =
-        augmented_controls[end-system.ncontrols+1:end, :]
-
-    states = []
-
-    push!(states, [system.ψ̃1; zeros(system.n_aug_states)])
-
-    for t = 2:T-1
-        augs = augs_matrix[:, t]
-        wfns = zeros(system.n_wfn_states)
-        state = [wfns; augs]
-        push!(states, state)
-    end
-
-    push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
-
-    actions = [actions_matrix[:, t] for t = 1:T]
-
-    return Trajectory(states, actions, times, T)
-end
-
-function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
-    states = []
-    push!(states, [system.ψ̃1; zeros(system.n_aug_states)])
-    for t = 2:T-1
-        # state1 = normalize([1. - t/T, 0, 0, 0, -t/T, 0])
-        # #print(state1)
-        # state2 = normalize([0, 1 - t/T, 0, -t/T, 0, 0])
-        # wfns = vcat(state1, state2)
-        x = vcat(system.ψ̃1...)
-        y = vcat(system.ψ̃goal...)
-        #linear interpolation
-        wfns = x + (y-x)*t/T
-        #wfns = 2*rand(system.n_wfn_states) .- 1
-        augs = randn(system.n_aug_states)
-        state = [wfns; augs]
-        push!(states, state)
-    end
-    push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
-
-    actions = [[0.1*randn(system.ncontrols) for t = 1:T-1]..., zeros(system.ncontrols)]
-
-    times = [Δt * t for t = 1:T]
-
-    return Trajectory(states, actions, times, T)
+    return Ψ̃
 end
 
 function derivative(xs::Vector, ts::Vector)
     dxs = similar(xs)
     dxs[1] = 0.0
     for t = 2:length(ts)
-        Δt = ts[t] - ts[t - 1]
         Δx = xs[t] - xs[t - 1]
+        Δt = ts[t] - ts[t - 1]
         dxs[t] = Δx / Δt
     end
     return dxs
@@ -143,7 +73,142 @@ function integral(xs::Vector, ts::Vector)
     return ∫xs
 end
 
-function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int; d2pi = true)
+
+
+
+
+struct Trajectory
+    states::Vector{Vector{Float64}}
+    actions::Vector{Vector{Float64}}
+    times::Vector{Float64}
+    T::Int
+    Δt::Float64
+end
+
+
+# constructor for case of given controls
+
+function Trajectory(
+    sys::AbstractQubitSystem,
+    controls::Matrix,
+    Δt::Real
+)
+    T = size(controls, 2) + 1
+
+    times = [Δt * t for t = 1:T]
+
+    controls = hcat(controls, controls[:, end])
+
+    if sys.∫a
+        ∫controls = similar(controls)
+
+        for k = 1:sys.ncontrols
+            ∫controls[k, :] = integral(controls[k, :], times)
+        end
+    end
+
+    augss = zeros(sys.ncontrols * (sys.augdim + 1), T)
+
+    if sys.∫a
+        augss[slice(1, sys.ncontrols), :] = ∫controls
+    end
+
+    augss[slice(sys.∫a + 1, sys.ncontrols), :] = controls
+
+    for j = 1:sys.control_order
+        for k = 1:sys.ncontrols
+
+            aug_j_idx = index(
+                sys.∫a + 1 + j,
+                k,
+                sys.ncontrols
+            )
+
+            aug_j_minus_1_idx = index(
+                sys.∫a + 1 + j - 1,
+                k,
+                sys.ncontrols
+            )
+
+            augss[aug_j_idx, :] = derivative(
+                augss[aug_j_minus_1_idx, :],
+                times
+            )
+        end
+    end
+
+    augs_matrix = augss[1:sys.n_aug_states, :]
+
+    A = @views [vec(controls[:, t]) for t = 1:T-1]
+
+    Ψ̃ = rollout(sys, A, Δt)
+
+
+    states = []
+
+    for t = 1:T
+        wfns = Ψ̃[t]
+        augs = augs_matrix[:, t]
+        x = [wfns; augs]
+        push!(states, x)
+    end
+
+    actions_matrix =
+        augss[slice(sys.augdim + 1, sys.ncontrols), :]
+
+    actions = [actions_matrix[:, t] for t = 1:T]
+
+    return Trajectory(states, actions, times, T, Δt)
+end
+
+function Trajectory(
+    sys::AbstractQubitSystem,
+    T::Int,
+    Δt::Float64;
+    linearly_interpolate=true,
+    phase_flip=true,
+    σ = 0.1
+)
+    if linearly_interpolate
+        if phase_flip
+            ψ̃goal = -sys.ψ̃goal
+        else
+            ψ̃goal = sys.ψ̃goal
+        end
+        Ψ̃ = linear_interpolation(sys.ψ̃1, ψ̃goal, T)
+    else
+        Ψ̃ = fill(2*rand(sys.n_wfn_states) - 1, T)
+    end
+
+    states = []
+
+    push!(states, [sys.ψ̃1; zeros(sys.n_aug_states)])
+
+    for t = 2:T-1
+        wfns = Ψ̃[t]
+        augs = σ * randn(sys.n_aug_states)
+        x = [wfns; augs]
+        push!(states, x)
+    end
+
+    push!(states, [ψ̃goal; zeros(sys.n_aug_states)])
+
+    actions = [
+        [σ * randn(sys.ncontrols) for t = 1:T-1]...,
+        zeros(sys.ncontrols)
+    ]
+
+    times = [Δt * t for t = 1:T]
+
+    return Trajectory(states, actions, times, T, Δt)
+end
+
+function jth_order_controls(
+    traj::Trajectory,
+    sys::AbstractQubitSystem,
+    j::Int;
+    d2pi = true
+)
     if sys.∫a
         @assert j ∈ -1:sys.control_order
     else
@@ -151,12 +216,16 @@ function jth_order_controls(traj::Trajectory, sys::AbstractQubitSystem, j::Int; 
     end
 
     if j != sys.control_order
-        jth_order_slice = slice(1 + sys.∫a + j, sys.ncontrols)
-        return [traj.states[t][sys.n_wfn_states .+ (jth_order_slice)]/(1. + (2π - 1.)*d2pi) 
-                for t = 1:traj.T]
+        jth_order_slice = slice(sys.∫a + 1 + j, sys.ncontrols)
+        return [
+            traj.states[t][
+                sys.n_wfn_states .+ (jth_order_slice)
+            ] for t = 1:traj.T
+        ] / (1. + (2π - 1.) * d2pi)
     else
-        # returns same value for T-1 and T to make plots cleaner
-        return [traj.actions[1:end-1]..., traj.actions[end-1]]/(1. + (2π - 1.)*d2pi)
+        # returns same value for actions at T-1 and T to make plots cleaner
+        return [traj.actions[1:end-1]..., traj.actions[end-1]] /
+            (1. + (2π - 1.) * d2pi)
     end
 end
 
@@ -165,7 +234,8 @@ function jth_order_controls_matrix(traj, sys, j; kwargs...)
     return hcat(jth_order_controls(traj, sys, j; kwargs...)...)
 end
 
-controls_matrix(traj, sys) = jth_order_controls_matrix(traj, sys, 0)
+controls_matrix(traj, sys) =
+    jth_order_controls_matrix(traj, sys, 0)
 
 actions_matrix(traj::Trajectory) = hcat(traj.actions...)
 
@@ -188,11 +258,16 @@ function pop_components(
     sys::AbstractQubitSystem;
     i = 1
 )
-    pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+    pops = [
+        abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)]))
+            for t = 1:traj.T
+    ]
     return pops
 end
 
-pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
+pop_matrix(args...; kwargs...) =
+    hcat(pop_components(args...; kwargs...)...)
+
 # get the second final state
 function final_state2(
     traj::Trajectory,
@@ -224,6 +299,7 @@ end
 #     components=nothing
 # )
 
-wfn_components_matrix(args...; kwargs...) = hcat(wfn_components(args...; kwargs...)...)
+wfn_components_matrix(args...; kwargs...) =
+    hcat(wfn_components(args...; kwargs...)...)
 
 end
