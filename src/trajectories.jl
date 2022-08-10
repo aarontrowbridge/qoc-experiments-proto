@@ -107,8 +107,8 @@ function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
         x = vcat(system.ψ̃1...)
         y = vcat(system.ψ̃goal...)
         #linear interpolation
-        wfns = x + (y-x)*t/T
-        #wfns = 2*rand(system.n_wfn_states) .- 1
+        #wfns = x + (y-x)*t/T
+        wfns = 2*rand(system.n_wfn_states) .- 1
         augs = randn(system.n_aug_states)
         state = [wfns; augs]
         push!(states, state)
@@ -116,6 +116,8 @@ function Trajectory(system::AbstractQubitSystem, Δt::Float64, T::Int)
     push!(states, [system.ψ̃goal; zeros(system.n_aug_states)])
 
     actions = [[0.1*randn(system.ncontrols) for t = 1:T-1]..., zeros(system.ncontrols)]
+    
+    #actions = [[zeros(system.ncontrols) for t = 1:T-1]..., zeros(system.ncontrols)]
 
     times = [Δt * t for t = 1:T]
 

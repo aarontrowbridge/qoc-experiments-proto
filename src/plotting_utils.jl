@@ -454,10 +454,11 @@ function plot_twoqubit(
     system::TwoQubitSystem,
     traj::Trajectory,
     path::String;
-    fig_title = nothing
+    fig_title = nothing,
+    i = 3
 )
     fig = Figure(resolution=(1200, 1500))
-    pops = pop_matrix(traj, system, i=3)
+    pops = pop_matrix(traj, system, i=i)
     #need to rewrite this for arbitrary number of levels
     ψax = Axis(fig[1:2, :]; title="Population", xlabel=L"t")
     series!(ψax, traj.times, pops;
