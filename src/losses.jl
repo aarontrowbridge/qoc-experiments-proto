@@ -13,6 +13,7 @@ export quaternionic_loss
 export iso_infidelity
 export element_loss
 export euclidean_loss
+export pure_real_loss
 
 using ..Utils
 using ..QuantumLogic
@@ -221,6 +222,13 @@ function euclidean_loss(ψ̃, ψ̃goal)
     norm(ψ̃ - ψ̃goal)
 end
 
+function pure_real_loss(ψ̃, ψ̃goal)
+    ψ = iso_to_ket(ψ̃)
+    ψgoal = iso_to_ket(ψ̃goal)
+    amp = ψ'ψgoal
+    return -real(amp)
+    
+end
 
 function iso_infidelity(ψ̃, ψ̃f)
     ψ = iso_to_ket(ψ̃)
