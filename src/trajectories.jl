@@ -165,16 +165,12 @@ function Trajectory(
     sys::AbstractQubitSystem,
     T::Int,
     Δt::Float64;
-    linearly_interpolate=true,
-    phase_flip=true,
+    linearly_interpolate = true,
+    phase = 0.0,
     σ = 0.1
 )
+    ψ̃goal = exp(1im * phase) * sys.ψ̃goal 
     if linearly_interpolate
-        if phase_flip
-            ψ̃goal = -sys.ψ̃goal
-        else
-            ψ̃goal = sys.ψ̃goal
-        end
         Ψ̃ = linear_interpolation(sys.ψ̃1, ψ̃goal, T)
     else
         Ψ̃ = fill(2*rand(sys.n_wfn_states) - 1, T)
