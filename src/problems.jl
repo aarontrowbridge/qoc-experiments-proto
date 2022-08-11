@@ -10,7 +10,7 @@ export get_traj_data
 
 using ..Utils
 using ..Integrators
-using ..Losses
+using ..Costs
 using ..QubitSystems
 using ..Trajectories
 using ..NLMOI
@@ -55,6 +55,7 @@ function QubitProblem(
     return QubitProblem(
         system,
         init_traj.T;
+        Δt=init_traj.Δt,
         init_traj=init_traj,
         kwargs...
     )
@@ -64,16 +65,24 @@ function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
     integrator=:FourthOrderPade,
-    loss=amplitude_loss,
+    cost=infidelity_cost,
     Δt=0.01,
     Q=200.0,
     R=0.1,
     eval_hessian=true,
     pin_first_qstate=true,
+    phase_flip=true,
+    σ=0.1,
     a_bound = 2π * 19e-3,
-    init_traj=Trajectory(system, Δt, T),
+    init_traj=Trajectory(
+        system,
+        T,
+        Δt;
+        phase_flip=phase_flip,
+        σ=σ
+    ),
     options=Options(),
-    return_constraints = false,
+    return_constraints=false,
 )
 
     if getfield(options, :linear_solver) == "pardiso" &&
@@ -103,13 +112,29 @@ function QubitProblem(
     evaluator = QubitEvaluator(
         system,
         integrator,
-        loss,
+        cost,
         eval_hessian,
         T, Δt,
         Q, R
     )
 
     cons = AbstractConstraint[]
+
+    # pin first qstate to be equal to analytic solution
+    if pin_first_qstate
+        if phase_flip
+            ψ̃¹goal = -system.ψ̃goal[1:system.isodim]
+        else
+            ψ̃¹goal = system.ψ̃goal[1:system.isodim]
+        end
+        pin_con = EqualityConstraint(
+            T,
+            1:system.isodim,
+            ψ̃¹goal,
+            system.vardim
+        )
+        push!(cons, pin_con)
+    end
 
     # initial quantum state constraints: ψ̃(t=1) = ψ̃1
     ψ1_con = EqualityConstraint(
@@ -119,17 +144,6 @@ function QubitProblem(
         system.vardim
     )
     push!(cons, ψ1_con)
-
-    # pin first qstate to be equal to analytic solution
-    if pin_first_qstate
-        pin_con = EqualityConstraint(
-            T,
-            1:system.isodim,
-            system.ψ̃goal[1:system.isodim],
-            system.vardim
-        )
-        push!(cons, pin_con)
-    end
 
     # initial a(t = 1) constraints: ∫a, a, da = 0
     aug1_con = EqualityConstraint(
@@ -158,8 +172,6 @@ function QubitProblem(
         system.vardim
     )
     push!(cons, a_bound_con)
-
-    # TODO: fix constraints: a_bounds not working
 
     constrain!(optimizer, variables, cons)
 
@@ -386,6 +398,20 @@ struct MinTimeProblem
     T::Int
 end
 
+
+
+# TODO: rewrite this constructor (hacky implementation rn)
+
+function MinTimeProblem(prob::QubitProblem; kwargs...)
+    return MinTimeProblem(
+        prob.system,
+        prob.T;
+        Δt=prob.trajectory.Δt,
+        init_traj=prob.trajectory,
+        kwargs...
+    )
+end
+
 function MinTimeProblem(
     system::AbstractQubitSystem,
     T::Int;
@@ -393,20 +419,20 @@ function MinTimeProblem(
     Rₛ=0.001,
     Δt=0.01,
     Δt_lbound=0.1 * Δt,
-    Δt_ubound=2.0 * Δt,
+    Δt_ubound=Δt,
     integrator=:FourthOrderPade,
+    init_traj=Trajectory(system, Δt, T),
     eval_hessian=true,
-    a_bound=1.0,
-    min_time_options=Options(),
+    mintime_options=Options(),
     kwargs...
 )
 
     optimizer = Ipopt.Optimizer()
 
     # set Ipopt optimizer options
-    for name in fieldnames(typeof(min_time_options))
+    for name in fieldnames(typeof(mintime_options))
         optimizer.options[String(name)] =
-            getfield(min_time_options, name)
+            getfield(mintime_options, name)
     end
 
     total_vars = system.vardim * T
@@ -418,17 +444,18 @@ function MinTimeProblem(
     # set up sub problem
     subprob, cons = QubitProblem(
         system,
-        T;
+        init_traj;
         return_constraints=true,
         integrator=integrator,
         eval_hessian=eval_hessian,
-        a_bound=a_bound,
+        pin_first_qstate=false, # TODO: figure out a better way to implement this - pinned first qstate dissallows constraints on all qstates during mintime solve
         kwargs...
     )
 
     # constraints on Δtₜs
     Δt_bounds_con =
         TimeStepBoundsConstraint((Δt_lbound, Δt_ubound), T)
+
     push!(cons, Δt_bounds_con)
 
     constrain!(optimizer, variables, cons)
@@ -446,7 +473,11 @@ function MinTimeProblem(
     dynamics_constraints =
         [MOI.NLPBoundsPair(0.0, 0.0) for _ = 1:total_dynamics]
 
-    block_data = MOI.NLPBlockData(dynamics_constraints, evaluator, true)
+    block_data = MOI.NLPBlockData(
+        dynamics_constraints,
+        evaluator,
+        true
+    )
 
     MOI.set(optimizer, MOI.NLPBlock(), block_data)
     MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
@@ -498,7 +529,8 @@ end
     xs = [Z[slice(t, nstates, vardim)] for t = 1:prob.T]
 
     us = [
-        Z[slice(t, nstates + 1, vardim, vardim)] for t = 1:prob.T
+        Z[slice(t, nstates + 1, vardim, vardim)]
+            for t = 1:prob.T
     ]
 
     Δts = [0.0; Z[(end - (prob.T - 1) + 1):end]]
@@ -524,8 +556,8 @@ function solve!(prob::MinTimeProblem)
 
     ψ̃T_con! = EqualityConstraint(
         prob.T,
-        isodim+1:n_wfn_states,
-        init_traj.states[end][isodim+1:n_wfn_states],
+        1:n_wfn_states,
+        init_traj.states[end][1:n_wfn_states],
         prob.subprob.system.vardim
     )
 
@@ -536,6 +568,7 @@ function solve!(prob::MinTimeProblem)
     update_traj_data!(prob)
 end
 
+# TODO: add functionality to vizualize Δt distribution
 
 
 end

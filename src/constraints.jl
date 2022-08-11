@@ -30,7 +30,7 @@ end
 struct EqualityConstraint <: AbstractConstraint
     ts::AbstractArray{Int}
     js::AbstractArray{Int}
-    vals::Vector{R} where R <: Real
+    vals::Vector{R} where R
     vardim::Int
 end
 
@@ -39,7 +39,8 @@ function EqualityConstraint(
     j::Union{Int, AbstractArray{Int}},
     val::Union{R, Vector{R}},
     vardim::Int
-) where R <: Real
+
+) where R
 
     @assert !(isa(val, Vector{R}) && isa(j, Int))
         "if val is an array, j must be an array of integers"

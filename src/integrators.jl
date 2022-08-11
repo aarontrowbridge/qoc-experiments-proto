@@ -14,6 +14,8 @@ export FourthOrderPadeJacobian
 export SecondOrderPadeHessian
 export FourthOrderPadeHessian
 
+export G
+
 using ..Utils
 using ..QubitSystems
 using ..Utils

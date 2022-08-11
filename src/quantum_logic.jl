@@ -1,6 +1,7 @@
 module QuantumLogic
 
 export GATES
+export ⊗
 export apply
 export ket_to_iso
 export iso_to_ket
@@ -8,7 +9,7 @@ export annihilate
 export create
 export quad
 export number
-export normalize 
+export normalize
 
 using LinearAlgebra
 
@@ -38,8 +39,10 @@ const GATES = Dict(
     :sqrtiSWAP => [1 0 0 0;
                    0 1/sqrt(2) 1im/sqrt(2) 0;
                    0 1im/sqrt(2) 1/sqrt(2) 0;
-                   0 0 0 1] 
+                   0 0 0 1]
 )
+
+⊗(A, B) = kron(A, B)
 
 function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
     @assert norm(ψ) ≈ 1.0
@@ -50,27 +53,29 @@ function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
 end
 
 function annihilate(levels::Int)
-       diagm(1 => map(sqrt, 1:levels - 1))
+    return diagm(1 => map(sqrt, 1:levels - 1))
 end
 
 function create(levels::Int)
-       (annihilate(levels))'
+    return (annihilate(levels))'
 end
 
 function number(levels::Int)
-       create(levels)*annihilate(levels)
+    return create(levels) * annihilate(levels)
 end
 
 function quad(levels::Int)
-       number(levels)*(number(levels) - I(levels))
+    return number(levels)*(number(levels) - I(levels))
 end
-
 
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]
 
-iso_to_ket(ψ̃) = ψ̃[1:div(length(ψ̃), 2)] + im * ψ̃[(div(length(ψ̃), 2) + 1):end]
+iso_to_ket(ψ̃) =
+    ψ̃[1:div(length(ψ̃), 2)] +
+    im * ψ̃[(div(length(ψ̃), 2) + 1):end]
 
 function normalize(state::Vector{C} where C <: Number)
-       return state/norm(state)
+    return state / norm(state)
 end
+
 end
