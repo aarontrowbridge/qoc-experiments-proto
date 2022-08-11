@@ -25,7 +25,7 @@ levels = 3
 
 
 system = TransmonSystem(
-    levels = levels, 
+    levels = levels,
     rotating_frame = true,
     ω = qubit_frequency,
     α = anharmonicity,
@@ -40,7 +40,7 @@ R = 2.0
 
 eval_hessian = true
 
-loss_fn = amplitude_loss
+cost_fn = amplitude_cost
 
 
 # absolulte tolerance for approximate tests
@@ -86,7 +86,7 @@ z1 = 2*rand(system.vardim) .- 1
 
 obj = SystemObjective(
     system,
-    loss_fn,
+    cost_fn,
     T,
     Q,
     R,
@@ -264,7 +264,7 @@ for integrator in integrators
 
 
     # # test dynamics Hessian of Lagrangian vs forward diff
-    
+
     dH = ForwardDiff.hessian(HofL, Z)
     display(μ∇²F[1:18, 1:18])
     display(dH[1:18, 1:18])
@@ -273,7 +273,7 @@ for integrator in integrators
             dH,
             atol=1e-2
         )
-    
+
     display(res2)
     @test all(
         isapprox.(

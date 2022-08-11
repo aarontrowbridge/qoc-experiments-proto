@@ -10,7 +10,7 @@ export get_traj_data
 
 using ..Utils
 using ..Integrators
-using ..Losses
+using ..Costs
 using ..QubitSystems
 using ..Trajectories
 using ..NLMOI
@@ -65,7 +65,7 @@ function QubitProblem(
     system::AbstractQubitSystem,
     T::Int;
     integrator=:FourthOrderPade,
-    loss=infidelity_loss,
+    cost=infidelity_cost,
     Δt=0.01,
     Q=200.0,
     R=0.1,
@@ -112,7 +112,7 @@ function QubitProblem(
     evaluator = QubitEvaluator(
         system,
         integrator,
-        loss,
+        cost,
         eval_hessian,
         T, Δt,
         Q, R

@@ -41,7 +41,7 @@ R = 2.0
 
 eval_hessian = true
 
-loss_fn = infidelity_loss
+cost_fn = infidelity_cost
 
 
 # absolulte tolerance for approximate tests
@@ -99,7 +99,7 @@ Z = 2 * rand(system.vardim * T) .- 1
 
 obj = SystemObjective(
     system,
-    loss_fn,
+    cost_fn,
     T,
     Q,
     R,
@@ -181,7 +181,7 @@ for integrator in integrators
         (system.nstates * (T - 1), system.vardim * T)
     )
 
- 
+
 
     # test dynamics Jacobian vs finite diff
 

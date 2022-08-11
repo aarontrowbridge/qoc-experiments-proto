@@ -31,7 +31,7 @@ T    = 1000
 Δt   = 0.01
 Q    = 200.0
 R    = 2.0
-loss = infidelity_loss
+cost = infidelity_cost
 hess = true
 
 a_bounds = [1.0, 0.5]
@@ -59,7 +59,7 @@ prob = QubitProblem(
     R=R,
     eval_hessian=hess,
     a_bound=a_bounds,
-    loss=loss,
+    cost=cost,
     pin_first_qstate = true,
     options=options,
     integrator=integrator,

@@ -21,7 +21,7 @@ T  = parse(Int, ARGS[2])
 Q  = 500.0
 R  = 0.001
 
-loss = infidelity_loss
+cost = infidelity_cost
 
 a_bound = [1.0, 0.5]
 
@@ -58,7 +58,7 @@ for Rᵤ in [1e-3, 1e-5]
         Rᵤ=Rᵤ,
         Rₛ=Rₛ,
         a_bound=a_bound,
-        loss=loss,
+        cost=cost,
         options=options,
         min_time_options=min_time_options
     )

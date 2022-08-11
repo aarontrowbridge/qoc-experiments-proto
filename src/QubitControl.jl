@@ -17,8 +17,8 @@ include("ipopt_options.jl")
 include("qubit_systems.jl")
 @reexport using .QubitSystems
 
-include("losses.jl")
-@reexport using .Losses
+include("costs.jl")
+@reexport using .Costs
 
 include("integrators.jl")
 @reexport using .Integrators

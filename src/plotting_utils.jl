@@ -106,6 +106,7 @@ function plot_single_qubit_2_qstate_with_controls(
     isodim::Int,
     control_order::Int,
     T::Int;
+    ∫a=false,
     is=(1, 2),
     fig_title=nothing
 )
@@ -120,7 +121,7 @@ function plot_single_qubit_2_qstate_with_controls(
     ψ̃²s = [xs[t][slice(is[2], isodim)] for t = 1:T]
     ψ̃²s = hcat(ψ̃²s...)
 
-    as = [[xs[t][slice()]; us[t]] for t = 1:T]
+    as = [[xs[t][slice(∫a + 1, ncontrols)]; us[t]] for t = 1:T]
     as = hcat(as...)
     as[end, end] = as[end, end-1]
 
@@ -499,7 +500,7 @@ function plot_twoqubit(
     # end
 
     save(path, fig)
-        
+
 end
 
 end
