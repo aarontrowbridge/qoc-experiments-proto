@@ -11,7 +11,7 @@ export get_traj_data
 using ..Utils
 using ..Integrators
 using ..Costs
-using ..QubitSystems
+using ..QuantumSystems
 using ..Trajectories
 using ..NLMOI
 using ..Evaluators
@@ -27,9 +27,23 @@ const MOI = MathOptInterface
 #
 # qubit problem
 #
+abstract type QuantumControlProblem end
+
+struct FixedTimeProblem <: QuantumControlProblem
+    system::AbstractQuantumSystem
+    evaluator::QubitEvaluator
+    variables::Vector{MOI.VariableIndex}
+    optimizer::Ipopt.Optimizer
+    trajectory::Trajectory
+    T::Int
+    Δt::Float64
+    total_vars::Int
+    total_states::Int
+    total_dynamics::Int
+end
 
 struct QubitProblem
-    system::AbstractQubitSystem
+    system::AbstractQuantumSystem
     evaluator::QubitEvaluator
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
@@ -48,7 +62,7 @@ end
 # end
 
 function QubitProblem(
-    system::AbstractQubitSystem,
+    system::AbstractQuantumSystem,
     init_traj::Trajectory;
     kwargs...
 )
@@ -62,7 +76,7 @@ function QubitProblem(
 end
 
 function QubitProblem(
-    system::AbstractQubitSystem,
+    system::AbstractQuantumSystem,
     T::Int;
     integrator=:FourthOrderPade,
     cost=infidelity_cost,
@@ -389,7 +403,7 @@ end
 # min time problem
 #
 
-struct MinTimeProblem
+struct MinTimeProblem <: QuantumControlProblem
     subprob::QubitProblem
     evaluator::MinTimeEvaluator
     variables::Vector{MOI.VariableIndex}
@@ -401,7 +415,7 @@ end
 
 # TODO: rewrite this constructor (hacky implementation rn)
 
-function MinTimeProblem(prob::QubitProblem; kwargs...)
+function MinTimeProblem(prob::FixedTimeProblem; kwargs...)
     return MinTimeProblem(
         prob.system,
         prob.T;
@@ -412,7 +426,7 @@ function MinTimeProblem(prob::QubitProblem; kwargs...)
 end
 
 function MinTimeProblem(
-    system::AbstractQubitSystem,
+    system::AbstractQuantumSystem,
     T::Int;
     Rᵤ=0.001,
     Rₛ=0.001,

@@ -16,7 +16,7 @@ using SparseArrays
 #
 
 @views function dynamics(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     integrator::AbstractQuantumIntegrator,
     xₜ₊₁::AbstractVector,
     xₜ::AbstractVector,
@@ -54,7 +54,7 @@ struct SystemDynamics
 end
 
 function SystemDynamics(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     integrator::Symbol,
     T::Int,
     Δt::Float64,
@@ -529,7 +529,7 @@ end
 # TODO: reimplement
 
 function MinTimeSystemDynamics(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     integrator::Symbol,
     T::Int,
     eval_hessian::Bool

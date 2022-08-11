@@ -23,7 +23,7 @@ struct SystemObjective
 end
 
 function SystemObjective(
-    system::AbstractQubitSystem,
+    system::AbstractQuantumSystem,
     cost_fn::Function,
     T::Int,
     Q::Float64,
@@ -125,7 +125,7 @@ struct MinTimeObjective
 end
 
 function MinTimeObjective(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     T::Int,
     Rᵤ::Float64,
     Rₛ::Float64,

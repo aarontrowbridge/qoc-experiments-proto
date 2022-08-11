@@ -33,7 +33,7 @@ function linear_interpolation(x1, xT, T::Int)
 end
 
 function rollout(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     A::Vector{<:AbstractVector},
     Δt::Real
 )
@@ -89,7 +89,7 @@ end
 # constructor for case of given controls
 
 function Trajectory(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     controls::Matrix,
     Δt::Real
 )
@@ -162,7 +162,7 @@ function Trajectory(
 end
 
 function Trajectory(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     T::Int,
     Δt::Float64;
     linearly_interpolate = true,
@@ -201,7 +201,7 @@ end
 
 function jth_order_controls(
     traj::Trajectory,
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     j::Int;
     d2pi = true
 )
@@ -237,7 +237,7 @@ actions_matrix(traj::Trajectory) = hcat(traj.actions...)
 
 function wfn_components(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
     i=1,
     components=nothing
 )
@@ -251,7 +251,7 @@ end
 
 function pop_components(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
     i = 1,
     components = nothing
 )
@@ -269,14 +269,14 @@ pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
 # get the second final state
 function final_state2(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
 )
     return traj.states[traj.T][slice(1, sys.isodim + 1, 2*sys.isodim, sys.isodim)]
 end
 
 function final_statei(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
     i = 3
 )
     return traj.states[traj.T][slice(i,sys.isodim)]
@@ -285,14 +285,14 @@ end
 #get the first final state
 function final_state(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
 )
     return traj.states[traj.T][slice(1, sys.isodim)]
 end
 
 # function populations(
 #     traj::Trajectory,
-#     sys::AbstractQubitSystem,
+#     sys::AbstractQuantumSystem,
 #     i = 1,
 #     components=nothing
 # )

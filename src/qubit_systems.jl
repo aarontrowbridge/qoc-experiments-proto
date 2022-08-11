@@ -1,6 +1,6 @@
 module QubitSystems
 
-export AbstractQubitSystem
+export AbstractQuantumSystem
 
 export SingleQubitSystem
 export MultiModeQubitSystem
@@ -20,9 +20,9 @@ Im2 = [
 
 G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
-abstract type AbstractQubitSystem end
+abstract type AbstractQuantumSystem end
 
-struct SingleQubitSystem <: AbstractQubitSystem
+struct SingleQubitSystem <: AbstractQuantumSystem
     n_wfn_states::Int
     n_aug_states::Int
     nstates::Int
@@ -131,7 +131,7 @@ end
 # Multi-mode Qubit System
 #
 
-struct MultiModeQubitSystem <: AbstractQubitSystem
+struct MultiModeQubitSystem <: AbstractQuantumSystem
     ncontrols::Int
     nqstates::Int
     nstates::Int
@@ -240,7 +240,7 @@ function MultiModeQubitSystem(
     end
 end
 
-struct TransmonSystem <: AbstractQubitSystem
+struct TransmonSystem <: AbstractQuantumSystem
     n_wfn_states::Int
     n_aug_states::Int
     nstates::Int
@@ -326,7 +326,7 @@ function TransmonSystem(;
 end
 
 
-struct TwoQubitSystem <: AbstractQubitSystem
+struct TwoQubitSystem <: AbstractQuantumSystem
     n_wfn_states::Int
     n_aug_states::Int
     nstates::Int

@@ -35,7 +35,7 @@ struct QuantumStateCost
     isodim::Int
 
     function QuantumStateCost(
-        sys::AbstractQubitSystem;
+        sys::AbstractQuantumSystem;
         cost=infidelity_cost
     )
         if cost == energy_cost

@@ -23,7 +23,7 @@ struct QubitEvaluator <: AbstractPICOEvaluator
 end
 
 function QubitEvaluator(
-    system::AbstractQubitSystem,
+    system::AbstractQuantumSystem,
     integrator::Symbol,
     cost_fn::Function,
     eval_hessian::Bool,
@@ -64,7 +64,7 @@ struct MinTimeEvaluator <: AbstractPICOEvaluator
 end
 
 function MinTimeEvaluator(
-    system::AbstractQubitSystem,
+    system::AbstractQuantumSystem,
     integrator::Symbol,
     T::Int,
     Rᵤ::Float64,
