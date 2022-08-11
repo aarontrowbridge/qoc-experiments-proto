@@ -65,8 +65,9 @@ prob = QubitProblem(
     options = options
 )
 
+
+solve!(prob)
+
 plot_multimode_qubit(system, prob.trajectory, plot_path)
-
-
 
 

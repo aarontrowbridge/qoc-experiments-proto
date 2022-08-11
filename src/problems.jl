@@ -193,121 +193,130 @@ function QubitProblem(
 end
 
 
-# function QubitProblem(
-#     system::MultiModeQubitSystem,
-#     T::Int;
-#     integrator=pade_schroedinger,
-#     loss=amplitude_loss,
-#     Δt=0.01,
-#     Q=0.0,
-#     Qf=200.0,
-#     R=0.1,
-#     eval_hessian=false,
-#     pin_first_qstate=true,
-#     a_bound=1.0,
-#     init_traj=Trajectory(system, Δt, T),
-#     options=Options(),
-# )
+function QubitProblem(
+    system::MultiModeQubitSystem,
+    T::Int;
+    integrator=:FourthOrderPade,
+    loss=amplitude_loss,
+    Δt=0.01,
+    Q=0.0,
+    Qf=200.0,
+    R=0.1,
+    eval_hessian=false,
+    pin_first_qstate=true,
+    qubit_bound = 2π * 0.018,
+    cavity_bound = 2π * 0.020,
+    init_traj=Trajectory(system, Δt, T),
+    options=Options(),
+)
 
-#     if getfield(options, :linear_solver) == "pardiso"
-#         Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
-#         Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
-#     end
+    if getfield(options, :linear_solver) == "pardiso"
+        Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
+        Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
+    end
 
-#     optimizer = Ipopt.Optimizer()
+    optimizer = Ipopt.Optimizer()
 
-#     # set Ipopt optimizer options
-#     for name in fieldnames(typeof(options))
-#         optimizer.options[String(name)] = getfield(options, name)
-#     end
+    # set Ipopt optimizer options
+    for name in fieldnames(typeof(options))
+        optimizer.options[String(name)] = getfield(options, name)
+    end
 
-#     total_vars = system.vardim * T
-#     total_dynamics = system.nstates * (T - 1)
-#     total_states = system.nstates * T
+    total_vars = system.vardim * T
+    total_dynamics = system.nstates * (T - 1)
+    total_states = system.nstates * T
 
-#     variables = MOI.add_variables(optimizer, total_vars)
+    variables = MOI.add_variables(optimizer, total_vars)
 
-#     evaluator = QubitEvaluator(
-#         system,
-#         integrator,
-#         loss,
-#         eval_hessian,
-#         T, Δt,
-#         Q, R
-#     )
+    evaluator = QubitEvaluator(
+        system,
+        integrator,
+        loss,
+        eval_hessian,
+        T, Δt,
+        Q, R
+    )
 
-#     cons = AbstractConstraint[]
+    cons = AbstractConstraint[]
 
-#     # initial quantum state constraints: ψ̃(t=1) = ψ̃1
-#     ψ1_con = EqualityConstraint(
-#         1,
-#         1:system.n_wfn_states,
-#         system.ψ̃1,
-#         system.vardim
-#     )
-#     push!(cons, ψ1_con)
+    # initial quantum state constraints: ψ̃(t=1) = ψ̃1
+    ψ1_con = EqualityConstraint(
+        1,
+        1:system.n_wfn_states,
+        system.ψ̃1,
+        system.vardim
+    )
+    push!(cons, ψ1_con)
 
-#     # pin first qstate to be equal to analytic solution
-#     if pin_first_qstate
-#         pin_con = EqualityConstraint(
-#             T,
-#             1:system.isodim,
-#             system.ψ̃goal[1:system.isodim],
-#             system.vardim
-#         )
-#         push!(cons, pin_con)
-#     end
+    # pin first qstate to be equal to analytic solution
+    if pin_first_qstate
+        pin_con = EqualityConstraint(
+            T,
+            1:system.isodim,
+            system.ψ̃goal[1:system.isodim],
+            system.vardim
+        )
+        push!(cons, pin_con)
+    end
 
-#     # initial a(t = 1) constraints: ∫a, a, da = 0
-#     aug1_con = EqualityConstraint(
-#         1,
-#         system.n_wfn_states .+ (1:system.n_aug_states),
-#         0.0,
-#         system.vardim
-#     )
-#     push!(cons, aug1_con)
+    # initial a(t = 1) constraints: ∫a, a, da = 0
+    aug1_con = EqualityConstraint(
+        1,
+        system.n_wfn_states .+ (1:system.n_aug_states),
+        0.0,
+        system.vardim
+    )
+    push!(cons, aug1_con)
 
-#     # final a(t = T) constraints: ∫a, a, da = 0
-#     augT_con = EqualityConstraint(
-#         T,
-#         system.n_wfn_states .+ (1:system.n_aug_states),
-#         0.0,
-#         system.vardim
-#     )
-#     push!(cons, augT_con)
+    # final a(t = T) constraints: ∫a, a, da = 0
+    augT_con = EqualityConstraint(
+        T,
+        system.n_wfn_states .+ (1:system.n_aug_states),
+        0.0,
+        system.vardim
+    )
+    push!(cons, augT_con)
 
 
-#     # bound |a(t)| < a_bound
-#     a_bound_con = BoundsConstraint(
-#         2:T-1,
-#         system.n_wfn_states .+ (1:system.ncontrols),
-#         a_bound,
-#         system.vardim
-#     )
-#     push!(cons, a_bound_con)
+    # bound |a(t)| < a_bound
+    q_bound_con = BoundsConstraint(
+        2:T-1,
+        system.n_wfn_states .+ (1:2),
+        qubit_bound,
+        system.vardim
+    )
 
-#     constrain!(optimizer, variables, cons)
+    push!(cons, q_bound_con)
+    c_bound_con = BoundsConstraint(
+        2:T-1,
+        system.n_wfn_states .+ (3:4),
+        cavity_bound,
+        system.vardim
+    )
+    push!(cons, c_bound_con)
 
-#     dynamics_constraints = fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
+    constrain!(optimizer, variables, cons)
 
-#     block_data = MOI.NLPBlockData(dynamics_constraints, evaluator, true)
+    dynamics_constraints = fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
 
-#     MOI.set(optimizer, MOI.NLPBlock(), block_data)
-#     MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    block_data = MOI.NLPBlockData(dynamics_constraints, evaluator, true)
 
-#     return QubitProblem(
-#         system,
-#         evaluator,
-#         variables,
-#         optimizer,
-#         init_traj,
-#         T,
-#         Δt,
-#         total_vars,
-#         total_states,
-#         total_dynamics,
-#     )
-# end
+    MOI.set(optimizer, MOI.NLPBlock(), block_data)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+
+    return QubitProblem(
+        system,
+        evaluator,
+        variables,
+        optimizer,
+        init_traj,
+        T,
+        Δt,
+        total_vars,
+        total_states,
+        total_dynamics,
+    )
+end
 
 
 function initialize_trajectory!(
