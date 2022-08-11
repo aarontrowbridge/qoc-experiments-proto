@@ -5,7 +5,7 @@ export MinTimeObjective
 
 using ..Utils
 using ..QubitSystems
-using ..Losses
+using ..Costs
 
 using LinearAlgebra
 using SparseArrays
@@ -24,13 +24,13 @@ end
 
 function SystemObjective(
     system::AbstractQubitSystem,
-    loss_fn::Function,
+    cost_fn::Function,
     T::Int,
     Q::Float64,
     R::Float64,
     eval_hessian::Bool
 )
-    loss = QuantumStateLoss(system; loss=loss_fn)
+    cost = QuantumStateCost(system; cost=cost_fn)
 
     @views function L(Z::AbstractVector{F}) where F
         ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
@@ -44,10 +44,10 @@ function SystemObjective(
             )]
             obj += R / 2 * sum(uₜ.^2)
         end
-        return Q * loss(ψ̃T) + obj
+        return Q * cost(ψ̃T) + obj
     end
 
-    ∇l = QuantumStateLossGradient(loss)
+    ∇c = QuantumStateCostGradient(cost)
 
     @views function ∇L(Z::AbstractVector{F}) where F
         ∇ = zeros(F, system.vardim * T)
@@ -65,7 +65,7 @@ function SystemObjective(
 
         ψ̃T_slice = slice(T, system.n_wfn_states, system.vardim)
         ψ̃T = Z[ψ̃T_slice]
-        ∇[ψ̃T_slice] = Q * ∇l(ψ̃T)
+        ∇[ψ̃T_slice] = Q * ∇c(ψ̃T)
 
         return ∇
     end
@@ -74,7 +74,7 @@ function SystemObjective(
     ∇²L_structure = nothing
 
     if eval_hessian
-        ∇²l = QuantumStateLossHessian(loss)
+        ∇²c = QuantumStateCostHessian(cost)
 
         ∇²L_structure = []
 
@@ -95,7 +95,7 @@ function SystemObjective(
         # ℓⁱs Hessian structure (eq. 17)
         append!(
             ∇²L_structure,
-            structure(∇²l, T, system.vardim)
+            structure(∇²c, T, system.vardim)
         )
 
         ∇²L = Z::AbstractVector -> begin
@@ -104,7 +104,7 @@ function SystemObjective(
                 Z,
                 slice(T, system.n_wfn_states, system.vardim)
             )
-            append!(Hs, Q * ∇²l(ψ̃T))
+            append!(Hs, Q * ∇²c(ψ̃T))
             return Hs
         end
     end

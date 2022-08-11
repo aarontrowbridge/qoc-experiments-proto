@@ -17,7 +17,6 @@ Im2 = [
     1  0
 ]
 
-⊗(A, B) = kron(A, B)
 
 G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
@@ -128,6 +127,10 @@ function SingleQubitSystem(
 end
 
 
+#
+# Multi-mode Qubit System
+#
+
 struct MultiModeQubitSystem <: AbstractQubitSystem
     ncontrols::Int
     nqstates::Int
@@ -149,14 +152,14 @@ function MultiModeQubitSystem(
     H_drift::Matrix,
     H_drives::Vector{Matrix{C}} where C,
     ψ1::Vector,
-    ψf::Vector;
+    ψgoal::Vector;
     control_order=2,
-    ∫a = false 
+    ∫a = false
 )
     isodim = 2 * length(ψ1)
 
     ψ̃1 = ket_to_iso(ψ1)
-    ψ̃goal = ket_to_iso(ψf)
+    ψ̃goal = ket_to_iso(ψgoal)
 
     G_drift = G(H_drift)
 
@@ -165,10 +168,11 @@ function MultiModeQubitSystem(
     G_drives = G.(H_drives)
 
     nqstates = 1
+
     n_wfn_states = nqstates * isodim
 
     augdim = control_order + ∫a
-    
+
     n_aug_states = ncontrols * augdim
 
     nstates = n_wfn_states + n_aug_states
@@ -193,21 +197,46 @@ function MultiModeQubitSystem(
     )
 end
 
-function MultiModeQubitSystem(hf_path::String)
+function MultiModeQubitSystem(
+    hf_path::String;
+    return_data=false,
+    kwargs...
+)
     h5open(hf_path, "r") do hf
 
         H_drift = hf["H_drift"][:, :]
-        H_drives = [hf["H_drives"][:, :, i] for i = 1:size(hf["H_drives"], 3)]
+
+        H_drives = [
+            copy(transpose(hf["H_drives"][:, :, i]))
+                for i = 1:size(hf["H_drives"], 3)
+        ]
 
         ψ1 = vcat(transpose(hf["psi1"][:, :])...)
         ψf = vcat(transpose(hf["psif"][:, :])...)
 
-        return MultiModeQubitSystem(
+        system = MultiModeQubitSystem(
             H_drift,
             H_drives,
             ψ1,
-            ψf
+            ψf;
+            kwargs...
         )
+
+        if return_data
+
+            data = Dict()
+
+            controls = copy(transpose(hf["controls"][:, :]))
+            data["controls"] = controls
+
+            ts = hf["tlist"][:]
+            data["T"] = length(ts)
+            data["Δt"] = ts[2] - ts[1]
+
+            return system, data
+        else
+            return system
+        end
     end
 end
 
@@ -229,7 +258,7 @@ struct TransmonSystem <: AbstractQubitSystem
 end
 
 function TransmonSystem(;
-    levels::Int, 
+    levels::Int,
     rotating_frame::Bool,
     ω::Float64,
     α::Float64,
@@ -245,7 +274,7 @@ function TransmonSystem(;
         ψ̃goal = ket_to_iso(ψf)
         ψ̃1 = ket_to_iso(ψ1)
     # otherwise it is multiple states and we are defining a (partial) isometry
-    else 
+    else
         nqstates = length(ψ1)
         isodim = 2 * length(ψ1[1])
         @assert isa(ψf, Vector{Vector{C}})
@@ -256,15 +285,15 @@ function TransmonSystem(;
 
     if rotating_frame
         H_drift = α/2 * quad(levels)
-    else 
+    else
         H_drift = ω * number(levels) + α/2 * quad(levels)
     end
 
     G_drift = G(H_drift)
 
-    ncontrols = 2 
+    ncontrols = 2
 
-    H_drive = [create(levels) + annihilate(levels), 
+    H_drive = [create(levels) + annihilate(levels),
               1im * (create(levels) - annihilate(levels))]
     G_drive = G.(H_drive)
 
@@ -281,7 +310,7 @@ function TransmonSystem(;
     return TransmonSystem(
         n_wfn_states,
         n_aug_states,
-        nstates, 
+        nstates,
         nqstates,
         isodim,
         augdim,
@@ -294,9 +323,8 @@ function TransmonSystem(;
         ψ̃goal,
         ∫a
     )
-
-
 end
+
 
 struct TwoQubitSystem <: AbstractQubitSystem
     n_wfn_states::Int
@@ -316,14 +344,13 @@ struct TwoQubitSystem <: AbstractQubitSystem
 end
 
 function TwoQubitSystem(;
-    ω1::Float64,
-    ω2::Float64,
-    J::Float64,
+    H_drift::Matrix, 
+    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
     ψ1::Union{Vector{C}, Vector{Vector{C}}},
     ψf::Union{Vector{C}, Vector{Vector{C}}},
     control_order = 2,
     ∫a = false
-) where C <: Number
+) where {C <: Number, T <: Number}
     if isa(ψ1, Vector{C})
         nqstates = 1
         isodim = 2 * length(ψ1)
@@ -340,18 +367,21 @@ function TwoQubitSystem(;
 
     ncontrols = 2
 
-    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) -
     #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
     #            gcouple*kron(GATES[:Z], GATES[:Z])
-    
+
     # H_drift = J*kron(GATES[:Z], GATES[:Z])
     H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z])
     G_drift = G(H_drift)
 
-    H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
-               1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2)))]
-
-    G_drives = G.(H_drive)
+    if isa(H_drive, Matrix{T})
+        ncontrols = 1
+        G_drive = [G(H_drive)]
+    else
+        ncontrols = length(H_drive)
+        G_drive = G.(H_drive)
+    end
 
     augdim = control_order + ∫a
 
@@ -363,8 +393,8 @@ function TwoQubitSystem(;
     vardim = nstates + ncontrols
 
     return TwoQubitSystem(
-        n_wfn_states, 
-        n_aug_states, 
+        n_wfn_states,
+        n_aug_states,
         nstates,
         nqstates,
         isodim,
@@ -373,7 +403,7 @@ function TwoQubitSystem(;
         ncontrols,
         control_order,
         G_drift,
-        G_drives,
+        G_drive,
         ψ̃1,
         ψ̃goal,
         ∫a

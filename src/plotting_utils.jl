@@ -106,6 +106,7 @@ function plot_single_qubit_2_qstate_with_controls(
     isodim::Int,
     control_order::Int,
     T::Int;
+    ∫a=false,
     is=(1, 2),
     fig_title=nothing
 )
@@ -120,7 +121,7 @@ function plot_single_qubit_2_qstate_with_controls(
     ψ̃²s = [xs[t][slice(is[2], isodim)] for t = 1:T]
     ψ̃²s = hcat(ψ̃²s...)
 
-    as = [[xs[t][slice()]; us[t]] for t = 1:T]
+    as = [[xs[t][slice(∫a + 1, ncontrols)]; us[t]] for t = 1:T]
     as = hcat(as...)
     as[end, end] = as[end, end-1]
 
@@ -264,10 +265,10 @@ function plot_multimode_qubit(
 )
     fig = Figure(resolution=(1200, 1500))
 
-    ψs = wfn_components_matrix(traj, system; components=[1,2])
+    ψs = pop_matrix(traj, system; components=[1,2,3,4,5])
 
     ψax = Axis(fig[1:2, :]; title="multimode system components", xlabel=L"t")
-    series!(ψax, traj.times, ψs, labels=["|g0⟩", "|g1⟩"])
+    series!(ψax, traj.times, ψs, labels=["|g0⟩", "|g1⟩", "|g2⟩", "|g3⟩", "|g4⟩"])
     axislegend(ψax; position=:lb)
 
     for j = 0:system.control_order
@@ -454,10 +455,11 @@ function plot_twoqubit(
     system::TwoQubitSystem,
     traj::Trajectory,
     path::String;
-    fig_title = nothing
+    fig_title = nothing,
+    i = 3
 )
     fig = Figure(resolution=(1200, 1500))
-    pops = pop_matrix(traj, system, i=3)
+    pops = pop_matrix(traj, system, i=i)
     #need to rewrite this for arbitrary number of levels
     ψax = Axis(fig[1:2, :]; title="Population", xlabel=L"t")
     series!(ψax, traj.times, pops;
@@ -499,7 +501,7 @@ function plot_twoqubit(
     # end
 
     save(path, fig)
-        
+
 end
 
 end

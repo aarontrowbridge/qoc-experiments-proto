@@ -1,4 +1,4 @@
-using QubitControl 
+using QubitControl
 using HDF5
 
 iter = 3000
@@ -21,7 +21,7 @@ levels = 3
 ψf = [-im*ψe, -im*ψg]
 
 system = TransmonSystem(
-    levels = levels, 
+    levels = levels,
     rotating_frame = true,
     ω = qubit_frequency,
     α = anharmonicity,
@@ -31,10 +31,10 @@ system = TransmonSystem(
 
 #T is number of time steps, not total time
 T = 400
-Δt = 0.1 
+Δt = 0.1
 Q = 200.
 R = 0.1
-loss = amplitude_loss
+cost = amplitude_cost
 hess = true
 pinqstate = true
 
@@ -52,7 +52,7 @@ prob = QubitProblem(
     Q = Q,
     R = R,
     eval_hessian = hess,
-    loss = loss,
+    cost = cost,
     a_bound = amax,
     pin_first_qstate = pinqstate,
     options = options

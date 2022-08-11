@@ -45,7 +45,7 @@ $$
 
 So, $\dim(\mathbf{x}_t) =$ `nqstates * isodim + ncontrols * augdim = nstates`, and $\dim(\mathbf{u}_t)=$ `ncontrols`.
 
-### loss functions
+### cost functions
 
 Currently the code is set up to support any quantum state cost function $\ell$; the default choice is
 
@@ -103,7 +103,7 @@ $$
 
 - [ ] min time problem reimplementation
   - [x] implementation
-  - [ ] tests
+  - [x] tests
   - [ ] add details to notes
 - [ ] analytic derivatives
   - [ ] integrators
@@ -118,12 +118,14 @@ $$
 - [x] add constraints on a(t)
 - [ ] write documentation 
 - [x] constraint types
-- [ ] systems
-  - [ ] multimode system with specified control limits
-  - [ ] two qubit system (try CNOT)
-  - [ ] transmon system
+- [x] systems
+  - [x] multimode system with specified control limits
+  - [x] two qubit system (try CNOT)
+  - [x] transmon system
+  - [x] multimode system
 - [ ] implicit $\ddot a(t)$
 - [ ] add ability to change linear solver
   - [ ] mac
   - [ ] ubuntu
   - [ ] arch (manjaro)
+- [ ] add ability to save and load trajectories

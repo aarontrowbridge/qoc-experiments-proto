@@ -41,12 +41,12 @@ R = 2.0
 
 eval_hessian = true
 
-loss_fn = amplitude_loss
+cost_fn = infidelity_cost
 
 
 # absolulte tolerance for approximate tests
 
-const ATOL = 1e-6
+const ATOL = 1e-5
 
 
 #
@@ -78,8 +78,7 @@ function show_diffs(A, B)
     for (i, (a, b)) in enumerate(zip(A, B))
         inds = Tuple(CartesianIndices(A)[i])
         if !isapprox(a, b, atol=ATOL) && inds[1] ≤ inds[2]
-            @info "values" (a, b)
-            @info "indices" inds
+            println((a, b), " @ ", inds)
         end
     end
 end
@@ -100,7 +99,7 @@ Z = 2 * rand(system.vardim * T) .- 1
 
 obj = SystemObjective(
     system,
-    loss_fn,
+    cost_fn,
     T,
     Q,
     R,
@@ -182,7 +181,7 @@ for integrator in integrators
         (system.nstates * (T - 1), system.vardim * T)
     )
 
- 
+
 
     # test dynamics Jacobian vs finite diff
 

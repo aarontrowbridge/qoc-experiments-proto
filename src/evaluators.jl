@@ -25,7 +25,7 @@ end
 function QubitEvaluator(
     system::AbstractQubitSystem,
     integrator::Symbol,
-    loss_fn::Function,
+    cost_fn::Function,
     eval_hessian::Bool,
     T::Int,
     Δt::Float64,
@@ -43,7 +43,7 @@ function QubitEvaluator(
 
     objective = SystemObjective(
         system,
-        loss_fn,
+        cost_fn,
         T,
         Q,
         R,
