@@ -53,8 +53,8 @@ system = TwoQubitSystem(
 
 T = 100
 Δt = 0.1
-Q = 200.
-R = 0.1
+Q = 2e14
+R = 0.01
 loss = pure_real_loss
 eval_hess = true
 pinqstate = false
