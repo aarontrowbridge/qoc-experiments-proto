@@ -264,10 +264,10 @@ function plot_multimode_qubit(
 )
     fig = Figure(resolution=(1200, 1500))
 
-    ψs = wfn_components_matrix(traj, system; components=[1,2])
+    ψs = pop_matrix(traj, system; components=[1,2,3,4,5])
 
     ψax = Axis(fig[1:2, :]; title="multimode system components", xlabel=L"t")
-    series!(ψax, traj.times, ψs, labels=["|g0⟩", "|g1⟩"])
+    series!(ψax, traj.times, ψs, labels=["|g0⟩", "|g1⟩", "|g2⟩", "|g3⟩", "|g4⟩"])
     axislegend(ψax; position=:lb)
 
     for j = 0:system.control_order

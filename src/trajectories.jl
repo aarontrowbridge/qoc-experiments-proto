@@ -188,11 +188,18 @@ end
 function pop_components(
     traj::Trajectory,
     sys::AbstractQubitSystem;
-    i = 1
+    i = 1,
+    components = nothing
 )
-    pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+    if isnothing(components)
+        pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+    else
+        pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])[components]) for t = 1:traj.T]
+    end
     return pops
 end
+
+
 
 pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
 # get the second final state
