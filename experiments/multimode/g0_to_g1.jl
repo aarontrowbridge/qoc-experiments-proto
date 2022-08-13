@@ -4,7 +4,7 @@ using HDF5
 
 hf_path = "notebooks/g0_to_g1_multimode_system_data.h5"
 
-system = MultiModeQubitSystem(hf_path)
+system = QuantumSystem(hf_path)
 
 T = parse(Int, ARGS[1])
 Δt = parse(Float64, ARGS[2])
@@ -26,7 +26,7 @@ cavity_a_bounds = fill(0.03, system.ncontrols - 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     T;
     Δt=Δt,

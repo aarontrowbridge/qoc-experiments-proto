@@ -8,10 +8,8 @@ plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/
 
 #system parameters
 
-qubit_frequency = 2π * 4.96 #GHz
-anharmonicity = -2π * 0.143 #GHz
-amax = 2π*19e-3
-
+ω = 2π * 4.96 #GHz
+α = -2π * 0.143 #GHz
 levels = 3
 
 ψg = [1. + 0*im, 0 , 0]
@@ -20,13 +18,16 @@ levels = 3
 ψ1 = [ψg, ψe]
 ψf = [-im*ψe, -im*ψg]
 
-system = TransmonSystem(
-    levels = levels,
-    rotating_frame = true,
-    ω = qubit_frequency,
-    α = anharmonicity,
+H_drift = α/2 * quad(levels)
+H_drive = [create(levels) + annihilate(levels),
+1im * (create(levels) - annihilate(levels))]
+
+system = QuantumSystem(
+    H_drift, 
+    H_drive,
     ψ1 = ψ1,
-    ψf = ψf
+    ψf = ψf,
+    control_bounds = [2π * 19e-3,  2π * 19e-3]
 )
 
 #T is number of time steps, not total time
@@ -34,7 +35,7 @@ T = 400
 Δt = 0.1
 Q = 200.
 R = 0.1
-cost = amplitude_cost
+cost = infidelity_cost
 hess = true
 pinqstate = true
 
@@ -45,7 +46,7 @@ options = Options(
     tol = 1e-5
 )
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     T;
     Δt = Δt,
@@ -53,7 +54,6 @@ prob = QubitProblem(
     R = R,
     eval_hessian = hess,
     cost = cost,
-    a_bound = amax,
     pin_first_qstate = pinqstate,
     options = options
 )
@@ -83,7 +83,7 @@ result = Dict(
     "eval_hessian" => hess,
     "a_bound" => 19e-3,
     # "trajectory" => prob.trajectory,
-    "a_max" => amax,
+    #"a_max" => amax,
     "pin_first_qstate" => pinqstate,
     "controls" => controls,
     "infidelity" => infidelity

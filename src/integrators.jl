@@ -17,7 +17,7 @@ export FourthOrderPadeHessian
 export G
 
 using ..Utils
-using ..QubitSystems
+using ..QuantumSystems
 using ..Utils
 
 using LinearAlgebra

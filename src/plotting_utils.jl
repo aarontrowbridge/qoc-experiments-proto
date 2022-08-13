@@ -11,14 +11,14 @@ export plot_twoqubit
 
 using ..Utils
 using ..Trajectories
-using ..QubitSystems
+using ..QuantumSystems
 using ..Problems
 
 using LaTeXStrings
 using CairoMakie
 
 function plot_single_qubit_1_qstate_with_controls(
-    prob::QubitProblem,
+    prob::QuantumControlProblem,
     filename::String;
     kwargs...
 )
@@ -86,7 +86,7 @@ function plot_single_qubit_1_qstate_with_controls(
 end
 
 function plot_single_qubit_2_qstate_with_controls(
-    prob::QubitProblem,
+    prob::QuantumControlProblem,
     filename::String;
     kwargs...
 )
@@ -259,7 +259,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
 end
 
 function plot_multimode_qubit(
-    system::MultiModeQubitSystem,
+    system::QuantumSystem,
     traj::Trajectory,
     path::String
 )
@@ -304,7 +304,7 @@ function plot_multimode_qubit(
 end
 
 function plot_single_qubit(
-    system::SingleQubitSystem,
+    system::QuantumSystem,
     traj::Trajectory,
     path::String;
     fig_title=nothing
@@ -357,7 +357,7 @@ function plot_single_qubit(
 end
 
 function plot_transmon(
-    system::TransmonSystem,
+    system::QuantumSystem,
     traj::Trajectory,
     path::String;
     fig_title=nothing
@@ -452,7 +452,7 @@ function plot_transmon_population(
 end
 
 function plot_twoqubit(
-    system::TwoQubitSystem,
+    system::QuantumSystem,
     traj::Trajectory,
     path::String;
     fig_title = nothing,

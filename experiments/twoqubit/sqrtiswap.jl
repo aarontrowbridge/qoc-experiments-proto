@@ -29,13 +29,16 @@ H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:
 H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
            1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2)))]
             
-#H_drive = [kron(create(2) + annihilate(2), I(2)), kron(I(2), create(2) + annihilate(2)), kron(I(2), number(2))]
+           #H_drive = [kron(create(2) + annihilate(2), I(2)), kron(I(2), create(2) + annihilate(2)), kron(I(2), number(2))]
 
-system = TwoQubitSystem(
+control_bounds = [2π * 0.5 for x in 1:length(H_drive)]
+
+system = QuantumSystem(
+    H_drift,
+    H_drive,
     ψ1 = ψ1,
     ψf = ψf,
-    H_drift = H_drift,
-    H_drive = H_drive
+    control_bounds = control_bounds
 )
 
 T = 100
@@ -52,7 +55,7 @@ options = Options(
     max_cpu_time = 7200.0
 )
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     T;
     Δt = Δt,
@@ -60,7 +63,6 @@ prob = QubitProblem(
     R = R,
     eval_hessian = eval_hess,
     loss = loss,
-    a_bound = 2π * 0.5,
     pin_first_qstate = pinqstate,
     options = options
 )

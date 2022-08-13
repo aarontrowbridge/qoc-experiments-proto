@@ -1,10 +1,10 @@
 module Evaluators
 
 export AbstractPICOEvaluator
-export QubitEvaluator
+export QuantumEvaluator
 export MinTimeEvaluator
 
-using ..QubitSystems
+using ..QuantumSystems
 using ..Integrators
 using ..Dynamics
 using ..Objectives
@@ -16,13 +16,13 @@ import Ipopt
 
 abstract type AbstractPICOEvaluator <: MOI.AbstractNLPEvaluator end
 
-struct QubitEvaluator <: AbstractPICOEvaluator
+struct QuantumEvaluator <: AbstractPICOEvaluator
     dynamics::SystemDynamics
     objective::SystemObjective
     eval_hessian::Bool
 end
 
-function QubitEvaluator(
+function QuantumEvaluator(
     system::AbstractQuantumSystem,
     integrator::Symbol,
     cost_fn::Function,
@@ -50,7 +50,7 @@ function QubitEvaluator(
         eval_hessian
     )
 
-    return QubitEvaluator(
+    return QuantumEvaluator(
         dynamics,
         objective,
         eval_hessian

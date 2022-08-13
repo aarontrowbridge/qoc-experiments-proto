@@ -26,7 +26,7 @@ gate = :X
 # ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
 ψ = [ψ0, ψ1]
 
-system = SingleQubitSystem(
+system = QuantumSystem(
     H_drift,
     H_drive,
     gate, ψ

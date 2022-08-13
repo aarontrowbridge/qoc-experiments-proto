@@ -5,7 +5,7 @@ export MinTimeSystemDynamics
 
 using ..Utils
 using ..QuantumLogic
-using ..QubitSystems
+using ..QuantumSystems
 using ..Integrators
 
 using LinearAlgebra

@@ -14,12 +14,12 @@ J = 0.1 * 2π
       [1.0  + 0im, 0, 0, 0],
       [0, 1. + 0im, 0, 0],
       [0, 0, 1 + 0im, 0],
-    #   [0.0, 1/sqrt(2) + 0im, 1/sqrt(2), 0],
-    #   [1/sqrt(2), 0.0, 1/sqrt(2) + 0im, 0],
-    #   [1/sqrt(2), 0.0, -1im/sqrt(2), 0.0],
-    #   [0.0, 1/sqrt(2), 0.0, 1/sqrt(2) + 0im],
-    #   [0.0, 1/sqrt(2), 0.0, 1im/sqrt(2) + 0im],
-    #   [1/sqrt(2), 0.0, 0.0, -1/sqrt(2) + 0im]
+      [0.0, 1/sqrt(2) + 0im, 1/sqrt(2), 0],
+      [1/sqrt(2), 0.0, 1/sqrt(2) + 0im, 0],
+      [1/sqrt(2), 0.0, -1im/sqrt(2), 0.0],
+      [0.0, 1/sqrt(2), 0.0, 1/sqrt(2) + 0im],
+      [0.0, 1/sqrt(2), 0.0, 1im/sqrt(2) + 0im],
+      [1/sqrt(2), 0.0, 0.0, -1/sqrt(2) + 0im]
       ]
 ψf = apply.(:CX, ψ1)
 # ψf = [[0, 0, 1. + 0im, 0.],
@@ -44,18 +44,21 @@ H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
             
 #H_drive = [kron(create(2) + annihilate(2), I(2)), kron(I(2), create(2) + annihilate(2)), kron(I(2), number(2))]
 
-system = TwoQubitSystem(
+control_bounds = [2π * 0.5 for x in 1:length(H_drive)]
+
+system = QuantumSystem(
+    H_drift,
+    H_drive,
     ψ1 = ψ1,
     ψf = ψf,
-    H_drift = H_drift,
-    H_drive = H_drive
+    control_bounds = control_bounds
 )
 
 T = 100
 Δt = 0.1
-Q = 2e14
+Q = 200.
 R = 0.01
-loss = pure_real_loss
+cost = infidelity_cost
 eval_hess = true
 pinqstate = false
 
@@ -65,21 +68,21 @@ options = Options(
     max_cpu_time = 7200.0
 )
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     T;
     Δt = Δt,
     Q = Q,
     R = R,
     eval_hessian = eval_hess,
-    loss = loss,
-    a_bound = 2π * 0.5,
+    cost = cost,
     pin_first_qstate = pinqstate,
     options = options
 )
 
 
 solve!(prob)
+
 plot_twoqubit(
     system,
     prob.trajectory,

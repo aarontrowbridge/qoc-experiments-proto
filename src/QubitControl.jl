@@ -14,8 +14,8 @@ include("quantum_logic.jl")
 include("ipopt_options.jl")
 @reexport using .IpoptOptions
 
-include("qubit_systems.jl")
-@reexport using .QubitSystems
+include("quantum_systems.jl")
+@reexport using .QuantumSystems
 
 include("costs.jl")
 @reexport using .Costs

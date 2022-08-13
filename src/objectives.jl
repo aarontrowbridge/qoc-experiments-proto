@@ -4,7 +4,7 @@ export SystemObjective
 export MinTimeObjective
 
 using ..Utils
-using ..QubitSystems
+using ..QuantumSystems
 using ..Costs
 
 using LinearAlgebra
