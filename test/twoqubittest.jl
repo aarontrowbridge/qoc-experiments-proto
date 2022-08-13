@@ -11,21 +11,33 @@ using LinearAlgebra
 # setting up simple quantum system
 #
 
-ω1 =  2π * 1.0 #GHz
-ω2 = 2π * 1.0 #GHz
+ω1 =  2π * 3.5 #GHz
+ω2 = 2π * 3.9 #GHz
 J = 0.1 * 2π
 
-ψ1 = [[1.0  + 0im, 0, 0, 0],
+ψ1 = [[0, 0, 0, 1 + 0im],
+      [1.0  + 0im, 0, 0, 0],
       [0, 1. + 0im, 0, 0],
-      [0, 0, 1 + 0im, 0],
-      [0, 0, 0, 1 + 0im]]
+      [0, 0, 1 + 0im, 0]
+      ]
 ψf = apply.(:sqrtiSWAP, ψ1)
 
 
-system = TwoQubitSystem(
-    ω1 = ω1,
-    ω2 = ω2,
-    J = J,
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
+    #            gcouple*kron(GATES[:Z], GATES[:Z])
+    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) + 
+    #            J*(kron(GATES[:Z], GATES[:Z]))
+    # H_drift = J*kron(GATES[:Z], GATES[:Z])
+H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z]
+
+H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
+           1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2)))]
+
+
+system = QuantumSystem(
+    H_drift,
+    H_drive,
     ψ1 = ψ1,
     ψf = ψf
 )
