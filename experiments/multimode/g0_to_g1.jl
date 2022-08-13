@@ -4,7 +4,14 @@ using HDF5
 
 hf_path = "notebooks/g0_to_g1_multimode_sys_data.h5"
 
-sys = MultiModeQubitSystem(hf_path)
+system = QuantumSystem(hf_path, control_bounds = a_bounds)
+# bounds on controls
+
+qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
+
+cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
+
+a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
 T = parse(Int, ARGS[1])
 Δt = parse(Float64, ARGS[2])
@@ -18,14 +25,6 @@ options = Options(
     max_cpu_time = 100000.0,
 )
 
-# bounds on controls
-
-qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
-
-cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
-
-a_bounds = [qubit_a_bounds; cavity_a_bounds]
-
 u_bounds = BoundsConstraint(
     1:T,
     sys.n_wfn_states .+
@@ -34,8 +33,8 @@ u_bounds = BoundsConstraint(
     sys.vardim
 )
 
-prob = QubitProblem(
-    sys,
+prob = QuantumControlProblem(
+    system,
     T;
     Δt=Δt,
     R=R,

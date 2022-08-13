@@ -37,7 +37,7 @@ options = Options(
     max_cpu_time = 7200.0
 )
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     T;
     Δt = Δt,

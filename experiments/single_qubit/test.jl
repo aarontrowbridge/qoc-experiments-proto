@@ -21,11 +21,16 @@ iter = 100
 # ψ = (ψ0 + ψ1) / √2
 
 ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
+ψf = apply.(gate, ψ)
 
-system = SingleQubitSystem(
+a_bounds = [1.0, 0.5]
+
+system = QuantumSystem(
     H_drift,
     H_drive,
-    gate, ψ
+    ψ1 = ψ,
+    ψf = ψf,
+    control_bounds = a_bounds
 )
 
 T    = 1000
@@ -35,7 +40,7 @@ R    = 2.0
 cost = infidelity_cost
 hess = true
 
-a_bounds = [1.0, 0.5]
+
 
 pin_first_qstate = false
 
@@ -55,16 +60,15 @@ options = Options(
     # linear_solver="pardiso",
 )
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     T;
     Δt=Δt,
     Q=Q,
     R=R,
     eval_hessian=hess,
-    a_bound=a_bounds,
     cost=cost,
-    pin_first_qstate = true,
+    pin_first_qstate = pin_first_qstate,
     options=options,
     integrator=integrator,
 )

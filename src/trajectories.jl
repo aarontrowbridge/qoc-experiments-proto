@@ -1,7 +1,7 @@
 module Trajectories
 
 using ..Utils
-using ..QubitSystems
+using ..QuantumSystems
 using ..QuantumLogic
 using ..Integrators
 
@@ -37,7 +37,7 @@ function linear_interpolation(x1, xT, T::Int)
 end
 
 function rollout(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     A::Vector{<:AbstractVector},
     Δt::Real
 )
@@ -93,7 +93,7 @@ end
 # constructor for case of given controls
 
 function Trajectory(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     controls::Matrix,
     Δt::Real
 )
@@ -166,16 +166,15 @@ function Trajectory(
 end
 
 function Trajectory(
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     T::Int,
     Δt::Float64;
     linearly_interpolate = true,
-    phase = 0.0,
     σ = 0.1
 )
-    ψ̃goal = exp(1im * phase) * sys.ψ̃goal 
+
     if linearly_interpolate
-        Ψ̃ = linear_interpolation(sys.ψ̃1, ψ̃goal, T)
+        Ψ̃ = linear_interpolation(sys.ψ̃1, sys.ψ̃goal, T)
     else
         Ψ̃ = fill(2*rand(sys.n_wfn_states) - 1, T)
     end
@@ -191,7 +190,7 @@ function Trajectory(
         push!(states, x)
     end
 
-    push!(states, [ψ̃goal; zeros(sys.n_aug_states)])
+    push!(states, [sys.ψ̃goal; zeros(sys.n_aug_states)])
 
     actions = [
         [σ * randn(sys.ncontrols) for t = 1:T-1]...,
@@ -205,7 +204,7 @@ end
 
 function jth_order_controls(
     traj::Trajectory,
-    sys::AbstractQubitSystem,
+    sys::AbstractQuantumSystem,
     j::Int;
     d2pi = true
 )
@@ -241,7 +240,7 @@ actions_matrix(traj::Trajectory) = hcat(traj.actions...)
 
 function wfn_components(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
     i=1,
     components=nothing
 )
@@ -255,7 +254,7 @@ end
 
 function pop_components(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
     i = 1,
     components = nothing
 )
@@ -273,14 +272,14 @@ pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
 # get the second final state
 function final_state2(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
 )
     return traj.states[traj.T][slice(1, sys.isodim + 1, 2*sys.isodim, sys.isodim)]
 end
 
 function final_statei(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
     i = 3
 )
     return traj.states[traj.T][slice(i,sys.isodim)]
@@ -289,14 +288,14 @@ end
 #get the first final state
 function final_state(
     traj::Trajectory,
-    sys::AbstractQubitSystem;
+    sys::AbstractQuantumSystem;
 )
     return traj.states[traj.T][slice(1, sys.isodim)]
 end
 
 # function populations(
 #     traj::Trajectory,
-#     sys::AbstractQubitSystem,
+#     sys::AbstractQuantumSystem,
 #     i = 1,
 #     components=nothing
 # )
@@ -343,7 +342,7 @@ end
 
 function load_controls_matrix_and_times(
     path::String,
-    sys::AbstractQubitSystem
+    sys::AbstractQuantumSystem
 )
     traj = load_trajectory(path)
     controls = controls_matrix(traj, sys)

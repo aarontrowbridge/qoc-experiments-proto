@@ -7,6 +7,7 @@ export QuantumStateCostHessian
 export structure
 
 export geodesic_cost
+export pure_real_cost
 export real_cost
 export infidelity_cost
 export quaternionic_cost
@@ -14,7 +15,7 @@ export iso_infidelity
 
 using ..Utils
 using ..QuantumLogic
-using ..QubitSystems
+using ..QuantumSystems
 
 using LinearAlgebra
 using SparseArrays
@@ -35,7 +36,7 @@ struct QuantumStateCost
     isodim::Int
 
     function QuantumStateCost(
-        sys::AbstractQubitSystem;
+        sys::AbstractQuantumSystem;
         cost=infidelity_cost
     )
         if cost == energy_cost
@@ -233,6 +234,12 @@ end
 #
 # experimental cost functions
 #
+
+function pure_real_cost(ψ̃, ψ̃goal)
+    ψ = iso_to_ket(ψ̃)
+    ψgoal = iso_to_ket(ψ̃goal)
+    return -(ψ'ψgoal)
+end
 
 function geodesic_cost(ψ̃, ψ̃goal)
     ψ = iso_to_ket(ψ̃)

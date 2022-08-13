@@ -17,12 +17,12 @@ function cavity_state(level)
 end
 #const TRANSMON_ID = I(TRANSMON_LEVELS)
 
-const TRANSMON_G = [1; zeros(TRANSMON_LEVELS - 1)]
-const TRANSMON_E = [zeros(1); 1; zeros(TRANSMON_LEVELS - 2)]
+TRANSMON_G = [1; zeros(TRANSMON_LEVELS - 1)]
+TRANSMON_E = [zeros(1); 1; zeros(TRANSMON_LEVELS - 2)]
 
 
-const CHI = 2π * -0.5469e-3
-const KAPPA = 2π * 4e-6
+CHI = 2π * -0.5469e-3
+KAPPA = 2π * 4e-6
 
 H_drift = 2 * CHI * kron(TRANSMON_E*TRANSMON_E', number(CAVITY_LEVELS)) +
           (KAPPA/2) * kron(I(TRANSMON_LEVELS), quad(CAVITY_LEVELS))
@@ -38,11 +38,20 @@ H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
 ψ1 = kron(TRANSMON_G, cavity_state(0))
 ψf = kron(TRANSMON_G, cavity_state(1))
 
-sys = MultiModeQubitSystem(
+# bounds on controls
+
+qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
+
+cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
+
+a_bounds = [qubit_a_bounds; cavity_a_bounds]
+
+system = QuantumSystem(
     H_drift,
     H_drives,
     ψ1,
-    ψf
+    ψf,
+    control_bounds = a_bounds
 )
 
 T = parse(Int, ARGS[1])
@@ -57,13 +66,7 @@ options = Options(
     max_cpu_time = 100000.0,
 )
 
-# bounds on controls
 
-qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
-
-cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
-
-a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
 u_bounds = BoundsConstraint(
     1:T,
@@ -82,8 +85,13 @@ data_dir = "data/multimode/fixed_time/no_guess/problems"
 
 resolves = parse(Int, ARGS[end])
 
+<<<<<<< HEAD
+prob = QuantumControlProblem(
+    system, 
+=======
 prob = QubitProblem(
     sys,
+>>>>>>> origin
     T;
     Δt=Δt,
     R=R,

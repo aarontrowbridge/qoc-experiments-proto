@@ -5,7 +5,7 @@ using HDF5
 hf_path = "notebooks/g0_to_g1_multimode_system_data.h5"
 
 system, data =
-    MultiModeQubitSystem(hf_path; return_data=true)
+    QuantumSystem(hf_path; return_data=true)
 
 Δt = data["Δt"]
 T = data["T"]
@@ -49,7 +49,7 @@ init_traj = Trajectory(system, data["controls"], Δt)
 
 # define problem
 
-prob = QubitProblem(
+prob = QuantumControlProblem(
     system,
     init_traj;
     R=R,

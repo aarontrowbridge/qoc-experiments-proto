@@ -17,7 +17,7 @@ export FourthOrderPadeHessian
 export G
 
 using ..Utils
-using ..QubitSystems
+using ..QuantumSystems
 using ..Utils
 
 using LinearAlgebra
@@ -47,7 +47,7 @@ struct Exponential <: AbstractQuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    Exponential(sys::AbstractQubitSystem) =
+    Exponential(sys::AbstractQuantumSystem) =
         new(sys.G_drift, sys.G_drives)
 end
 
@@ -68,7 +68,7 @@ struct SecondOrderPade <: AbstractQuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    SecondOrderPade(sys::AbstractQubitSystem) =
+    SecondOrderPade(sys::AbstractQuantumSystem) =
         new(sys.G_drift, sys.G_drives)
 end
 
@@ -92,7 +92,7 @@ struct FourthOrderPade <: AbstractQuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    FourthOrderPade(sys::AbstractQubitSystem) =
+    FourthOrderPade(sys::AbstractQuantumSystem) =
         new(sys.G_drift, sys.G_drives)
 end
 
@@ -255,7 +255,7 @@ struct SecondOrderPadeHessian
     G_drives::Vector{Matrix}
     isodim::Int
 
-    function SecondOrderPadeHessian(sys::AbstractQubitSystem)
+    function SecondOrderPadeHessian(sys::AbstractQuantumSystem)
         return new(
             sys.G_drives,
             sys.isodim
@@ -292,7 +292,7 @@ struct FourthOrderPadeHessian
     nqstates::Int
     isodim::Int
 
-    function FourthOrderPadeHessian(sys::AbstractQubitSystem)
+    function FourthOrderPadeHessian(sys::AbstractQuantumSystem)
         drive_anticoms = fill(
             zeros(size(sys.G_drift)),
             sys.ncontrols,

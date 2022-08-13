@@ -25,11 +25,14 @@ gate = :X
 
 # ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
 ψ = [ψ0, ψ1]
+ψf = apply.(gate, ψ)
 
-system = SingleQubitSystem(
+system = QuantumSystem(
     H_drift,
     H_drive,
-    gate, ψ
+    ψ1 = ψ,
+    ψf = ψf,
+    control_bounds = [1.0, 0.5]
 )
 
 T = 5
