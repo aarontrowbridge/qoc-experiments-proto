@@ -75,6 +75,13 @@ u_bounds = BoundsConstraint(
 
 cons = AbstractConstraint[u_bounds]
 
+experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "")
+
+plot_dir = "plots/multimode/fixed_time/no_guess"
+data_dir = "data/multimode/fixed_time/no_guess/problems"
+
+resolves = parse(Int, ARGS[end])
+
 prob = QubitProblem(
     sys,
     T;
@@ -86,13 +93,6 @@ prob = QubitProblem(
     options=options,
     cons=cons
 )
-
-experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "")
-
-plot_dir = "plots/multimode/fixed_time/no_guess"
-data_dir = "data/multimode/fixed_time/no_guess/problems"
-
-resolves = parse(Int, ARGS[end])
 
 for i = 1:resolves
     resolve = "_resolve_$i"
