@@ -169,16 +169,12 @@ function Trajectory(
     sys::AbstractQubitSystem,
     T::Int,
     Δt::Float64;
-    linearly_interpolate=true,
-    phase_flip=true,
+    linearly_interpolate = true,
+    phase = 0.0,
     σ = 0.1
 )
+    ψ̃goal = exp(1im * phase) * sys.ψ̃goal 
     if linearly_interpolate
-        if phase_flip
-            ψ̃goal = -sys.ψ̃goal
-        else
-            ψ̃goal = sys.ψ̃goal
-        end
         Ψ̃ = linear_interpolation(sys.ψ̃1, ψ̃goal, T)
     else
         Ψ̃ = fill(2*rand(sys.n_wfn_states) - 1, T)
@@ -260,18 +256,20 @@ end
 function pop_components(
     traj::Trajectory,
     sys::AbstractQubitSystem;
-    i = 1
+    i = 1,
+    components = nothing
 )
-    pops = [
-        abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)]))
-            for t = 1:traj.T
-    ]
+    if isnothing(components)
+        pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+    else
+        pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])[components]) for t = 1:traj.T]
+    end
     return pops
 end
 
-pop_matrix(args...; kwargs...) =
-    hcat(pop_components(args...; kwargs...)...)
 
+
+pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
 # get the second final state
 function final_state2(
     traj::Trajectory,

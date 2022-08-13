@@ -21,14 +21,11 @@ const TRANSMON_G = [1; zeros(TRANSMON_LEVELS - 1)]
 const TRANSMON_E = [zeros(1); 1; zeros(TRANSMON_LEVELS - 2)]
 
 
-const CAVITY_NUMBER = create(CAVITY_LEVELS)*annihilate(CAVITY_LEVELS)
-const CAVITY_QUAD = CAVITY_NUMBER*(CAVITY_NUMBER - I(CAVITY_LEVELS))
-
 const CHI = 2π * -0.5469e-3
 const KAPPA = 2π * 4e-6
 
-H_drift = 2 * CHI * kron(TRANSMON_E*TRANSMON_E', CAVITY_NUMBER) +
-          (KAPPA/2) * kron(I(TRANSMON_LEVELS), CAVITY_QUAD)
+H_drift = 2 * CHI * kron(TRANSMON_E*TRANSMON_E', number(CAVITY_LEVELS)) +
+          (KAPPA/2) * kron(I(TRANSMON_LEVELS), quad(CAVITY_LEVELS))
 
 transmon_driveR = kron(create(TRANSMON_LEVELS) + annihilate(TRANSMON_LEVELS), I(CAVITY_LEVELS))
 transmon_driveI = kron(1im*(create(TRANSMON_LEVELS) - annihilate(TRANSMON_LEVELS)), I(CAVITY_LEVELS))
@@ -37,6 +34,7 @@ cavity_driveR = kron(I(TRANSMON_LEVELS), create(CAVITY_LEVELS) + annihilate(CAVI
 cavity_driveI = kron(I(TRANSMON_LEVELS),  1im * (create(CAVITY_LEVELS) - annihilate(CAVITY_LEVELS)))
 
 H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
+
 ψ1 = kron(TRANSMON_G, cavity_state(0))
 ψf = kron(TRANSMON_G, cavity_state(1))
 
