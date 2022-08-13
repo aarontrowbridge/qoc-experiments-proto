@@ -1,10 +1,10 @@
-WDIR = joinpath(@__DIR__, "../../")
+# WDIR = joinpath(@__DIR__, "../../")
 using QubitControl
 using HDF5
 
-hf_path = "notebooks/g0_to_g1_multimode_system_data.h5"
+hf_path = "notebooks/g0_to_g1_multimode_sys_data.h5"
 
-system = MultiModeQubitSystem(hf_path)
+sys = MultiModeQubitSystem(hf_path)
 
 T = parse(Int, ARGS[1])
 Δt = parse(Float64, ARGS[2])
@@ -22,12 +22,20 @@ options = Options(
 
 qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
 
-cavity_a_bounds = fill(0.03, system.ncontrols - 2)
+cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
+u_bounds = BoundsConstraint(
+    1:T,
+    sys.n_wfn_states .+
+    slice(sys.∫a + 1 + sys.control_order, sys.ncontrols),
+    0.0001,
+    sys.vardim
+)
+
 prob = QubitProblem(
-    system,
+    sys,
     T;
     Δt=Δt,
     R=R,
@@ -39,16 +47,10 @@ prob = QubitProblem(
 
 plot_path = "plots/multimode/fixed_time/no_guess/g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * ".png"
 
-plot_multimode_qubit(system, prob.trajectory, plot_path)
+plot_multimode_qubit(sys, prob.trajectory, plot_path)
 
-solve!(prob)
+save_path = "data/multimode/fixed_time/no_guess/g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * ".h5"
 
-# pico_controls = controls_matrix(prob.trajectory, prob.system)
-# tlist = hcat(prob.trajectory.times...)
+solve!(prob, save=true, path=save_path)
 
-# h5open("notebooks/controls_data.h5", "w") do hdf
-#     hdf["controls"] = pico_controls
-#     hdf["tlist"] = tlist
-# end
-
-plot_multimode_qubit(system, prob.trajectory, plot_path)
+plot_multimode_qubit(sys, prob.trajectory, plot_path)

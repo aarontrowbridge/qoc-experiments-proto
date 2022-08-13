@@ -19,6 +19,7 @@ using ..IpoptOptions
 using ..Constraints
 
 using Ipopt
+using JLD2
 using Libdl
 using MathOptInterface
 const MOI = MathOptInterface
@@ -36,9 +37,6 @@ struct QubitProblem
     trajectory::Trajectory
     T::Int
     Δt::Float64
-    total_vars::Int
-    total_states::Int
-    total_dynamics::Int
 end
 
 # function QubitProblem(mmsys::MultiModeQubitSystem; kwargs...)
@@ -83,6 +81,7 @@ function QubitProblem(
     ),
     options=Options(),
     return_constraints=false,
+    cons=AbstractConstraint[]
 )
 
     if getfield(options, :linear_solver) == "pardiso" &&
@@ -117,8 +116,6 @@ function QubitProblem(
         T, Δt,
         Q, R
     )
-
-    cons = AbstractConstraint[]
 
     # pin first qstate to be equal to analytic solution
     if pin_first_qstate
@@ -191,10 +188,7 @@ function QubitProblem(
         optimizer,
         init_traj,
         T,
-        Δt,
-        total_vars,
-        total_states,
-        total_dynamics,
+        Δt
     )
 
     if return_constraints
@@ -344,7 +338,8 @@ function initialize_trajectory!(
     end
 end
 
-initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
+initialize_trajectory!(prob) =
+    initialize_trajectory!(prob, prob.trajectory)
 
 @views function update_traj_data!(prob::QubitProblem)
     Z = MOI.get(
@@ -378,10 +373,29 @@ initialize_trajectory!(prob) = initialize_trajectory!(prob, prob.trajectory)
     prob.trajectory.actions .= us
 end
 
-function solve!(prob::QubitProblem; init_traj=prob.trajectory)
+function solve!(
+    prob::QubitProblem;
+    init_traj=prob.trajectory,
+    save=false,
+    path=nothing
+)
+    @assert !(save && isnothing(path))
+        "must provide path for saving"
+
     initialize_trajectory!(prob, init_traj)
+
     MOI.optimize!(prob.optimizer)
+
     update_traj_data!(prob)
+
+    if save
+        path_parts = split(path, "/")
+        dir = joinpath(path_parts[1:end-1])
+        if !isdir(dir)
+            mkpath(dir)
+        end
+        save_object(path, prob)
+    end
 end
 
 
@@ -396,8 +410,6 @@ struct MinTimeProblem
     optimizer::Ipopt.Optimizer
     T::Int
 end
-
-
 
 # TODO: rewrite this constructor (hacky implementation rn)
 
@@ -540,7 +552,10 @@ end
 end
 
 
-function solve!(prob::MinTimeProblem)
+function solve!(prob::MinTimeProblem; save=false, path=nothing)
+    @assert !(save && isnothing(path))
+        "must provide path for saving"
+
     solve!(prob.subprob)
 
     init_traj = prob.subprob.trajectory
@@ -550,6 +565,7 @@ function solve!(prob::MinTimeProblem)
 
     # constrain end points to match subprob solution
 
+    # TODO: this is a hacky way to do this - fix this
     isodim       = prob.subprob.system.isodim
     n_wfn_states = prob.subprob.system.n_wfn_states
 
@@ -565,7 +581,11 @@ function solve!(prob::MinTimeProblem)
     MOI.optimize!(prob.optimizer)
 
     update_traj_data!(prob)
+    if save
+        save_trajectory(prob.subprob.trajectory, path)
+    end
 end
+
 
 # TODO: add functionality to vizualize Δt distribution
 

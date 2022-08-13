@@ -5,6 +5,8 @@ using ..QubitSystems
 using ..QuantumLogic
 using ..Integrators
 
+using HDF5
+
 export Trajectory
 
 export jth_order_controls
@@ -18,6 +20,8 @@ export final_state2
 export pop_components
 export pop_matrix
 export final_statei
+export save_trajectory
+export load_trajectory
 
 #
 # helper functions
@@ -299,5 +303,51 @@ end
 
 wfn_components_matrix(args...; kwargs...) =
     hcat(wfn_components(args...; kwargs...)...)
+
+
+#
+# saving and loading trajectories
+#
+
+function save_trajectory(traj::Trajectory, path::String)
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+    h5open(path, "cw") do f
+        f["states"] = hcat(traj.states...)
+        f["actions"] = hcat(traj.actions...)
+        f["times"] = traj.times
+        f["T"] = traj.T
+        f["dt"] = traj.Δt
+    end
+end
+
+function load_trajectory(path::String)
+    try
+        h5open(path, "r") do f
+            states_matrix = f["states"]
+            actions_matrix = f["actions"]
+            times = f["times"]
+            T = f["T"]
+            Δt = f["dt"]
+            states = [states_matrix[:, t] for t = 1:T]
+            actions = [actions_matrix[:, t] for t = 1:T]
+            return Trajectory(states, actions, times, T, Δt)
+        end
+    catch
+        @warn "Could not load trajectory from file: " path
+    end
+end
+
+function load_controls_matrix_and_times(
+    path::String,
+    sys::AbstractQubitSystem
+)
+    traj = load_trajectory(path)
+    controls = controls_matrix(traj, sys)
+    return controls, traj.times
+end
 
 end

@@ -1,8 +1,8 @@
 module Utils
 
 export index
-export generate_file_path
 export slice
+export generate_file_path
 
 """
 this module contains helper functions for indexing and taking slices of the full problem variable vector
@@ -59,17 +59,30 @@ function generate_file_path(extension, file_name, path)
 
     # Create a save file name based on the one given; ensure it will
     # not conflict with others in the directory.
-    max_numeric_prefix = -1
+    max_numeric_suffix = -1
     for (_, _, files) in walkdir(path)
         for file_name_ in files
             if occursin("_$(file_name).$(extension)", file_name_)
-                numeric_prefix = parse(Int, split(file_name_, "_")[1])
-                max_numeric_prefix = max(numeric_prefix, max_numeric_prefix)
+
+                numeric_suffix = parse(
+                    Int,
+                    split(file_name_, "_")[end]
+                )
+
+                max_numeric_suffix = max(
+                    numeric_suffix,
+                    max_numeric_suffix
+                )
             end
         end
     end
 
-    file_path = joinpath(path, "$(lpad(max_numeric_prefix + 1, 5, '0'))_$(file_name).$(extension)")
+    file_path = joinpath(
+        path,
+        file_name *
+        "_$(lpad(max_numeric_suffix + 1, 5, '0')).$(extension)"
+    )
+
     return file_path
 end
 
