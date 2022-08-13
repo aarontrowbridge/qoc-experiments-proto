@@ -1,4 +1,5 @@
 using QubitControl
+using JLD2
 
 σx = GATES[:X]
 σy = GATES[:Y]
@@ -8,7 +9,7 @@ H_drift = σz / 2
 H_drive = [σx / 2, σy / 2]
 
 gate = :X
-iter = 1000
+iter = 100
 
 
 ψ0 = [1, 0]
@@ -40,10 +41,13 @@ pin_first_qstate = false
 
 integrator = :FourthOrderPade
 
-plot_dir = "plots/single_qubit/test"
-plot_file = "$(gate)_gate_2_controls_test_R_$(R)_T_$(T)_iter_$(iter).png"
+experiment = "$(gate)_gate_2_controls_test_R_$(R)_T_$(T)_iter_$(iter)"
 
-plot_path = joinpath(plot_dir, plot_file)
+plot_dir = "plots/single_qubit/test"
+
+save_dir = "data/single_qubit/test/problems"
+
+save_path = generate_file_path("jld2", experiment, save_dir)
 
 options = Options(
     max_iter = iter,
@@ -65,14 +69,29 @@ prob = QubitProblem(
     integrator=integrator,
 )
 
+# solve for first n iters
+
+solve!(prob; save=true, path=save_path)
+
+plot_file = experiment * "_pre_save"
+
+plot_path = generate_file_path("png", plot_file, plot_dir)
+
 plot_single_qubit(
     system,
     prob.trajectory,
-    plot_path;
+    plot_path,
     fig_title="$gate gate on basis states"
 )
 
-solve!(prob)
+loaded_prob = load_object(save_path)
+
+solve!(loaded_prob; save=false)
+
+plot_file = experiment * "_post_save"
+
+plot_path = generate_file_path("png", plot_file, plot_dir)
+
 
 plot_single_qubit(
     system,
