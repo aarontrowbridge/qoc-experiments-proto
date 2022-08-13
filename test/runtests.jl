@@ -30,8 +30,9 @@ gate = :X
 system = QuantumSystem(
     H_drift,
     H_drive,
-    ψ1 = ψ1,
-    ψf = ψf
+    ψ1 = ψ,
+    ψf = ψf,
+    control_bounds = [1.0, 0.5]
 )
 
 T = 5

@@ -342,7 +342,7 @@ end
 
 function load_controls_matrix_and_times(
     path::String,
-    sys::AbstractQubitSystem
+    sys::AbstractQuantumSystem
 )
     traj = load_trajectory(path)
     controls = controls_matrix(traj, sys)

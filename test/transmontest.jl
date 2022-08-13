@@ -30,7 +30,8 @@ system = QuantumSystem(
     H_drift,
     H_drive,
     ψ1 = ψ1,
-    ψf = ψf
+    ψf = ψf,
+    control_bounds = [2π * 19e-3, 2π * 19e-3]
 )
 
 
