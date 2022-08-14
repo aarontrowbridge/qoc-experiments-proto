@@ -3,7 +3,7 @@ module PlottingUtils
 export plot_single_qubit_1_qstate_with_controls
 export plot_single_qubit_2_qstate_with_controls
 export plot_single_qubit_2_qstate_with_seperated_controls
-export plot_multimode_qubit
+export plot_multimode
 export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
@@ -258,7 +258,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
     save(filename, fig)
 end
 
-function plot_multimode_qubits(
+function plot_multimode(
     system::QuantumSystem,
     traj::Trajectory,
     path::String

@@ -85,13 +85,8 @@ data_dir = "data/multimode/fixed_time/no_guess/problems"
 
 resolves = parse(Int, ARGS[end])
 
-<<<<<<< HEAD
 prob = QuantumControlProblem(
     system, 
-=======
-prob = QubitProblem(
-    sys,
->>>>>>> origin
     T;
     Δt=Δt,
     R=R,
@@ -114,8 +109,8 @@ for i = 1:resolves
         experiment * resolve,
         data_dir
     )
-    plot_multimode_qubit(sys, prob.trajectory, plot_path)
+    plot_multimode(sys, prob.trajectory, plot_path)
     solve!(prob, save=true, path=data_path)
-    plot_multimode_qubit(sys, prob.trajectory, plot_path)
+    plot_multimode(sys, prob.trajectory, plot_path)
     global prob = load_object(data_path)
 end
