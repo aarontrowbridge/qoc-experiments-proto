@@ -1,4 +1,4 @@
-# QubitControl.jl
+# Pico.jl
 
 This package implements direct collocation to solve quantum optimal control problems. It currently relies on MathOptInterface.jl, with Ipopt.jl as the nonlinear solver backend.
 
