@@ -65,7 +65,7 @@ plot_path = "plots/multimode/fixed_time/guess/g0_to_g1_init_traj_T_$(T)_R_$(R)_i
 
 # test the plot
 
-plot_multimode_qubit(system, prob.trajectory, plot_path)
+plot_multimode(system, prob.trajectory, plot_path)
 
 
 # solve multimode problem
@@ -75,7 +75,7 @@ solve!(prob)
 
 # plot results
 
-plot_multimode_qubit(system, prob.trajectory, plot_path)
+plot_multimode(system, prob.trajectory, plot_path)
 
 
 # save results if requested

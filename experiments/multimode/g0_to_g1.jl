@@ -46,10 +46,10 @@ prob = QuantumControlProblem(
 
 plot_path = "plots/multimode/fixed_time/no_guess/g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * ".png"
 
-plot_multimode_qubit(sys, prob.trajectory, plot_path)
+plot_multimode(sys, prob.trajectory, plot_path)
 
 save_path = "data/multimode/fixed_time/no_guess/g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * ".h5"
 
 solve!(prob, save=true, path=save_path)
 
-plot_multimode_qubit(sys, prob.trajectory, plot_path)
+plot_multimode(sys, prob.trajectory, plot_path)
