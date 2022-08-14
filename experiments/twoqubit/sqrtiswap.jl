@@ -45,7 +45,7 @@ T = 100
 Δt = 0.1
 Q = 200.
 R = 0.1
-loss = amplitude_loss
+cost = infidelity_cost
 eval_hess = true
 pinqstate = true
 
