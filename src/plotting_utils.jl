@@ -258,7 +258,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
     save(filename, fig)
 end
 
-function plot_multimode_qubit(
+function plot_multimode_qubits(
     system::QuantumSystem,
     traj::Trajectory,
     path::String
