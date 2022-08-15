@@ -42,24 +42,25 @@ H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
 
 qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
 
-cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
+cavity_a_bounds = fill(0.03, 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
-
-system = QuantumSystem(
-    H_drift,
-    H_drives,
-    ψ1,
-    ψf,
-    control_bounds = a_bounds
-)
 
 T = parse(Int, ARGS[1])
 Δt = parse(Float64, ARGS[2])
 R = parse(Float64, ARGS[3])
 iter = parse(Int, ARGS[4])
 pin_first_qstate = parse(Bool, ARGS[5])
-phase_flip = parse(Bool, ARGS[6])
+phase = parse(Float64, ARGS[6])
+
+system = QuantumSystem(
+    H_drift,
+    H_drives,
+    ψ1 = ψ1,
+    ψf = ψf,
+    control_bounds = a_bounds,
+    phase = phase
+)
 
 options = Options(
     max_iter = iter,
@@ -70,10 +71,10 @@ options = Options(
 
 u_bounds = BoundsConstraint(
     1:T,
-    sys.n_wfn_states .+
-    slice(sys.∫a + 1 + sys.control_order, sys.ncontrols),
+    system.n_wfn_states .+
+    slice(system.∫a + 1 + system.control_order, system.ncontrols),
     0.0001,
-    sys.vardim
+    system.vardim
 )
 
 cons = AbstractConstraint[u_bounds]
@@ -90,8 +91,6 @@ prob = QuantumControlProblem(
     T;
     Δt=Δt,
     R=R,
-    a_bound=a_bounds,
-    phase_flip=phase_flip,
     pin_first_qstate=pin_first_qstate,
     options=options,
     cons=cons
@@ -109,8 +108,8 @@ for i = 1:resolves
         experiment * resolve,
         data_dir
     )
-    plot_multimode(sys, prob.trajectory, plot_path)
+    plot_multimode(system, prob.trajectory, plot_path)
     solve!(prob, save=true, path=data_path)
-    plot_multimode(sys, prob.trajectory, plot_path)
+    plot_multimode(system, prob.trajectory, plot_path)
     global prob = load_object(data_path)
 end
