@@ -81,12 +81,12 @@ function QuantumControlProblem(
     cons=AbstractConstraint[]
 )
 
-    if getfield(options, :linear_solver) == "pardiso" &&
-        !Sys.isapple()
+    # if getfield(options, :linear_solver) == "pardiso" &&
+    #     !Sys.isapple()
 
-        Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
-        Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
-    end
+    #     Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
+    #     Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
+    # end
 
     optimizer = Ipopt.Optimizer()
 
@@ -164,9 +164,9 @@ function QuantumControlProblem(
             system.control_bounds[cntrl_index],
             system.vardim
         )
-        push!(cons, cntrl_bound) 
+        push!(cons, cntrl_bound)
     end
- 
+
     constrain!(optimizer, variables, cons)
 
     dynamics_constraints =
@@ -246,7 +246,7 @@ initialize_trajectory!(prob) =
 end
 
 function solve!(prob::QuantumControlProblem; init_traj=prob.trajectory, save = false, path = nothing)
-    
+
     @assert !(save && isnothing(path))
         "must provide path for saving"
 
@@ -306,7 +306,7 @@ function QuantumMinTimeProblem(
     linearly_interpolate = true,
     init_traj=Trajectory(
         system, T, Δt,
-        linearly_interpolate = linearly_interpolate, 
+        linearly_interpolate = linearly_interpolate,
         σ = σ),
     eval_hessian=true,
     mintime_options=Options(),

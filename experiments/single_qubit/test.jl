@@ -1,4 +1,6 @@
-using QubitControl
+push!(LOAD_PATH, "../../")
+
+using Pico
 using JLD2
 
 σx = GATES[:X]
@@ -57,7 +59,7 @@ save_path = generate_file_path("jld2", experiment, save_dir)
 options = Options(
     max_iter = iter,
     tol = 1e-5,
-    # linear_solver="pardiso",
+    linear_solver="pardiso",
 )
 
 prob = QuantumControlProblem(

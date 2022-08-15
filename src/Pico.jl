@@ -1,12 +1,13 @@
-module QubitControl
+module Pico
 
 using Reexport
 
 include("utils.jl")
 @reexport using .Utils
 
-include("qutip_utils.jl")
-@reexport using .QuTiPUtils
+# TODO: update conda on new os
+# include("qutip_utils.jl")
+# @reexport using .QuTiPUtils
 
 include("quantum_logic.jl")
 @reexport using .QuantumLogic

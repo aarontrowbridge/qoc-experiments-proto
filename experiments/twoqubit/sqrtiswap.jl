@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 using LinearAlgebra
 
 iter = 5000
@@ -18,17 +18,17 @@ J = 0.1 * 2π
 ψf = apply.(:sqrtiSWAP, ψ1)
 
 
-    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) -
     #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
     #            gcouple*kron(GATES[:Z], GATES[:Z])
-    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) + 
+    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) +
     #            J*(kron(GATES[:Z], GATES[:Z]))
     # H_drift = J*kron(GATES[:Z], GATES[:Z])
 H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z]
 
 H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
            1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2)))]
-            
+
            #H_drive = [kron(create(2) + annihilate(2), I(2)), kron(I(2), create(2) + annihilate(2)), kron(I(2), number(2))]
 
 control_bounds = [2π * 0.5 for x in 1:length(H_drive)]

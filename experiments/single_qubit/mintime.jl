@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 
 σx = GATES[:X]
 σy = GATES[:Y]
@@ -17,8 +17,8 @@ gate = Symbol(:X)
 a_bound = [1.0, 0.5]
 
 system = QuantumSystem(
-    H_drift, 
-    H_drives, 
+    H_drift,
+    H_drives,
     ψ1 = ψ,
     ψf = ψf,
     control_bounds = a_bound
@@ -80,4 +80,3 @@ plot_single_qubit(
     prob.subprob.trajectory,
     plot_path
 )
-

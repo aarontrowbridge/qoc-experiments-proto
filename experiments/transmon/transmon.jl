@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 using HDF5
 
 iter = 3000
@@ -23,7 +23,7 @@ H_drive = [create(levels) + annihilate(levels),
 1im * (create(levels) - annihilate(levels))]
 
 system = QuantumSystem(
-    H_drift, 
+    H_drift,
     H_drive,
     ψ1 = ψ1,
     ψf = ψf,

@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 using LinearAlgebra
 using JLD2
 
@@ -86,7 +86,7 @@ data_dir = "data/multimode/fixed_time/no_guess/problems"
 resolves = parse(Int, ARGS[end])
 
 prob = QuantumControlProblem(
-    system, 
+    system,
     T;
     Δt=Δt,
     R=R,

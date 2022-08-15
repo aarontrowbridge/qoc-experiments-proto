@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 using Test
 
 using ForwardDiff
