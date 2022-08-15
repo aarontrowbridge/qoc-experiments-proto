@@ -2,7 +2,7 @@ module QuantumSystems
 
 export AbstractQuantumSystem
 
-export QuantumSystem 
+export QuantumSystem
 export TransmonSystem
 
 using ..QuantumLogic
@@ -83,10 +83,10 @@ end
 
 function QuantumSystem(
     H_drift::Matrix,
-    H_drive::Union{Matrix{T}, Vector{Matrix{T}}};
+    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
     ψ1::Union{Vector{C1}, Vector{Vector{C1}}},
     ψf::Union{Vector{C2}, Vector{Vector{C2}}},
-    control_bounds::Vector{Float64},
+    control_bounds::Vector{Float64};
     control_order=2,
     ∫a = false,
     phase = nothing

@@ -42,24 +42,26 @@ H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
 
 qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
 
-cavity_a_bounds = fill(0.03, sys.ncontrols - 2)
+cavity_a_bounds = fill(0.03, length(H_drives) - 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
-system = QuantumSystem(
+sys = QuantumSystem(
     H_drift,
     H_drives,
     ψ1,
     ψf,
-    control_bounds = a_bounds
+    a_bounds
 )
 
-T = parse(Int, ARGS[1])
-Δt = parse(Float64, ARGS[2])
-R = parse(Float64, ARGS[3])
-iter = parse(Int, ARGS[4])
-pin_first_qstate = parse(Bool, ARGS[5])
-phase_flip = parse(Bool, ARGS[6])
+
+T                = parse(Int,     ARGS[1])
+Δt               = parse(Float64, ARGS[2])
+R                = parse(Float64, ARGS[3])
+iter             = parse(Int,     ARGS[4])
+resolves         = parse(Int,     ARGS[5])
+pin_first_qstate = parse(Bool,    ARGS[6])
+phase_flip       = parse(Bool,    ARGS[7])
 
 options = Options(
     max_iter = iter,
@@ -83,15 +85,12 @@ experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
-resolves = parse(Int, ARGS[end])
 
 prob = QuantumControlProblem(
-    system,
+    sys,
     T;
     Δt=Δt,
     R=R,
-    a_bound=a_bounds,
-    phase_flip=phase_flip,
     pin_first_qstate=pin_first_qstate,
     options=options,
     cons=cons

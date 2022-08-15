@@ -81,12 +81,11 @@ function QuantumControlProblem(
     cons=AbstractConstraint[]
 )
 
-    # if getfield(options, :linear_solver) == "pardiso" &&
-    #     !Sys.isapple()
-
-    #     Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
-    #     Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
-    # end
+    if getfield(options, :linear_solver) == "pardiso" &&
+        !Sys.isapple()
+        Libdl.dlopen("/usr/lib/x86_64-linux-gnu/liblapack.so.3", RTLD_GLOBAL)
+        Libdl.dlopen("/usr/lib/x86_64-linux-gnu/libomp.so.5", RTLD_GLOBAL)
+    end
 
     optimizer = Ipopt.Optimizer()
 
