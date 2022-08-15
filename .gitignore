@@ -1,5 +1,6 @@
 libpardiso.dylib
 pardiso.lic
+libpardiso.so
 
 data/*
 
