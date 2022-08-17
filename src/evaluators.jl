@@ -25,7 +25,7 @@ end
 function QuantumEvaluator(
     system::AbstractQuantumSystem,
     integrator::Symbol,
-    cost_fn::Function,
+    cost_fn::Symbol,
     eval_hessian::Bool,
     T::Int,
     Δt::Float64,

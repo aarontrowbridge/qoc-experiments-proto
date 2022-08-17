@@ -19,9 +19,13 @@ abstract type AbstractConstraint end
 function constrain!(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
-    cons::Vector{AbstractConstraint}
+    cons::Vector{AbstractConstraint};
+    verbose=false
 )
     for con in cons
+        if verbose
+            println("applying constraint: ", con.name)
+        end
         con(opt, vars)
     end
 end
@@ -32,14 +36,15 @@ struct EqualityConstraint <: AbstractConstraint
     js::AbstractArray{Int}
     vals::Vector{R} where R
     vardim::Int
+    name::String
 end
 
 function EqualityConstraint(
     t::Union{Int, AbstractArray{Int}},
     j::Union{Int, AbstractArray{Int}},
     val::Union{R, Vector{R}},
-    vardim::Int
-
+    vardim::Int;
+    name="unnamed equality constraint"
 ) where R
 
     @assert !(isa(val, Vector{R}) && isa(j, Int))
@@ -61,7 +66,8 @@ function EqualityConstraint(
         [t...],
         [j...],
         [val...],
-        vardim
+        vardim,
+        name
     )
 end
 
@@ -86,13 +92,15 @@ struct BoundsConstraint <: AbstractConstraint
     js::AbstractArray{Int}
     vals::Vector{Tuple{R, R}} where R <: Real
     vardim::Int
+    name::String
 end
 
 function BoundsConstraint(
     t::Union{Int, AbstractArray{Int}},
     j::Union{Int, AbstractArray{Int}},
     val::Union{Tuple{R, R}, Vector{Tuple{R, R}}},
-    vardim::Int
+    vardim::Int;
+    name="unnamed bounds constraint"
 ) where R <: Real
 
     @assert !(isa(val, Vector{Tuple{R, R}}) && isa(j, Int))
@@ -115,7 +123,8 @@ function BoundsConstraint(
         [t...],
         j,
         val,
-        vardim
+        vardim,
+        name
     )
 end
 
@@ -123,7 +132,8 @@ function BoundsConstraint(
     t::Union{Int, AbstractArray{Int}},
     j::Union{Int, AbstractArray{Int}},
     val::Union{R, Vector{R}},
-    vardim::Int
+    vardim::Int;
+    name="unnamed bounds constraint"
 ) where R <: Real
 
     @assert !(isa(val, Vector{R}) && isa(j, Int))
@@ -150,7 +160,8 @@ function BoundsConstraint(
         [t...],
         j,
         val,
-        vardim
+        vardim,
+        name
     )
 end
 
@@ -177,11 +188,20 @@ end
 struct TimeStepBoundsConstraint <: AbstractConstraint
     bounds::Tuple{R, R} where R <: Real
     T::Int
+    name::String
+    function TimeStepBoundsConstraint(
+        bounds::Tuple{R, R} where R <: Real,
+        T::Int;
+        name="unnamed time step bounds constraint"
+    )
+        @assert bounds[1] < bounds[2] "lower bound must be less than upper bound"
+        return new(bounds, T, name)
+    end
 end
 
 function (con::TimeStepBoundsConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex},
+    vars::Vector{MOI.VariableIndex}
 )
     for t = 1:(con.T - 1)
         MOI.add_constraints(

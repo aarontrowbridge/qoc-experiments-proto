@@ -2,7 +2,6 @@ using Pico
 using LinearAlgebra
 using JLD2
 
-iter = 4000
 
 const EXPERIMENT_NAME = "g0_to_g1"
 # plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/rewrite/")
@@ -103,13 +102,13 @@ for i = 1:resolves
         experiment * resolve,
         plot_dir
     )
-    data_path = generate_file_path(
+    save_path = generate_file_path(
         "jld2",
         experiment * resolve,
         data_dir
     )
     plot_multimode(sys, prob.trajectory, plot_path)
-    solve!(prob, save=true, path=data_path)
+    solve!(prob, save_path=save_path)
     plot_multimode(sys, prob.trajectory, plot_path)
-    global prob = load_object(data_path)
+    global prob = load_prob(save_path)
 end

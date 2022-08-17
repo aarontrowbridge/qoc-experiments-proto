@@ -36,19 +36,19 @@ struct QuantumStateCost
     isodim::Int
 
     function QuantumStateCost(
-        sys::AbstractQuantumSystem;
-        cost=infidelity_cost
+        sys::AbstractQuantumSystem,
+        cost::Symbol = :infidelity_cost
     )
         if cost == energy_cost
             cs = [
-                ψ̃ⁱ -> cost(ψ̃ⁱ, sys.H_target)
+                ψ̃ⁱ -> eval(cost)(ψ̃ⁱ, sys.H_target)
                     for i = 1:sys.nqstates
             ]
         elseif cost == neg_entropy_cost
-            cs = [cost for i = 1:sys.nqstates]
+            cs = [ψ̃ -> eval(cost)(ψ̃) for i = 1:sys.nqstates]
         else
             cs = [
-                ψ̃ⁱ -> cost(ψ̃ⁱ, sys.ψ̃goal[slice(i, sys.isodim)])
+                ψ̃ⁱ -> eval(cost)(ψ̃ⁱ, sys.ψ̃goal[slice(i, sys.isodim)])
                     for i = 1:sys.nqstates
             ]
         end

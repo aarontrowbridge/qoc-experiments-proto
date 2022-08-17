@@ -268,7 +268,9 @@ end
 
 
 
-pop_matrix(args...; kwargs...) = hcat(pop_components(args...; kwargs...)...)
+pop_matrix(args...; kwargs...) =
+    hcat(pop_components(args...; kwargs...)...)
+
 # get the second final state
 function final_state2(
     traj::Trajectory,

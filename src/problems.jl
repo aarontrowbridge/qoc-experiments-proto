@@ -10,6 +10,9 @@ export initialize_trajectory!
 export update_traj_data!
 export get_traj_data
 
+export save_prob
+export load_prob
+
 using ..Utils
 using ..Integrators
 using ..Costs
@@ -20,9 +23,9 @@ using ..Evaluators
 using ..IpoptOptions
 using ..Constraints
 
-using Ipopt
 using JLD2
 using Libdl
+using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
 
@@ -30,6 +33,7 @@ const MOI = MathOptInterface
 #
 # qubit problem
 #
+
 abstract type FixedTimeProblem end
 
 struct QuantumControlProblem <: FixedTimeProblem
@@ -38,6 +42,7 @@ struct QuantumControlProblem <: FixedTimeProblem
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
     trajectory::Trajectory
+    parameters::Dict
     T::Int
     Δt::Float64
 end
@@ -56,12 +61,48 @@ function QuantumControlProblem(
     )
 end
 
+function save_prob(prob::FixedTimeProblem, path::String)
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+    data = Dict(
+        "system" => prob.system,
+        "trajectory" => prob.trajectory,
+        "parameters" => prob.parameters,
+    )
+    save(path, data)
+end
+
+function load_prob(path::String)
+    data = load(path)
+    return QuantumControlProblem(
+        data["system"],
+        data["trajectory"],
+        data["parameters"]
+    )
+end
+
+function QuantumControlProblem(
+    sys::AbstractQuantumSystem,
+    traj::Trajectory,
+    parameters::Dict
+)
+    return QuantumControlProblem(
+        sys,
+        traj;
+        parameters...
+    )
+end
+
+
 
 function QuantumControlProblem(
     system::AbstractQuantumSystem,
     T::Int;
     integrator=:FourthOrderPade,
-    cost=infidelity_cost,
+    cost=:infidelity_cost,
     Δt=0.01,
     Q=200.0,
     R=0.1,
@@ -73,13 +114,30 @@ function QuantumControlProblem(
         system,
         T,
         Δt;
-        linearly_interpolate = linearly_interpolate,
+        linearly_interpolate=linearly_interpolate,
         σ=σ
     ),
     options=Options(),
     return_constraints=false,
     cons=AbstractConstraint[]
 )
+
+    prob_cons = AbstractConstraint[cons...]
+
+    parameters = Dict(
+        :integrator => integrator,
+        :cost => cost,
+        :eval_hessian => eval_hessian,
+        :Q => Q,
+        :R => R,
+        :eval_hessian => eval_hessian,
+        :pin_first_qstate => pin_first_qstate,
+        :σ => σ,
+        :linearly_interpolate => linearly_interpolate,
+        :options => options,
+        :return_constraints => return_constraints,
+        :cons => cons
+    )
 
     if getfield(options, :linear_solver) == "pardiso" &&
         !Sys.isapple()
@@ -96,13 +154,8 @@ function QuantumControlProblem(
 
     total_vars = system.vardim * T
     total_dynamics = system.nstates * (T - 1)
-    total_states = system.nstates * T
 
     variables = MOI.add_variables(optimizer, total_vars)
-
-    # TODO: this is super hacky, I know; it should be fixed
-    # subtype(::Type{Type{T}}) where T <: AbstractQuantumIntegrator = T
-    # integrator = subtype(integrator)
 
     evaluator = QuantumEvaluator(
         system,
@@ -120,9 +173,10 @@ function QuantumControlProblem(
             T,
             1:system.isodim,
             ψ̃¹goal,
-            system.vardim
+            system.vardim;
+            name="pinned first qstate at T"
         )
-        push!(cons, pin_con)
+        push!(prob_cons, pin_con)
     end
 
     # initial quantum state constraints: ψ̃(t=1) = ψ̃1
@@ -130,28 +184,20 @@ function QuantumControlProblem(
         1,
         1:system.n_wfn_states,
         system.ψ̃1,
-        system.vardim
+        system.vardim;
+        name="initial quantum state constraints"
     )
-    push!(cons, ψ1_con)
+    push!(prob_cons, ψ1_con)
 
     # initial a(t = 1) constraints: ∫a, a, da = 0
-    aug1_con = EqualityConstraint(
-        1,
+    aug_cons = EqualityConstraint(
+        [1, T],
         system.n_wfn_states .+ (1:system.n_aug_states),
         0.0,
-        system.vardim
+        system.vardim;
+        name="initial and final augmented state constraints"
     )
-    push!(cons, aug1_con)
-
-    # final a(t = T) constraints: ∫a, a, da = 0
-    augT_con = EqualityConstraint(
-        T,
-        system.n_wfn_states .+ (1:system.n_aug_states),
-        0.0,
-        system.vardim
-    )
-    push!(cons, augT_con)
-
+    push!(prob_cons, aug_cons)
 
     # bound |a(t)| < a_bound
     @assert length(system.control_bounds) == length(system.G_drives)
@@ -159,14 +205,17 @@ function QuantumControlProblem(
     for cntrl_index in 1:system.ncontrols
         cntrl_bound = BoundsConstraint(
             2:T-1,
-            system.n_wfn_states + system.∫a*system.ncontrols + cntrl_index,
+            system.n_wfn_states +
+            system.∫a * system.ncontrols +
+            cntrl_index,
             system.control_bounds[cntrl_index],
-            system.vardim
+            system.vardim;
+            name="constraint on control $(cntrl_index)"
         )
-        push!(cons, cntrl_bound)
+        push!(prob_cons, cntrl_bound)
     end
 
-    constrain!(optimizer, variables, cons)
+    constrain!(optimizer, variables, prob_cons; verbose=true)
 
     dynamics_constraints =
         fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
@@ -183,12 +232,13 @@ function QuantumControlProblem(
         variables,
         optimizer,
         init_traj,
+        parameters,
         T,
-        Δt
+        Δt,
     )
 
     if return_constraints
-        return prob, cons
+        return prob, prob_cons
     else
         return prob
     end
@@ -244,10 +294,11 @@ initialize_trajectory!(prob) =
     prob.trajectory.actions .= us
 end
 
-function solve!(prob::QuantumControlProblem; init_traj=prob.trajectory, save = false, path = nothing)
-
-    @assert !(save && isnothing(path))
-        "must provide path for saving"
+function solve!(
+    prob::QuantumControlProblem;
+    init_traj = prob.trajectory,
+    save_path = nothing
+)
 
     initialize_trajectory!(prob, init_traj)
 
@@ -255,13 +306,8 @@ function solve!(prob::QuantumControlProblem; init_traj=prob.trajectory, save = f
 
     update_traj_data!(prob)
 
-    if save
-        path_parts = split(path, "/")
-        dir = joinpath(path_parts[1:end-1])
-        if !isdir(dir)
-            mkpath(dir)
-        end
-        save_object(path, prob)
+    if ! isnothing(save_path)
+        save_prob(prob, save_path)
     end
 end
 
@@ -426,11 +472,14 @@ end
 end
 
 
-function solve!(prob::MinTimeProblem; save=false, path=nothing)
-    @assert !(save && isnothing(path))
-        "must provide path for saving"
-
-    solve!(prob.subprob)
+function solve!(
+    prob::MinTimeProblem;
+    save_path=nothing,
+    solve_subprob=true,
+)
+    if solve_subprob
+        solve!(prob.subprob)
+    end
 
     init_traj = prob.subprob.trajectory
 
@@ -443,20 +492,33 @@ function solve!(prob::MinTimeProblem; save=false, path=nothing)
     isodim       = prob.subprob.system.isodim
     n_wfn_states = prob.subprob.system.n_wfn_states
 
-    ψ̃T_con! = EqualityConstraint(
-        prob.T,
-        1:n_wfn_states,
-        init_traj.states[end][1:n_wfn_states],
-        prob.subprob.system.vardim
-    )
+    if prob.subprob.parameters[:pin_first_qstate]
+        ψ̃T_con! = EqualityConstraint(
+            prob.T,
+            (isodim + 1):n_wfn_states,
+            init_traj.states[end][(isodim + 1):n_wfn_states],
+            prob.subprob.system.vardim
+        )
+    else
+        ψ̃T_con! = EqualityConstraint(
+            prob.T,
+            1:n_wfn_states,
+            init_traj.states[end][1:n_wfn_states],
+            prob.subprob.system.vardim
+        )
+    end
+
 
     ψ̃T_con!(prob.optimizer, prob.variables)
+
+    constrain!(prob.optimizer, prob.variables, prob.subprob.parameters[:cons])
 
     MOI.optimize!(prob.optimizer)
 
     update_traj_data!(prob)
-    if save
-        save_trajectory(prob.subprob.trajectory, path)
+
+    if ! isnothing(save_path)
+        save_prob(prob.subprob, save_path)
     end
 end
 

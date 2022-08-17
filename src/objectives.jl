@@ -24,13 +24,13 @@ end
 
 function SystemObjective(
     system::AbstractQuantumSystem,
-    cost_fn::Function,
+    cost_fn::Symbol,
     T::Int,
     Q::Float64,
     R::Float64,
     eval_hessian::Bool
 )
-    cost = QuantumStateCost(system; cost=cost_fn)
+    cost = QuantumStateCost(system, cost_fn)
 
     @views function L(Z::AbstractVector{F}) where F
         ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]

@@ -263,6 +263,13 @@ function plot_multimode(
     traj::Trajectory,
     path::String
 )
+    # TODO: add this check to all plot functions
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+
     fig = Figure(resolution=(1200, 1500))
 
     ψs = pop_matrix(traj, system; components=[1,2,3,4,5])
