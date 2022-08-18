@@ -13,7 +13,7 @@ subprob = load_prob(subprob_path)
 
 Rᵤ   = 1e1
 Rₛ   = Rᵤ
-iter = 50
+iter = 100
 
 mintime_options = Options(
     max_iter = iter,
@@ -26,11 +26,19 @@ mintime_prob = QuantumMinTimeProblem(
     mintime_options=mintime_options,
 )
 
+mintime_info = "_Ru_$(Rᵤ)_mintime_iter_$(iter)"
+
 save_dir = "data/multimode/min_time/no_guess/problems"
-save_path = joinpath(save_dir, experiment * ".jld2")
+save_path = joinpath(
+    save_dir,
+    experiment * mintime_info * ".jld2"
+)
 
 plot_dir = "plots/multimode/min_time/no_guess"
-plot_path = joinpath(plot_dir, experiment * ".png")
+plot_path = joinpath(
+    plot_dir,
+    experiment * mintime_info * ".png"
+)
 
 plot_multimode(
     subprob.system,
