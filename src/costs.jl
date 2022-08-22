@@ -1,8 +1,8 @@
 module Costs
 
-export QuantumStateCost
-export QuantumStateCostGradient
-export QuantumStateCostHessian
+export QuantumCost
+export QuantumCostGradient
+export QuantumCostHessian
 
 export structure
 
@@ -31,32 +31,34 @@ using Symbolics
 #       ⋅ Σ α * (1 - ψ̃'ψ̃), α = 1e-3
 
 
-struct QuantumStateCost
+struct QuantumCost
     cs::Vector{Function}
     isodim::Int
 
-    function QuantumStateCost(
+    function QuantumCost(
         sys::AbstractQuantumSystem,
         cost::Symbol = :infidelity_cost
     )
-        if cost == energy_cost
+        if cost == :energy_cost
             cs = [
                 ψ̃ⁱ -> eval(cost)(ψ̃ⁱ, sys.H_target)
                     for i = 1:sys.nqstates
             ]
-        elseif cost == neg_entropy_cost
-            cs = [ψ̃ -> eval(cost)(ψ̃) for i = 1:sys.nqstates]
+        elseif cost == :neg_entropy_cost
+            cs = [ψ̃ⁱ -> eval(cost)(ψ̃ⁱ) for i = 1:sys.nqstates]
         else
             cs = [
-                ψ̃ⁱ -> eval(cost)(ψ̃ⁱ, sys.ψ̃goal[slice(i, sys.isodim)])
-                    for i = 1:sys.nqstates
+                ψ̃ⁱ -> eval(cost)(
+                    ψ̃ⁱ,
+                    sys.ψ̃goal[slice(i, sys.isodim)]
+                ) for i = 1:sys.nqstates
             ]
         end
         return new(cs, sys.isodim)
     end
 end
 
-function (qcost::QuantumStateCost)(ψ̃::AbstractVector)
+function (qcost::QuantumCost)(ψ̃::AbstractVector)
     cost = 0.0
     for (i, cⁱ) in enumerate(qcost.cs)
         cost += cⁱ(ψ̃[slice(i, qcost.isodim)])
@@ -64,12 +66,12 @@ function (qcost::QuantumStateCost)(ψ̃::AbstractVector)
     return cost
 end
 
-struct QuantumStateCostGradient
+struct QuantumCostGradient
     ∇cs::Vector{Function}
     isodim::Int
 
-    function QuantumStateCostGradient(
-        cost::QuantumStateCost;
+    function QuantumCostGradient(
+        cost::QuantumCost;
         simplify=true
     )
         Symbolics.@variables ψ̃[1:cost.isodim]
@@ -95,7 +97,7 @@ struct QuantumStateCostGradient
     end
 end
 
-@views function (∇c::QuantumStateCostGradient)(
+@views function (∇c::QuantumCostGradient)(
     ψ̃::AbstractVector
 )
     ∇ = similar(ψ̃)
@@ -110,13 +112,13 @@ end
     return ∇
 end
 
-struct QuantumStateCostHessian
+struct QuantumCostHessian
     ∇²cs::Vector{Function}
     ∇²c_structures::Vector{Vector{Tuple{Int, Int}}}
     isodim::Int
 
-    function QuantumStateCostHessian(
-        cost::QuantumStateCost;
+    function QuantumCostHessian(
+        cost::QuantumCost;
         simplify=true
     )
 
@@ -158,7 +160,7 @@ struct QuantumStateCostHessian
 end
 
 function structure(
-    H::QuantumStateCostHessian,
+    H::QuantumCostHessian,
     T::Int,
     vardim::Int
 )
@@ -178,7 +180,7 @@ function structure(
     return H_structure
 end
 
-@views function (H::QuantumStateCostHessian)(ψ̃::AbstractVector)
+@views function (H::QuantumCostHessian)(ψ̃::AbstractVector)
 
     Hs = []
 
@@ -220,11 +222,13 @@ function energy_cost(
 end
 
 
+# TODO: figure out a way to implement this without erroring and Von Neumann entropy being always 0 for a pure state
 function neg_entropy_cost(
     ψ̃::AbstractVector
 )
     ψ = iso_to_ket(ψ̃)
     ρ = ψ * ψ'
+    ρ = Hermitian(ρ)
     return tr(ρ * log(ρ))
 end
 

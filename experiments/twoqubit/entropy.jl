@@ -21,7 +21,7 @@ J = 0.1 * 2π
       [0.0, 1/sqrt(2), 0.0, 1im/sqrt(2) + 0im],
       [1/sqrt(2), 0.0, 0.0, -1/sqrt(2) + 0im]
       ]
-ψf = apply.(:CX, ψ1)
+
 # ψf = [[0, 0, 1. + 0im, 0.],
 # [1.0  + 0im, 0, 0, 0],
 # [0, 1. + 0im, 0, 0],
@@ -50,7 +50,7 @@ system = QuantumSystem(
     H_drift,
     H_drive,
     ψ1,
-    ψf,
+    ψ1,
     control_bounds
 )
 
@@ -58,7 +58,7 @@ T = 100
 Δt = 0.1
 Q = 200.
 R = 0.01
-cost = :infidelity_cost
+cost = :neg_entropy_cost
 eval_hess = true
 pinqstate = false
 

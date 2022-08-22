@@ -174,14 +174,14 @@ function Trajectory(
 )
 
     if linearly_interpolate
-        Ψ̃ = linear_interpolation(sys.ψ̃1, sys.ψ̃goal, T)
+        Ψ̃ = linear_interpolation(sys.ψ̃init, sys.ψ̃goal, T)
     else
         Ψ̃ = fill(2*rand(sys.n_wfn_states) - 1, T)
     end
 
     states = []
 
-    push!(states, [sys.ψ̃1; zeros(sys.n_aug_states)])
+    push!(states, [sys.ψ̃init; zeros(sys.n_aug_states)])
 
     for t = 2:T-1
         wfns = Ψ̃[t]
@@ -272,27 +272,15 @@ pop_matrix(args...; kwargs...) =
     hcat(pop_components(args...; kwargs...)...)
 
 # get the second final state
-function final_state2(
-    traj::Trajectory,
-    sys::AbstractQuantumSystem;
-)
-    return traj.states[traj.T][slice(1, sys.isodim + 1, 2*sys.isodim, sys.isodim)]
-end
+final_state(traj, sys) = final_state_i(traj, sys, 1)
+final_state_2(traj, sys) = final_state_i(traj, sys, 2)
 
-function final_statei(
+function final_state_i(
     traj::Trajectory,
-    sys::AbstractQuantumSystem;
-    i = 3
+    sys::AbstractQuantumSystem,
+    i::Int
 )
-    return traj.states[traj.T][slice(i,sys.isodim)]
-end
-
-#get the first final state
-function final_state(
-    traj::Trajectory,
-    sys::AbstractQuantumSystem;
-)
-    return traj.states[traj.T][slice(1, sys.isodim)]
+    return traj.states[traj.T][slice(i, sys.isodim)]
 end
 
 # function populations(

@@ -1,6 +1,6 @@
 module Objectives
 
-export SystemObjective
+export QuantumObjective
 export MinTimeObjective
 
 using ..Utils
@@ -15,14 +15,14 @@ using Symbolics
 # objective functions
 #
 
-struct SystemObjective
+struct QuantumObjective
     L::Function
     ∇L::Function
     ∇²L::Union{Function, Nothing}
     ∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
 end
 
-function SystemObjective(
+function QuantumObjective(
     system::AbstractQuantumSystem,
     cost_fn::Symbol,
     T::Int,
@@ -30,7 +30,7 @@ function SystemObjective(
     R::Float64,
     eval_hessian::Bool
 )
-    cost = QuantumStateCost(system, cost_fn)
+    cost = QuantumCost(system, cost_fn)
 
     @views function L(Z::AbstractVector{F}) where F
         ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
@@ -47,7 +47,7 @@ function SystemObjective(
         return Q * cost(ψ̃T) + obj
     end
 
-    ∇c = QuantumStateCostGradient(cost)
+    ∇c = QuantumCostGradient(cost)
 
     @views function ∇L(Z::AbstractVector{F}) where F
         ∇ = zeros(F, system.vardim * T)
@@ -74,7 +74,7 @@ function SystemObjective(
     ∇²L_structure = nothing
 
     if eval_hessian
-        ∇²c = QuantumStateCostHessian(cost)
+        ∇²c = QuantumCostHessian(cost)
 
         ∇²L_structure = []
 
@@ -109,7 +109,7 @@ function SystemObjective(
         end
     end
 
-    return SystemObjective(L, ∇L, ∇²L, ∇²L_structure)
+    return QuantumObjective(L, ∇L, ∇²L, ∇²L_structure)
 end
 
 

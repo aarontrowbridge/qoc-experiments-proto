@@ -1,5 +1,6 @@
 module Constraints
 
+export problem_constraints
 export constrain!
 
 export AbstractConstraint
@@ -8,6 +9,7 @@ export BoundsConstraint
 export TimeStepBoundsConstraint
 
 using ..Utils
+using ..QuantumSystems
 
 using Ipopt
 using MathOptInterface
@@ -216,5 +218,67 @@ function (con::TimeStepBoundsConstraint)(
         )
     end
 end
+
+
+function problem_constraints(
+    system::AbstractQuantumSystem,
+    T::Int;
+    pin_first_qstate=false
+)
+    cons = AbstractConstraint[]
+
+    # initial quantum state constraints: ψ̃(t=1) = ψ̃1
+    ψ1_con = EqualityConstraint(
+        1,
+        1:system.n_wfn_states,
+        system.ψ̃init,
+        system.vardim;
+        name="initial quantum state constraints"
+    )
+    push!(cons, ψ1_con)
+
+    # initial a(t = 1) constraints: ∫a, a, da = 0
+    aug_cons = EqualityConstraint(
+        [1, T],
+        system.n_wfn_states .+ (1:system.n_aug_states),
+        0.0,
+        system.vardim;
+        name="initial and final augmented state constraints"
+    )
+    push!(cons, aug_cons)
+
+    # bound |a(t)| < a_bound
+    @assert length(system.control_bounds) ==
+        length(system.G_drives)
+
+    for cntrl_index in 1:system.ncontrols
+        cntrl_bound = BoundsConstraint(
+            2:T-1,
+            system.n_wfn_states +
+            system.∫a * system.ncontrols +
+            cntrl_index,
+            system.control_bounds[cntrl_index],
+            system.vardim;
+            name="constraint on control $(cntrl_index)"
+        )
+        push!(cons, cntrl_bound)
+    end
+
+    # pin first qstate to be equal to analytic solution
+    if pin_first_qstate
+        ψ̃¹goal = system.ψ̃goal[1:system.isodim]
+        pin_con = EqualityConstraint(
+            T,
+            1:system.isodim,
+            ψ̃¹goal,
+            system.vardim;
+            name="pinned first qstate at T"
+        )
+        push!(cons, pin_con)
+    end
+
+    return cons
+end
+
 
 end
