@@ -62,11 +62,11 @@ function generate_file_path(extension, file_name, path)
     max_numeric_suffix = -1
     for (_, _, files) in walkdir(path)
         for file_name_ in files
-            if occursin("_$(file_name).$(extension)", file_name_)
+            if occursin("$(file_name)", file_name_) && occursin(".$(extension)", file_name_)
 
                 numeric_suffix = parse(
                     Int,
-                    split(file_name_, "_")[end]
+                    split(split(file_name_, "_")[end], ".")[1]
                 )
 
                 max_numeric_suffix = max(

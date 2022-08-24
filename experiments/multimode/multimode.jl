@@ -1,11 +1,11 @@
-using QubitControl
+using Pico
 using LinearAlgebra
 using JLD2
 
-iter = 4000
+iter = 5
 
 const EXPERIMENT_NAME = "g0_to_g1"
-# plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/rewrite/")
+plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/lanthanum/")
 
 const TRANSMON_LEVELS = 2
 const CAVITY_LEVELS = 14
@@ -46,12 +46,11 @@ cavity_a_bounds = fill(0.03, 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
-T = parse(Int, ARGS[1])
-Δt = parse(Float64, ARGS[2])
-R = parse(Float64, ARGS[3])
-iter = parse(Int, ARGS[4])
-pin_first_qstate = parse(Bool, ARGS[5])
-phase = parse(Float64, ARGS[6])
+T = 1500
+Δt = 2.
+R = 0.1
+pin_first_qstate = false
+phase = 0.
 
 system = QuantumSystem(
     H_drift,
@@ -64,7 +63,7 @@ system = QuantumSystem(
 
 options = Options(
     max_iter = iter,
-    max_cpu_time = 100000.0,
+    max_cpu_time = 30000.0,
 )
 
 
@@ -79,12 +78,12 @@ u_bounds = BoundsConstraint(
 
 cons = AbstractConstraint[u_bounds]
 
-experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "")
+experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * "phase_$(phase)"
 
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
-resolves = parse(Int, ARGS[end])
+
 
 prob = QuantumControlProblem(
     system, 
@@ -96,20 +95,39 @@ prob = QuantumControlProblem(
     cons=cons
 )
 
-for i = 1:resolves
-    resolve = "_resolve_$i"
-    plot_path = generate_file_path(
-        "png",
-        experiment * resolve,
-        plot_dir
-    )
-    data_path = generate_file_path(
-        "jld2",
-        experiment * resolve,
-        data_dir
-    )
-    plot_multimode(system, prob.trajectory, plot_path)
-    solve!(prob, save=true, path=data_path)
-    plot_multimode(system, prob.trajectory, plot_path)
-    global prob = load_object(data_path)
+
+let sol = true, i = 0
+
+    while sol
+        resolve = "_resolve_$(i)"
+        plot_path = generate_file_path(
+            "png",
+            experiment * resolve,
+            plot_dir
+        )
+        data_path = generate_file_path(
+            "jld2",
+            experiment * resolve,
+            data_dir
+        )
+        plot_multimode(system, prob.trajectory, plot_path)
+        solve!(prob, save=true, path=data_path)
+        plot_multimode(system, prob.trajectory, plot_path)
+
+        prompt = true
+        while prompt 
+            println("Resolve? (y/n)")
+            answer = readline()
+            if answer == "y"
+                global prob = load_object(data_path)
+                prompt = false
+            elseif answer == "n"
+                prompt = false
+                sol = false
+            else 
+                println("Invalid response, must be y or n")
+            end
+        end
+        i +=1
+    end
 end
