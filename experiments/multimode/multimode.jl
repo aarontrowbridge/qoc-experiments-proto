@@ -53,8 +53,8 @@ sys = QuantumSystem(
     a_bounds
 )
 
-T                = 300
-Δt               = 1.5
+T                = 500
+Δt               = 0.8
 R                = 1.0
 iter             = 1000
 resolves         = 10
