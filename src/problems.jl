@@ -13,6 +13,7 @@ export get_traj_data
 
 export save_prob
 export load_prob
+export load_data
 
 using ..Utils
 using ..QuantumSystems
@@ -61,9 +62,23 @@ function save_prob(prob::FixedTimeProblem, path::String)
     @save path data
 end
 
+function save_prob(data::ProblemData, path::String)
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+    @save path data
+end
+
 function load_prob(path::String)
     @load path data
     return QuantumControlProblem(data)
+end
+
+function load_data(path::String)
+    @load path data
+    return data
 end
 
 
@@ -314,7 +329,7 @@ end
 abstract type MinTimeProblem end
 
 struct QuantumMinTimeProblem <: MinTimeProblem
-    subprob::QuantumControlProblem
+    subprob::Union{FixedTimeProblem, ProblemData}
     evaluator::MinTimeEvaluator
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
@@ -328,8 +343,8 @@ function QuantumMinTimeProblem(
     data::ProblemData;
     Rᵤ=0.001,
     Rₛ=0.001,
-    Δt_lbound=0.1 * prob.trajectory.Δt,
-    Δt_ubound=prob.trajectory.Δt,
+    Δt_lbound=0.1 * data.trajectory.Δt,
+    Δt_ubound=data.trajectory.Δt,
     mintime_eval_hessian=true,
     mintime_options=Options(),
     mintime_constraints=AbstractConstraint[]
@@ -339,7 +354,7 @@ function QuantumMinTimeProblem(
         :Rₛ => Rₛ,
         :Δt_lbound => Δt_lbound,
         :Δt_ubound => Δt_ubound,
-        :eval_hessian => eval_hessian,
+        :eval_hessian => mintime_eval_hessian,
         :mintime_options => mintime_options,
     )
 
@@ -381,7 +396,7 @@ function QuantumMinTimeProblem(
     constrain!(optimizer, variables, cons)
 
     return QuantumMinTimeProblem(
-        prob,
+        data,
         evaluator,
         variables,
         optimizer,
@@ -539,6 +554,7 @@ function solve!(
     solve_subprob=true,
 )
     if solve_subprob
+        @assert prob.subprob isa FixedTimeProblem
         solve!(prob.subprob)
     end
 

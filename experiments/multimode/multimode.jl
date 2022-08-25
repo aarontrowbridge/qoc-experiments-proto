@@ -53,21 +53,26 @@ sys = QuantumSystem(
     a_bounds
 )
 
+T                = 300
+Δt               = 1.5
+R                = 1.0
+iter             = 1000
+resolves         = 10
+pin_first_qstate = false
+phase_flip       = false
 
-T                = parse(Int,     ARGS[1])
-Δt               = parse(Float64, ARGS[2])
-R                = parse(Float64, ARGS[3])
-iter             = parse(Int,     ARGS[4])
-resolves         = parse(Int,     ARGS[5])
-pin_first_qstate = parse(Bool,    ARGS[6])
-phase_flip       = parse(Bool,    ARGS[7])
+# T                = parse(Int,     ARGS[1])
+# Δt               = parse(Float64, ARGS[2])
+# R                = parse(Float64, ARGS[3])
+# iter             = parse(Int,     ARGS[4])
+# resolves         = parse(Int,     ARGS[5])
+# pin_first_qstate = parse(Bool,    ARGS[6])
+# phase_flip       = parse(Bool,    ARGS[7])
 
 options = Options(
     max_iter = iter,
     max_cpu_time = 100000.0,
 )
-
-
 
 u_bounds = BoundsConstraint(
     1:T,
@@ -86,13 +91,13 @@ data_dir = "data/multimode/fixed_time/no_guess/problems"
 
 
 prob = QuantumControlProblem(
-    sys,
-    T;
+    sys;
+    T=T,
     Δt=Δt,
     R=R,
     pin_first_qstate=pin_first_qstate,
     options=options,
-    cons=cons
+    constraints=cons
 )
 
 for i = 1:resolves

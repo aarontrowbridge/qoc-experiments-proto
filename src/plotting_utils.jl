@@ -262,6 +262,7 @@ function plot_multimode(
     system::QuantumSystem,
     traj::Trajectory,
     path::String;
+    components=nothing,
     show_augs=false
 )
     # TODO: add this check to all plot functions
@@ -273,7 +274,7 @@ function plot_multimode(
 
     fig = Figure(resolution=(1200, 1500))
 
-    ψs = pop_matrix(traj, system; components=nothing)
+    ψs = pop_matrix(traj, system; components=components)
 
     ψax = Axis(
         fig[1:2, :];
@@ -289,7 +290,7 @@ function plot_multimode(
         # labels=["|g0⟩", "|g1⟩", "|g2⟩", "|g3⟩", "|g4⟩"]
     )
 
-    axislegend(ψax; position=:lb)
+    axislegend(ψax; position=:lc)
 
     if show_augs
         for j = 0:system.control_order

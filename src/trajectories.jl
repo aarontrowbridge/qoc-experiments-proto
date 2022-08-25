@@ -42,8 +42,8 @@ function rollout(
     Δt::Real
 )
     T = length(A) + 1
-    Ψ̃ = Vector{typeof(sys.ψ̃1)}(undef, T)
-    Ψ̃[1] = sys.ψ̃1
+    Ψ̃ = Vector{typeof(sys.ψ̃goal)}(undef, T)
+    Ψ̃[1] = sys.ψ̃goal
     for t = 2:T
         Gₜ = G(A[t - 1], sys.G_drift, sys.G_drives)
         ψ̃ⁱₜ₋₁s = @views [
@@ -318,9 +318,9 @@ function load_trajectory(path::String)
         h5open(path, "r") do f
             states_matrix = f["states"]
             actions_matrix = f["actions"]
-            times = f["times"]
-            T = f["T"]
-            Δt = f["dt"]
+            times = f["times"][]
+            T = f["T"][]
+            Δt = f["dt"][]
             states = [states_matrix[:, t] for t = 1:T]
             actions = [actions_matrix[:, t] for t = 1:T]
             return Trajectory(states, actions, times, T, Δt)

@@ -7,6 +7,8 @@ export TransmonSystem
 
 using ..QuantumLogic
 
+using HDF5
+
 using LinearAlgebra
 
 Im2 = [
@@ -148,28 +150,29 @@ function QuantumSystem(
                 for i = 1:size(hf["H_drives"], 3)
         ]
 
-        ψ1 = vcat(transpose(hf["psi1"][:, :])...)
-        ψf = vcat(transpose(hf["psif"][:, :])...)
+        ψinit = vcat(transpose(hf["psi1"][:, :])...)
+        ψgoal = vcat(transpose(hf["psif"][:, :])...)
+
+
+        qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
+        cavity_a_bounds = fill(0.03, length(H_drives) - 2)
+        a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
         system = QuantumSystem(
             H_drift,
             H_drives,
-            ψ1 = ψ1,
-            ψf = ψf,
+            ψinit,
+            ψgoal,
+            a_bounds,
             kwargs...
         )
 
         if return_data
-
             data = Dict()
-
             controls = copy(transpose(hf["controls"][:, :]))
             data["controls"] = controls
-
-            ts = hf["tlist"][:]
-            data["T"] = length(ts)
-            data["Δt"] = ts[2] - ts[1]
-
+            Δt = hf["tlist"][2] - hf["tlist"][1]
+            data["Δt"] = Δt
             return system, data
         else
             return system

@@ -14,8 +14,8 @@ using Base: @kwdef
 @kwdef mutable struct Options{T}
     tol::T = 1e-8
     s_max::T = 100.0
-    max_iter::Int = 1000
-    max_cpu_time = 10000.0
+    max_iter::Int = 1_000
+    max_cpu_time = 1_000_000.0
     dual_inf_tol::T = 1.0
     constr_viol_tol::T = 1.0e-8
     compl_inf_tol::T = 1.0e-3

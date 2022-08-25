@@ -1,29 +1,29 @@
 using Pico
 using JLD2
 
-subprob_dir = "data/multimode/fixed_time/no_guess/problems"
+subprob_data_dir = "data/multimode/fixed_time/no_guess/problems"
+
 experiment =
-    "g0_to_g1_T_350_dt_1.0_R_0.001_iter_100_resolve_5_00000"
+    "g0_to_g1_T_350_dt_1.5_R_1.0_iter_1000_resolve_10_00000"
 
-subprob_path = joinpath(subprob_dir, experiment * ".jld2")
+subprob_data_path =
+    joinpath(subprob_data_dir, experiment * ".jld2")
 
-subprob = load_prob(subprob_path)
+@load subprob_data_path data
 
 # parameters
 
 Rᵤ   = 1e1
 Rₛ   = Rᵤ
-iter = 100
+iter = 1000
 
-mintime_options = Options(
-    max_iter = iter,
-)
-
-mintime_prob = QuantumMinTimeProblem(
-    subprob;
+prob = QuantumMinTimeProblem(
+    data;
     Rᵤ=Rᵤ,
     Rₛ=Rₛ,
-    mintime_options=mintime_options,
+    mintime_options=Options(
+        max_iter=iter,
+    )
 )
 
 mintime_info = "_Ru_$(Rᵤ)_mintime_iter_$(iter)"
@@ -41,15 +41,15 @@ plot_path = joinpath(
 )
 
 plot_multimode(
-    subprob.system,
-    mintime_prob.subprob.trajectory,
+    prob.subprob.system,
+    prob.subprob.trajectory,
     plot_path
 )
 
-solve!(mintime_prob; save_path=save_path, solve_subprob=false)
+solve!(prob; save_path=save_path, solve_subprob=false)
 
 plot_multimode(
-    subprob.system,
-    mintime_prob.subprob.trajectory,
+    prob.subprob.system,
+    prob.subprob.trajectory,
     plot_path
 )
