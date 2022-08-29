@@ -83,13 +83,20 @@ u_bounds = BoundsConstraint(
     system.vardim
 )
 
-cons = AbstractConstraint[u_bounds]
+energy_con = EqualityConstraint(
+    1:T,
+    [CAVITY_LEVELS, 2 * CAVITY_LEVELS, 3 * CAVITY_LEVELS, 4 * CAVITY_LEVELS],
+    0.0,
+    system.vardim;
+    name="highest energy level constraints"
+)
+
+cons = AbstractConstraint[u_bounds, energy_con]
 
 experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "")
 
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
-
 
 prob = QuantumControlProblem(
     sys;
