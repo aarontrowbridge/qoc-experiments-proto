@@ -30,10 +30,17 @@ gate = :X
 system = QuantumSystem(
     H_drift,
     H_drive,
-    ψ1 = ψ,
-    ψf = ψf,
-    control_bounds = [1.0, 0.5]
+    ψ,
+    ψf,
+    [1.0, 0.5]
 )
+
+
+"""
+    Testing derivatives
+
+"""
+
 
 T = 5
 
@@ -44,12 +51,17 @@ R = 2.0
 
 eval_hessian = true
 
-cost_fn = infidelity_cost
+cost_fn = :infidelity_cost
 
 
 # absolulte tolerance for approximate tests
 
 const ATOL = 1e-5
+
+
+
+
+
 
 
 #

@@ -25,9 +25,9 @@ H_drive = [create(levels) + annihilate(levels),
 system = QuantumSystem(
     H_drift,
     H_drive,
-    ψ1 = ψ1,
-    ψf = ψf,
-    control_bounds = [2π * 19e-3,  2π * 19e-3]
+    ψ1,
+    ψf,
+    [2π * 19e-3,  2π * 19e-3]
 )
 
 #T is number of time steps, not total time
@@ -35,7 +35,7 @@ T = 400
 Δt = 0.1
 Q = 200.
 R = 0.1
-cost = infidelity_cost
+cost = :infidelity_cost
 hess = true
 pinqstate = true
 
@@ -47,8 +47,8 @@ options = Options(
 )
 
 prob = QuantumControlProblem(
-    system,
-    T;
+    system;
+    T=T,
     Δt = Δt,
     Q = Q,
     R = R,
@@ -65,11 +65,15 @@ solve!(prob)
 display(prob.trajectory.states[2])
 
 raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)
+
 display(raw_controls)
+
 controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
+
 display(controls)
 
-infidelity = iso_infidelity(final_state2(prob.trajectory, system), ket_to_iso(-im*ψg))
+infidelity = iso_infidelity(final_state_2(prob.trajectory, system), ket_to_iso(-im*ψg))
+
 println(infidelity)
 
 display(final_state2(prob.trajectory, system))
@@ -90,8 +94,10 @@ result = Dict(
 )
 
 
-save_file_path = generate_file_path("h5", EXPERIMENT_NAME * "_iter$(iter)" * "_time_$(time)ns" * "_pinq_$(pinqstate)", "pulses/transmon/exptry/")
+save_file_path = generate_file_path("h5", EXPERIMENT_NAME * "_iter_$(iter)" * "_time_$(time)ns" * "_pinq_$(pinqstate)", "pulses/transmon/exptry/")
+
 println("Saving this optimization to $(save_file_path)")
+
 h5open(save_file_path, "cw") do save_file
     for key in keys(result)
         write(save_file, key, result[key])

@@ -38,8 +38,8 @@ options = Options(
 )
 
 prob = QuantumControlProblem(
-    system,
-    T;
+    system;
+    T=T,
     Δt = Δt,
     Q = Q,
     R = R,
@@ -60,9 +60,9 @@ plot_twoqubit(
 )
 
 
-infidelity = iso_infidelity(final_statei(prob.trajectory, system, i = 3), ket_to_iso(ψf[3]))
+infidelity = iso_infidelity(final_state_i(prob.trajectory, system, i = 3), ket_to_iso(ψf[3]))
 for j in 1:4
-    display(final_statei(prob.trajectory, system, i = j))
+    display(final_state_i(prob.trajectory, system, i = j))
 end
 #display(final_statei(prob.trajectory, system, i = 3))
 println("Infidelity = $infidelity" )

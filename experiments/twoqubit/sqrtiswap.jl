@@ -36,16 +36,16 @@ control_bounds = [2π * 0.5 for x in 1:length(H_drive)]
 system = QuantumSystem(
     H_drift,
     H_drive,
-    ψ1 = ψ1,
-    ψf = ψf,
-    control_bounds = control_bounds
+    ψ1,
+    ψf,
+    control_bounds
 )
 
 T = 100
 Δt = 0.1
 Q = 200.
 R = 0.1
-cost = infidelity_cost
+cost = :infidelity_cost
 eval_hess = true
 pinqstate = true
 
@@ -62,7 +62,7 @@ prob = QuantumControlProblem(
     Q = Q,
     R = R,
     eval_hessian = eval_hess,
-    loss = loss,
+    cost = cost,
     pin_first_qstate = pinqstate,
     options = options
 )
