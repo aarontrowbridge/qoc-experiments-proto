@@ -69,6 +69,7 @@ phase_flip       = false
 # pin_first_qstate = parse(Bool,    ARGS[6])
 # phase_flip       = parse(Bool,    ARGS[7])
 
+
 options = Options(
     max_iter = iter,
     max_cpu_time = 100000.0,
@@ -76,10 +77,10 @@ options = Options(
 
 u_bounds = BoundsConstraint(
     1:T,
-    sys.n_wfn_states .+
-    slice(sys.∫a + 1 + sys.control_order, sys.ncontrols),
+    system.n_wfn_states .+
+    slice(system.∫a + 1 + system.control_order, system.ncontrols),
     0.0001,
-    sys.vardim
+    system.vardim
 )
 
 cons = AbstractConstraint[u_bounds]
