@@ -261,45 +261,83 @@ end
 function plot_multimode(
     system::QuantumSystem,
     traj::Trajectory,
-    path::String
+    path::String;
+    components=nothing,
+    show_augs=false
 )
+    # TODO: add this check to all plot functions
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+
     fig = Figure(resolution=(1200, 1500))
 
-    ψs = pop_matrix(traj, system; components=[1,2,3,4,5])
+    ψs = pop_matrix(traj, system; components=components)
 
-    ψax = Axis(fig[1:2, :]; title="multimode system components", xlabel=L"t")
-    series!(ψax, traj.times, ψs, labels=["|g0⟩", "|g1⟩", "|g2⟩", "|g3⟩", "|g4⟩"])
-    axislegend(ψax; position=:lb)
+    ψax = Axis(
+        fig[1:2, :];
+        title="multimode system components",
+        xlabel=L"t [ns]"
+    )
 
-    for j = 0:system.control_order
+    series!(
+        ψax,
+        traj.times,
+        ψs;
+        color=:rainbow1,
+        # labels=["|g0⟩", "|g1⟩", "|g2⟩", "|g3⟩", "|g4⟩"]
+    )
 
-        ax_j = Axis(fig[3 + j, :]; xlabel = L"t (ns)")
+    axislegend(ψax; position=:lc)
 
-        data = jth_order_controls_matrix(traj, system, j)
+    if show_augs
+        for j = 0:system.control_order
 
-        if j == system.control_order
-            data[:, end] = data[:, end-1]
+            ax_j = Axis(fig[3 + j, :]; xlabel = L"t [ns]")
+
+            data = jth_order_controls_matrix(traj, system, j)
+
+            if j == system.control_order
+                data[:, end] = data[:, end-1]
+            end
+
+            series!(
+                ax_j,
+                traj.times,
+                data;
+                labels = [
+                    j == 0 ?
+                    latexstring("a_$k (t)") :
+                    latexstring(
+                        "\\mathrm{d}^{",
+                        j == 1 ? "" : "$j",
+                        "}_t a_$k"
+                    )
+                    for k = 1:system.ncontrols
+                ]
+            )
+
+            axislegend(ax_j; position=:lt)
         end
+    else
+        ax = Axis(fig[3, :]; xlabel = L"t [ns]")
+
+        data = jth_order_controls_matrix(traj, system, 0)
 
         series!(
-            ax_j,
+            ax,
             traj.times,
             data;
             labels = [
-                j == 0 ?
-                latexstring("a_$k (t)") :
-                latexstring(
-                    "\\mathrm{d}^{",
-                    j == 1 ? "" : "$j",
-                    "}_t a_$k"
-                )
-                for k = 1:system.ncontrols
+                latexstring("a_$k (t)")
+                    for k = 1:system.ncontrols
             ]
         )
 
-        axislegend(ax_j; position=:lt)
+        axislegend(ax; position=:lt)
     end
-
     save(path, fig)
 end
 
@@ -309,6 +347,12 @@ function plot_single_qubit(
     path::String;
     fig_title=nothing
 )
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+
     fig = Figure(resolution=(1200, 1500))
 
     ψs = wfn_components_matrix(traj, system)

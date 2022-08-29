@@ -1,6 +1,5 @@
 libpardiso.dylib
 pardiso.lic
-
-data/*
-
+libpardiso.so
 output.txt
+data/*

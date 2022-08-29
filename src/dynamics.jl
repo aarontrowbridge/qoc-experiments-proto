@@ -1,7 +1,7 @@
 module Dynamics
 
-export SystemDynamics
-export MinTimeSystemDynamics
+export QuantumDynamics
+export MinTimeQuantumDynamics
 
 using ..Utils
 using ..QuantumLogic
@@ -45,7 +45,7 @@ using SparseArrays
     return [δψ̃s; δaugs]
 end
 
-struct SystemDynamics
+struct QuantumDynamics
     F::Function
     ∇F::Function
     ∇F_structure::Vector{Tuple{Int, Int}}
@@ -53,7 +53,7 @@ struct SystemDynamics
     μ∇²F_structure::Union{Vector{Tuple{Int, Int}}, Nothing}
 end
 
-function SystemDynamics(
+function QuantumDynamics(
     sys::AbstractQuantumSystem,
     integrator::Symbol,
     T::Int,
@@ -510,7 +510,7 @@ function SystemDynamics(
         end
     end
 
-    return SystemDynamics(
+    return QuantumDynamics(
         F,
         ∇F,
         ∇F_structure,
@@ -528,7 +528,7 @@ end
 
 # TODO: reimplement
 
-function MinTimeSystemDynamics(
+function MinTimeQuantumDynamics(
     sys::AbstractQuantumSystem,
     integrator::Symbol,
     T::Int,
@@ -1001,7 +1001,7 @@ function MinTimeSystemDynamics(
         end
     end
 
-    return SystemDynamics(
+    return QuantumDynamics(
         F,
         ∇F,
         ∇F_structure,

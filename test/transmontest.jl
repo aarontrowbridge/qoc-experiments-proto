@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 using Test
 
 using ForwardDiff
@@ -85,7 +85,7 @@ z1 = 2*rand(system.vardim) .- 1
 
 # setting up objective struct
 
-obj = SystemObjective(
+obj = QuantumObjective(
     system,
     cost_fn,
     T,
@@ -167,7 +167,7 @@ for integrator in integrators
 
     # setting up dynamics struct
 
-    dyns = SystemDynamics(
+    dyns = QuantumDynamics(
         system,
         integrator,
         T,

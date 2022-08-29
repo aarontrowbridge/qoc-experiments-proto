@@ -9,8 +9,8 @@ To install and use this repo on your own machine:
 1. clone the repo into a directory of your choosing
 2. open a julia REPL from the repo directory and enter the package manager via `julia> ]`
 3. run `(@v1.7) pkg> activate .` 
-4. then run `(QubitControl) pkg> instantiate`
-5. now the package can be used via `using QubitControl`
+4. then run `(Pico) pkg> instantiate`
+5. now the package can be used via `using Pico`
 
 
 ## Problem formulation

@@ -1,4 +1,6 @@
-using QubitControl
+push!(LOAD_PATH, "../../")
+
+using Pico
 using JLD2
 
 σx = GATES[:X]
@@ -20,31 +22,26 @@ iter = 100
 
 # ψ = (ψ0 + ψ1) / √2
 
-ψ = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
-ψf = apply.(gate, ψ)
+ψinit = [ψ0, ψ1, (ψ0 + im * ψ1) / √2, (ψ0 - ψ1) / √2]
+ψgoal = apply.(gate, ψinit)
 
 a_bounds = [1.0, 0.5]
 
 system = QuantumSystem(
     H_drift,
     H_drive,
-    ψ1 = ψ,
-    ψf = ψf,
-    control_bounds = a_bounds
+    ψinit,
+    ψgoal,
+    a_bounds
 )
 
-T    = 1000
-Δt   = 0.01
-Q    = 200.0
-R    = 2.0
-cost = infidelity_cost
-hess = true
-
-
-
+T                = 1000
+Δt               = 0.01
+Q                = 200.0
+R                = 2.0
+cost             = :infidelity_cost
 pin_first_qstate = false
-
-integrator = :FourthOrderPade
+integrator       = :FourthOrderPade
 
 experiment = "$(gate)_gate_2_controls_test_R_$(R)_T_$(T)_iter_$(iter)"
 
@@ -56,53 +53,61 @@ save_path = generate_file_path("jld2", experiment, save_dir)
 
 options = Options(
     max_iter = iter,
-    tol = 1e-5,
-    # linear_solver="pardiso",
 )
 
 prob = QuantumControlProblem(
-    system,
-    T;
+    system;
+    T=T,
     Δt=Δt,
     Q=Q,
     R=R,
-    eval_hessian=hess,
     cost=cost,
-    pin_first_qstate = pin_first_qstate,
-    options=options,
+    pin_first_qstate=pin_first_qstate,
     integrator=integrator,
+    options=options,
 )
 
 # solve for first n iters
 
-solve!(prob; save=true, path=save_path)
 
 plot_file = experiment * "_pre_save"
 
 plot_path = generate_file_path("png", plot_file, plot_dir)
 
 plot_single_qubit(
-    system,
+    prob.system,
     prob.trajectory,
     plot_path,
     fig_title="$gate gate on basis states"
 )
 
-loaded_prob = load_object(save_path)
+solve!(prob; save_path=save_path)
 
-solve!(loaded_prob; save=false)
+plot_single_qubit(
+    prob.system,
+    prob.trajectory,
+    plot_path,
+    fig_title="$gate gate on basis states"
+)
+
+loaded_prob = load_prob(save_path)
+
+solve!(loaded_prob)
 
 plot_file = experiment * "_post_save"
 
 plot_path = generate_file_path("png", plot_file, plot_dir)
 
-
 plot_single_qubit(
-    system,
-    prob.trajectory,
+    loaded_prob.system,
+    loaded_prob.trajectory,
     plot_path,
     fig_title="$gate gate on basis states"
 )
 
-infidelity = iso_infidelity(final_state2(prob.trajectory, system), ket_to_iso(apply(:X, ψ1)))
+infidelity = iso_infidelity(
+    final_state_2(prob.trajectory, system),
+    ket_to_iso(apply(gate, ψ1))
+)
+
 println(infidelity)

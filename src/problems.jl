@@ -4,15 +4,18 @@ export FixedTimeProblem
 export MinTimeProblem
 export QuantumControlProblem
 export QuantumMinTimeProblem
+export ProblemData
 
 export solve!
 export initialize_trajectory!
 export update_traj_data!
 export get_traj_data
 
+export save_prob
+export load_prob
+export load_data
+
 using ..Utils
-using ..Integrators
-using ..Costs
 using ..QuantumSystems
 using ..Trajectories
 using ..NLMOI
@@ -20,9 +23,9 @@ using ..Evaluators
 using ..IpoptOptions
 using ..Constraints
 
-using Ipopt
 using JLD2
 using Libdl
+using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
 
@@ -30,16 +33,63 @@ const MOI = MathOptInterface
 #
 # qubit problem
 #
+
 abstract type FixedTimeProblem end
+
+struct ProblemData
+    system::AbstractQuantumSystem
+    trajectory::Trajectory
+    constraints::Vector{AbstractConstraint}
+    params::Dict
+
+    function ProblemData(prob::FixedTimeProblem)
+        return new(
+            prob.system,
+            prob.trajectory,
+            prob.constraints,
+            prob.params
+        )
+    end
+end
+
+function save_prob(prob::FixedTimeProblem, path::String)
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+    data = ProblemData(prob)
+    @save path data
+end
+
+function save_prob(data::ProblemData, path::String)
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+    @save path data
+end
+
+function load_prob(path::String)
+    @load path data
+    return QuantumControlProblem(data)
+end
+
+function load_data(path::String)
+    @load path data
+    return data
+end
+
+
 
 struct QuantumControlProblem <: FixedTimeProblem
     system::AbstractQuantumSystem
-    evaluator::QuantumEvaluator
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
     trajectory::Trajectory
-    T::Int
-    Δt::Float64
+    constraints::Vector{AbstractConstraint}
+    params::Dict
 end
 
 function QuantumControlProblem(
@@ -48,62 +98,105 @@ function QuantumControlProblem(
     kwargs...
 )
     return QuantumControlProblem(
-        system,
-        init_traj.T;
+        system;
+        T=init_traj.T,
         Δt=init_traj.Δt,
         init_traj=init_traj,
         kwargs...
     )
 end
 
+function QuantumControlProblem(data::ProblemData)
+    return QuantumControlProblem(
+        data.system,
+        data.trajectory,
+        data.constraints,
+        data.params
+    )
+end
 
 function QuantumControlProblem(
-    system::AbstractQuantumSystem,
-    T::Int;
-    integrator=:FourthOrderPade,
-    cost=infidelity_cost,
+    sys::AbstractQuantumSystem,
+    traj::Trajectory,
+    cons::Vector{AbstractConstraint},
+    params::Dict
+)
+    optimizer = Ipopt.Optimizer()
+
+    set!(optimizer, params[:options])
+
+    evaluator = QuantumEvaluator(
+        sys,
+        params[:integrator],
+        params[:cost],
+        params[:eval_hessian],
+        traj.T,
+        traj.Δt,
+        params[:Q],
+        params[:R]
+    )
+
+    n_dynamics_cons = sys.nstates * (traj.T - 1)
+    n_variables = sys.vardim * traj.T
+
+    variables = initialize_optimizer!(
+        optimizer,
+        evaluator,
+        n_dynamics_cons,
+        n_variables
+    )
+
+    constrain!(optimizer, variables, cons)
+
+    return QuantumControlProblem(
+        sys,
+        variables,
+        optimizer,
+        traj,
+        cons,
+        params,
+    )
+end
+
+
+
+function QuantumControlProblem(
+    system::AbstractQuantumSystem;
+    T=100,
     Δt=0.01,
+    integrator=:FourthOrderPade,
+    cost=:infidelity_cost,
     Q=200.0,
     R=0.1,
     eval_hessian=true,
     pin_first_qstate=true,
-    σ = 0.1,
+    options=Options(),
+    constraints=AbstractConstraint[],
+
+    # keyword args below are for initializing the trajactory
     linearly_interpolate = true,
+    σ = 0.1,
     init_traj=Trajectory(
         system,
         T,
         Δt;
-        linearly_interpolate = linearly_interpolate,
+        linearly_interpolate=linearly_interpolate,
         σ=σ
-    ),
-    options=Options(),
-    return_constraints=false,
-    cons=AbstractConstraint[]
+    )
 )
-
-    if getfield(options, :linear_solver) == "pardiso" &&
-        !Sys.isapple()
-
-        Libdl.dlopen("/usr/lib/liblapack.so.3", RTLD_GLOBAL)
-        Libdl.dlopen("/usr/lib/libomp.so", RTLD_GLOBAL)
-    end
+    params = Dict(
+        :integrator => integrator,
+        :cost => cost,
+        :Q => Q,
+        :R => R,
+        :eval_hessian => eval_hessian,
+        :pin_first_qstate => pin_first_qstate,
+        :options => options,
+    )
 
     optimizer = Ipopt.Optimizer()
 
-    # set Ipopt optimizer options
-    for name in fieldnames(typeof(options))
-        optimizer.options[String(name)] = getfield(options, name)
-    end
-
-    total_vars = system.vardim * T
-    total_dynamics = system.nstates * (T - 1)
-    total_states = system.nstates * T
-
-    variables = MOI.add_variables(optimizer, total_vars)
-
-    # TODO: this is super hacky, I know; it should be fixed
-    # subtype(::Type{Type{T}}) where T <: AbstractQuantumIntegrator = T
-    # integrator = subtype(integrator)
+    set!(optimizer, options)
 
     evaluator = QuantumEvaluator(
         system,
@@ -114,85 +207,51 @@ function QuantumControlProblem(
         Q, R
     )
 
-    # pin first qstate to be equal to analytic solution
-    if pin_first_qstate
-        ψ̃¹goal = system.ψ̃goal[1:system.isodim]
-        pin_con = EqualityConstraint(
-            T,
-            1:system.isodim,
-            ψ̃¹goal,
-            system.vardim
-        )
-        push!(cons, pin_con)
-    end
+    n_dynamics_cons = system.nstates * (T - 1)
+    n_variables = system.vardim * T
 
-    # initial quantum state constraints: ψ̃(t=1) = ψ̃1
-    ψ1_con = EqualityConstraint(
-        1,
-        1:system.n_wfn_states,
-        system.ψ̃1,
-        system.vardim
+    variables = initialize_optimizer!(
+        optimizer,
+        evaluator,
+        n_dynamics_cons,
+        n_variables
     )
-    push!(cons, ψ1_con)
 
-    # initial a(t = 1) constraints: ∫a, a, da = 0
-    aug1_con = EqualityConstraint(
-        1,
-        system.n_wfn_states .+ (1:system.n_aug_states),
-        0.0,
-        system.vardim
+    cons = problem_constraints(
+        system,
+        T;
+        pin_first_qstate=pin_first_qstate
     )
-    push!(cons, aug1_con)
 
-    # final a(t = T) constraints: ∫a, a, da = 0
-    augT_con = EqualityConstraint(
-        T,
-        system.n_wfn_states .+ (1:system.n_aug_states),
-        0.0,
-        system.vardim
-    )
-    push!(cons, augT_con)
+    push!(cons, constraints...)
 
-
-    # bound |a(t)| < a_bound
-    @assert length(system.control_bounds) == length(system.G_drives)
-
-    for cntrl_index in 1:system.ncontrols
-        cntrl_bound = BoundsConstraint(
-            2:T-1,
-            system.n_wfn_states + system.∫a*system.ncontrols + cntrl_index,
-            system.control_bounds[cntrl_index],
-            system.vardim
-        )
-        push!(cons, cntrl_bound) 
-    end
- 
     constrain!(optimizer, variables, cons)
 
-    dynamics_constraints =
-        fill(MOI.NLPBoundsPair(0.0, 0.0), total_dynamics)
-
-    block_data =
-        MOI.NLPBlockData(dynamics_constraints, evaluator, true)
-
-    MOI.set(optimizer, MOI.NLPBlock(), block_data)
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-
-    prob = QuantumControlProblem(
+    return QuantumControlProblem(
         system,
-        evaluator,
         variables,
         optimizer,
         init_traj,
-        T,
-        Δt
+        cons,
+        params,
     )
+end
 
-    if return_constraints
-        return prob, cons
-    else
-        return prob
-    end
+function initialize_optimizer!(
+    optimizer::Ipopt.Optimizer,
+    evaluator::AbstractPICOEvaluator,
+    n_dynamics_cons::Int,
+    n_variables::Int
+)
+    dynamics_cons = fill(
+        MOI.NLPBoundsPair(0.0, 0.0),
+        n_dynamics_cons
+    )
+    block_data = MOI.NLPBlockData(dynamics_cons, evaluator, true)
+    MOI.set(optimizer, MOI.NLPBlock(), block_data)
+    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    variables = MOI.add_variables(optimizer, n_variables)
+    return variables
 end
 
 
@@ -200,7 +259,7 @@ function initialize_trajectory!(
     prob::QuantumControlProblem,
     traj::Trajectory
 )
-    for (t, x, u) in zip(1:prob.T, traj.states, traj.actions)
+    for (t, x, u) in zip(1:traj.T, traj.states, traj.actions)
         MOI.set(
             prob.optimizer,
             MOI.VariablePrimalStart(),
@@ -222,14 +281,14 @@ initialize_trajectory!(prob) =
 
     xs = []
 
-    for t = 1:prob.T
+    for t = 1:prob.trajectory.T
         xₜ = Z[slice(t, prob.system.nstates, prob.system.vardim)]
         push!(xs, xₜ)
     end
 
     us = []
 
-    for t = 1:prob.T
+    for t = 1:prob.trajectory.T
         uₜ = Z[
             slice(
                 t,
@@ -245,10 +304,11 @@ initialize_trajectory!(prob) =
     prob.trajectory.actions .= us
 end
 
-function solve!(prob::QuantumControlProblem; init_traj=prob.trajectory, save = false, path = nothing)
-    
-    @assert !(save && isnothing(path))
-        "must provide path for saving"
+function solve!(
+    prob::QuantumControlProblem;
+    init_traj = prob.trajectory,
+    save_path = nothing
+)
 
     initialize_trajectory!(prob, init_traj)
 
@@ -256,13 +316,8 @@ function solve!(prob::QuantumControlProblem; init_traj=prob.trajectory, save = f
 
     update_traj_data!(prob)
 
-    if save
-        path_parts = split(path, "/")
-        dir = joinpath(path_parts[1:end-1])
-        if !isdir(dir)
-            mkpath(dir)
-        end
-        save_object(path, prob)
+    if ! isnothing(save_path)
+        save_prob(prob, save_path)
     end
 end
 
@@ -274,106 +329,171 @@ end
 abstract type MinTimeProblem end
 
 struct QuantumMinTimeProblem <: MinTimeProblem
-    subprob::QuantumControlProblem
+    subprob::Union{FixedTimeProblem, ProblemData}
     evaluator::MinTimeEvaluator
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
-    T::Int
+    constraints::Vector{AbstractConstraint}
+    params::Dict
 end
 
 # TODO: rewrite this constructor (hacky implementation rn)
 
-function QuantumMinTimeProblem(prob::FixedTimeProblem; kwargs...)
-    return QuantumMinTimeProblem(
-        prob.system,
-        prob.T;
-        Δt=prob.trajectory.Δt,
-        init_traj=prob.trajectory,
-        kwargs...
-    )
-end
-
 function QuantumMinTimeProblem(
-    system::AbstractQuantumSystem,
-    T::Int;
+    data::ProblemData;
     Rᵤ=0.001,
     Rₛ=0.001,
-    Δt=0.01,
-    Δt_lbound=0.1 * Δt,
-    Δt_ubound=Δt,
-    integrator=:FourthOrderPade,
-    σ = 0.1,
-    linearly_interpolate = true,
-    init_traj=Trajectory(
-        system, T, Δt,
-        linearly_interpolate = linearly_interpolate, 
-        σ = σ),
-    eval_hessian=true,
+    Δt_lbound=0.1 * data.trajectory.Δt,
+    Δt_ubound=data.trajectory.Δt,
+    mintime_eval_hessian=true,
     mintime_options=Options(),
-    kwargs...
+    mintime_constraints=AbstractConstraint[]
 )
+    params = Dict(
+        :Rᵤ => Rᵤ,
+        :Rₛ => Rₛ,
+        :Δt_lbound => Δt_lbound,
+        :Δt_ubound => Δt_ubound,
+        :eval_hessian => mintime_eval_hessian,
+        :mintime_options => mintime_options,
+    )
 
     optimizer = Ipopt.Optimizer()
 
-    # set Ipopt optimizer options
-    for name in fieldnames(typeof(mintime_options))
-        optimizer.options[String(name)] =
-            getfield(mintime_options, name)
-    end
+    set!(optimizer, mintime_options)
 
-    total_vars = system.vardim * T
-    total_dynamics = system.nstates * (T - 1)
+    T = data.trajectory.T
 
-    # defining Z = [Z; Δts]
-    variables = MOI.add_variables(optimizer, total_vars + T - 1)
-
-    # set up sub problem
-    subprob, cons = QuantumControlProblem(
-        system,
-        init_traj;
-        return_constraints=true,
-        integrator=integrator,
-        eval_hessian=eval_hessian,
-        pin_first_qstate=false, # TODO: figure out a better way to implement this - pinned first qstate dissallows constraints on all qstates during mintime solve
-        kwargs...
-    )
-
-    # constraints on Δtₜs
-    Δt_bounds_con =
-        TimeStepBoundsConstraint((Δt_lbound, Δt_ubound), T)
-
-    push!(cons, Δt_bounds_con)
-
-    constrain!(optimizer, variables, cons)
-
-    # build min time evaluator
     evaluator = MinTimeEvaluator(
-        subprob.system,
-        integrator,
+        data.system,
+        data.params[:integrator],
         T,
         Rᵤ,
         Rₛ,
-        eval_hessian
+        mintime_eval_hessian
     )
 
-    dynamics_constraints =
-        [MOI.NLPBoundsPair(0.0, 0.0) for _ = 1:total_dynamics]
+    n_dynamics_cons = data.system.nstates * (T - 1)
+    n_variables = data.system.vardim * T + T - 1
 
-    block_data = MOI.NLPBlockData(
-        dynamics_constraints,
+    variables = initialize_optimizer!(
+        optimizer,
         evaluator,
-        true
+        n_dynamics_cons,
+        n_variables
     )
 
-    MOI.set(optimizer, MOI.NLPBlock(), block_data)
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+    cons = vcat(data.constraints, mintime_constraints)
+
+    Δt_con = TimeStepBoundsConstraint(
+        (Δt_lbound, Δt_ubound),
+        T;
+        name="time step bounds constraint"
+    )
+
+    push!(cons, Δt_con)
+
+    constrain!(optimizer, variables, cons)
+
+    return QuantumMinTimeProblem(
+        data,
+        evaluator,
+        variables,
+        optimizer,
+        cons,
+        params
+    )
+end
+
+
+
+function QuantumMinTimeProblem(
+    system::AbstractQuantumSystem;
+
+    # time params
+    T=100,
+    Δt=0.01,
+
+    # mintime prob params
+    Rᵤ=0.001,
+    Rₛ=0.001,
+    Δt_lbound=0.1 * Δt,
+    Δt_ubound=Δt,
+    mintime_options=Options(),
+    mintime_integrator=:FourthOrderPade,
+    mintime_eval_hessian=true,
+
+    # mintime prob  constraints
+    mintime_constraints=AbstractConstraint[],
+
+    # keyword args for initial trajectory
+    σ = 0.1,
+    linearly_interpolate = true,
+    init_traj=Trajectory(
+        system,
+        T,
+        Δt;
+        linearly_interpolate = linearly_interpolate,
+        σ = σ
+    ),
+
+    # keyword args for subprob
+    kwargs...
+)
+    params = Dict(
+        :Rᵤ => Rᵤ,
+        :Rₛ => Rₛ,
+        :Δt_lbound => Δt_lbound,
+        :Δt_ubound => Δt_ubound,
+        :mintime_options => mintime_options,
+        :mintime_integrator => mintime_integrator,
+        :mintime_eval_hessian => mintime_eval_hessian,
+    )
+
+    optimizer = Ipopt.Optimizer()
+
+    set!(optimizer, mintime_options)
+
+    subprob = QuantumControlProblem(system, init_traj; kwargs...)
+
+    evaluator = MinTimeEvaluator(
+        system,
+        mintime_integrator,
+        T,
+        Rᵤ,
+        Rₛ,
+        mintime_eval_hessian
+    )
+
+    n_dynamics_cons = system.nstates * (T - 1)
+    n_variables = system.vardim * T + T - 1
+
+    variables = initialize_optimizer!(
+        optimizer,
+        evaluator,
+        n_dynamics_cons,
+        n_variables
+    )
+
+    cons = vcat(subprob.constraints, mintime_constraints)
+
+    Δt_con = TimeStepBoundsConstraint(
+        (Δt_lbound, Δt_ubound),
+        T;
+        name="time step bounds constraint"
+    )
+
+    push!(cons, Δt_con)
+
+    constrain!(optimizer, variables, cons)
 
     return QuantumMinTimeProblem(
         subprob,
         evaluator,
         variables,
         optimizer,
-        T,
+        cons,
+        params
     )
 end
 
@@ -381,7 +501,7 @@ function initialize_trajectory!(
     prob::MinTimeProblem,
     traj::Trajectory
 )
-    for (t, x, u) in zip(1:prob.T, traj.states, traj.actions)
+    for (t, x, u) in zip(1:traj.T, traj.states, traj.actions)
         MOI.set(
             prob.optimizer,
             MOI.VariablePrimalStart(),
@@ -392,8 +512,8 @@ function initialize_trajectory!(
     MOI.set(
         prob.optimizer,
         MOI.VariablePrimalStart(),
-        prob.variables[(end - (prob.T - 1) + 1):end],
-        fill(prob.subprob.Δt, prob.T - 1)
+        prob.variables[(end - (traj.T - 1) + 1):end],
+        fill(traj.Δt, traj.T - 1)
     )
 end
 
@@ -403,6 +523,7 @@ end
 
 @views function update_traj_data!(prob::MinTimeProblem)
 
+    T       = prob.subprob.trajectory.T
     vardim  = prob.subprob.system.vardim
     nstates = prob.subprob.system.nstates
 
@@ -412,14 +533,14 @@ end
         prob.variables
     )
 
-    xs = [Z[slice(t, nstates, vardim)] for t = 1:prob.T]
+    xs = [Z[slice(t, nstates, vardim)] for t = 1:T]
 
     us = [
         Z[slice(t, nstates + 1, vardim, vardim)]
-            for t = 1:prob.T
+            for t = 1:T
     ]
 
-    Δts = [0.0; Z[(end - (prob.T - 1) + 1):end]]
+    Δts = [0.0; Z[(end - (T - 1) + 1):end]]
 
     prob.subprob.trajectory.states .= xs
     prob.subprob.trajectory.actions .= us
@@ -427,37 +548,51 @@ end
 end
 
 
-function solve!(prob::MinTimeProblem; save=false, path=nothing)
-    @assert !(save && isnothing(path))
-        "must provide path for saving"
-
-    solve!(prob.subprob)
+function solve!(
+    prob::MinTimeProblem;
+    save_path=nothing,
+    solve_subprob=true,
+)
+    if solve_subprob
+        @assert prob.subprob isa FixedTimeProblem
+        solve!(prob.subprob)
+    end
 
     init_traj = prob.subprob.trajectory
 
     initialize_trajectory!(prob, init_traj)
 
-
-    # constrain end points to match subprob solution
-
-    # TODO: this is a hacky way to do this - fix this
-    isodim       = prob.subprob.system.isodim
     n_wfn_states = prob.subprob.system.n_wfn_states
 
-    ψ̃T_con! = EqualityConstraint(
-        prob.T,
-        1:n_wfn_states,
-        init_traj.states[end][1:n_wfn_states],
-        prob.subprob.system.vardim
-    )
+    # constrain endpoints to match subprob solution
+
+    if prob.subprob.params[:pin_first_qstate]
+        isodim = prob.subprob.system.isodim
+        ψ̃T_con! = EqualityConstraint(
+            prob.subprob.trajectory.T,
+            (isodim + 1):n_wfn_states,
+            init_traj.states[end][(isodim + 1):n_wfn_states],
+            prob.subprob.system.vardim;
+            name="final qstate constraint"
+        )
+    else
+        ψ̃T_con! = EqualityConstraint(
+            prob.subprob.trajectory.T,
+            1:n_wfn_states,
+            init_traj.states[end][1:n_wfn_states],
+            prob.subprob.system.vardim;
+            name="final qstate constraint"
+        )
+    end
 
     ψ̃T_con!(prob.optimizer, prob.variables)
 
     MOI.optimize!(prob.optimizer)
 
     update_traj_data!(prob)
-    if save
-        save_trajectory(prob.subprob.trajectory, path)
+
+    if ! isnothing(save_path)
+        save_prob(prob.subprob, save_path)
     end
 end
 

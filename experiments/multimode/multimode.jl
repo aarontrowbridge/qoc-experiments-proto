@@ -1,8 +1,7 @@
-using QubitControl
+using Pico
 using LinearAlgebra
 using JLD2
 
-iter = 4000
 
 const EXPERIMENT_NAME = "g0_to_g1"
 # plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/rewrite/")
@@ -42,32 +41,39 @@ H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
 
 qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
 
-cavity_a_bounds = fill(0.03, 2)
+cavity_a_bounds = fill(0.03, length(H_drives) - 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
-T = parse(Int, ARGS[1])
-Δt = parse(Float64, ARGS[2])
-R = parse(Float64, ARGS[3])
-iter = parse(Int, ARGS[4])
-pin_first_qstate = parse(Bool, ARGS[5])
-phase = parse(Float64, ARGS[6])
-
-system = QuantumSystem(
+sys = QuantumSystem(
     H_drift,
     H_drives,
-    ψ1 = ψ1,
-    ψf = ψf,
-    control_bounds = a_bounds,
-    phase = phase
+    ψ1,
+    ψf,
+    a_bounds
 )
+
+T                = 500
+Δt               = 0.8
+R                = 1.0
+iter             = 1000
+resolves         = 10
+pin_first_qstate = false
+phase_flip       = false
+
+# T                = parse(Int,     ARGS[1])
+# Δt               = parse(Float64, ARGS[2])
+# R                = parse(Float64, ARGS[3])
+# iter             = parse(Int,     ARGS[4])
+# resolves         = parse(Int,     ARGS[5])
+# pin_first_qstate = parse(Bool,    ARGS[6])
+# phase_flip       = parse(Bool,    ARGS[7])
+
 
 options = Options(
     max_iter = iter,
     max_cpu_time = 100000.0,
 )
-
-
 
 u_bounds = BoundsConstraint(
     1:T,
@@ -84,16 +90,15 @@ experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
-resolves = parse(Int, ARGS[end])
 
 prob = QuantumControlProblem(
-    system, 
-    T;
+    sys;
+    T=T,
     Δt=Δt,
     R=R,
     pin_first_qstate=pin_first_qstate,
     options=options,
-    cons=cons
+    constraints=cons
 )
 
 for i = 1:resolves
@@ -103,13 +108,13 @@ for i = 1:resolves
         experiment * resolve,
         plot_dir
     )
-    data_path = generate_file_path(
+    save_path = generate_file_path(
         "jld2",
         experiment * resolve,
         data_dir
     )
-    plot_multimode(system, prob.trajectory, plot_path)
-    solve!(prob, save=true, path=data_path)
-    plot_multimode(system, prob.trajectory, plot_path)
-    global prob = load_object(data_path)
+    plot_multimode(prob.system, prob.trajectory, plot_path)
+    solve!(prob, save_path=save_path)
+    plot_multimode(prob.system, prob.trajectory, plot_path)
+    global prob = load_prob(save_path)
 end
