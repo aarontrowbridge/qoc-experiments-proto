@@ -94,7 +94,7 @@ plot_twoqubit(
 
 #infidelity = iso_infidelity(final_statei(prob.trajectory, system, i = 4), ket_to_iso(ψf[4]))
 for j in 1:4
-    display(final_statei(prob.trajectory, system, i = j))
+    display(final_state_i(prob.trajectory, system, i = j))
     infidelity = iso_infidelity(final_state_i(prob.trajectory, system, i = j), ket_to_iso(ψf[j]))
     println("Infidelity = $infidelity" )
 end
