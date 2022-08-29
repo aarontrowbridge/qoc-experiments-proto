@@ -112,8 +112,8 @@ for i = 1:resolves
         experiment * resolve,
         data_dir
     )
-    plot_multimode(sys, prob.trajectory, plot_path)
+    plot_multimode(prob.system, prob.trajectory, plot_path)
     solve!(prob, save_path=save_path)
-    plot_multimode(sys, prob.trajectory, plot_path)
+    plot_multimode(prob.system, prob.trajectory, plot_path)
     global prob = load_prob(save_path)
 end
