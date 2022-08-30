@@ -14,6 +14,7 @@ export get_traj_data
 export save_prob
 export load_prob
 export load_data
+export get_and_save_controls
 
 using ..Utils
 using ..QuantumSystems
@@ -24,6 +25,7 @@ using ..IpoptOptions
 using ..Constraints
 
 using JLD2
+using HDF5
 using Libdl
 using Ipopt
 using MathOptInterface
@@ -80,6 +82,25 @@ function load_data(path::String)
     @load path data
     return data
 end
+
+function get_and_save_controls(
+    data_path::String,
+    save_path::String
+)
+    path_parts = split(save_path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if ! isdir(dir)
+        mkpath(dir)
+    end
+    data = load_data(data_path)
+    controls = controls_matrix(data.trajectory, data.system)
+    h5open(save_path, "cw") do f
+        f["controls"] = controls
+    end
+end
+
+
+
 
 
 

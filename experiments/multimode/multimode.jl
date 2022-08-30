@@ -45,7 +45,7 @@ cavity_a_bounds = fill(0.03, length(H_drives) - 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
-sys = QuantumSystem(
+system = QuantumSystem(
     H_drift,
     H_drives,
     ψ1,
@@ -53,12 +53,12 @@ sys = QuantumSystem(
     a_bounds
 )
 
-T                = 500
-Δt               = 0.8
+T                = 300
+Δt               = 1.5
 R                = 1.0
-iter             = 1000
-resolves         = 10
-pin_first_qstate = false
+iter             = 100
+resolves         = 20
+pin_first_qstate = true
 phase_flip       = false
 
 # T                = parse(Int,     ARGS[1])
@@ -84,7 +84,7 @@ u_bounds = BoundsConstraint(
 )
 
 energy_con = EqualityConstraint(
-    1:T,
+    2:T-1,
     [CAVITY_LEVELS, 2 * CAVITY_LEVELS, 3 * CAVITY_LEVELS, 4 * CAVITY_LEVELS],
     0.0,
     system.vardim;
@@ -93,13 +93,13 @@ energy_con = EqualityConstraint(
 
 cons = AbstractConstraint[u_bounds, energy_con]
 
-experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "")
+experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * "_mode_constrained"
 
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
 prob = QuantumControlProblem(
-    sys;
+    system;
     T=T,
     Δt=Δt,
     R=R,
