@@ -2,10 +2,10 @@ using Pico
 using LinearAlgebra
 using JLD2
 
-iter = 5
+iter = 20000
 
 const EXPERIMENT_NAME = "g0_to_g1"
-plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/lanthanum/")
+plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/fermium/")
 
 const TRANSMON_LEVELS = 2
 const CAVITY_LEVELS = 14
@@ -46,7 +46,7 @@ cavity_a_bounds = fill(0.03, 2)
 
 a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
-T = 1500
+T = 1350
 Δt = 2.
 R = 0.1
 pin_first_qstate = false
@@ -64,6 +64,7 @@ system = QuantumSystem(
 options = Options(
     max_iter = iter,
     max_cpu_time = 30000.0,
+    tol = 1e-6
 )
 
 
@@ -80,7 +81,7 @@ cons = AbstractConstraint[u_bounds]
 
 experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * "phase_$(phase)"
 
-plot_dir = "plots/multimode/fixed_time/no_guess"
+plot_dir = "plots/multimode/fermium"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
 
