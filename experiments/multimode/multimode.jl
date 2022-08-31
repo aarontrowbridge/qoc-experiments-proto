@@ -56,8 +56,8 @@ system = QuantumSystem(
 T                = 300
 Δt               = 1.5
 R                = 1.0
-iter             = 100
-resolves         = 20
+iter             = 10_000
+resolves         = 10
 pin_first_qstate = true
 phase_flip       = false
 
