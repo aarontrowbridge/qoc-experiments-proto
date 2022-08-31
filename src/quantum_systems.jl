@@ -3,6 +3,7 @@ module QuantumSystems
 export AbstractQuantumSystem
 
 export QuantumSystem
+export MultiModeSystem
 export TransmonSystem
 
 using ..QuantumLogic
@@ -126,6 +127,140 @@ struct TransmonSystem <: AbstractQuantumSystem
     ψ̃goal::Vector{Float64}
     ∫a::Bool
 end
+
+
+struct MultiModeSystem <: AbstractQuantumSystem
+    n_wfn_states::Int
+    n_aug_states::Int
+    nstates::Int
+    nqstates::Int
+    isodim::Int
+    augdim::Int
+    vardim::Int
+    ncontrols::Int
+    control_order::Int
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
+    control_bounds::Vector{Float64}
+    ψ̃init::Vector{Float64}
+    ψ̃goal::Vector{Float64}
+    ∫a::Bool
+end
+
+function MultiModeSystem(
+    transmon_levels::Int,
+    cavity_levels::Int,
+    ψ1::String, # e.g. "g0" or "e3" or "eN"
+    ψf::String, # e.g. "g1" or "e4" or "eN";
+    χ=2π * -0.5459e-3,
+    κ=2π * 4e-6,
+    transmon_control_bound=2π * 0.018,
+    cavity_control_bound=0.03,
+    n_cavities=1, # TODO: add functionality for multiple cavities
+    control_order=2,
+    goal_phase=0.0,
+    ∫a=false
+)
+    @assert length(ψ1) == length(ψf) == 2
+    @assert ψ1[1] in ['g', 'e'] && ψf[1] in ['g', 'e']
+    @assert parse(Int, ψ1[2]) in 0:cavity_levels-2
+    @assert parse(Int, ψf[2]) in 0:cavity_levels-2
+
+    transmon_e = [1; zeros(transmon_levels - 1)]
+    transmon_g = [zeros(transmon_levels - 1); 1]
+
+    ψinit = kron(
+        ψ1[1] == 'g' ? transmon_g : transmon_e,
+        cavity_state(parse(Int, ψ1[2]), cavity_levels)
+    )
+
+    ψgoal = kron(
+        ψf[1] == 'g' ? transmon_g : transmon_e,
+        cavity_state(parse(Int, ψf[2]), cavity_levels)
+    )
+
+    ψgoal *= exp(im * goal_phase)
+
+    H_drift = 2χ * kron(
+        create(transmon_levels) + annihilate(transmon_levels),
+        I(cavity_levels)
+    ) + κ / 2 * kron(
+        I(transmon_levels),
+        quad(cavity_levels)
+    )
+
+    H_drive_transmon_R = kron(
+        create(transmon_levels) + annihilate(transmon_levels),
+        I(cavity_levels)
+    )
+
+    H_drive_transmon_I = kron(
+        im * (create(transmon_levels) -
+            annihilate(transmon_levels)),
+        I(cavity_levels)
+    )
+
+    H_drive_cavity_R = kron(
+        I(transmon_levels),
+        create(cavity_levels) + annihilate(cavity_levels)
+    )
+
+    H_drive_cavity_I = kron(
+        I(transmon_levels),
+        im * (create(cavity_levels) -
+            annihilate(cavity_levels))
+    )
+
+    H_drives = [
+        H_drive_transmon_R,
+        H_drive_transmon_I,
+        H_drive_cavity_R,
+        H_drive_cavity_I
+    ]
+
+    control_bounds = [
+        fill(transmon_control_bound, 2);
+        fill(cavity_control_bound, 2 * n_cavities)
+    ]
+
+    G_drift = G(H_drift)
+    G_drives = G.(H_drives)
+
+    ψ̃init = ket_to_iso(ψinit)
+    ψ̃goal = ket_to_iso(ψgoal)
+
+    isodim = length(ψ̃init)
+    augdim = control_order + ∫a
+
+    nqstates = 1
+    ncontrols = length(G_drives)
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+
+    return MultiModeSystem(
+        n_wfn_states,
+        n_aug_states,
+        nstates,
+        nqstates,
+        isodim,
+        augdim,
+        vardim,
+        ncontrols,
+        control_order,
+        G_drift,
+        G_drives,
+        control_bounds,
+        ψ̃init,
+        ψ̃goal,
+        ∫a
+    )
+end
+
 
 
 

@@ -2,55 +2,17 @@ using Pico
 using LinearAlgebra
 using JLD2
 
+transmon_levels = 2
+cavity_levels = 14
 
-const EXPERIMENT_NAME = "g0_to_g1"
-# plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/rewrite/")
+ψ1 = "g0"
+ψf = "g1"
 
-const TRANSMON_LEVELS = 2
-const CAVITY_LEVELS = 14
-
-function cavity_state(level)
-    state = zeros(CAVITY_LEVELS)
-    state[level + 1] = 1.
-    return state
-end
-#const TRANSMON_ID = I(TRANSMON_LEVELS)
-
-TRANSMON_G = [1; zeros(TRANSMON_LEVELS - 1)]
-TRANSMON_E = [zeros(1); 1; zeros(TRANSMON_LEVELS - 2)]
-
-
-CHI = 2π * -0.5469e-3
-KAPPA = 2π * 4e-6
-
-H_drift = 2 * CHI * kron(TRANSMON_E*TRANSMON_E', number(CAVITY_LEVELS)) +
-          (KAPPA/2) * kron(I(TRANSMON_LEVELS), quad(CAVITY_LEVELS))
-
-transmon_driveR = kron(create(TRANSMON_LEVELS) + annihilate(TRANSMON_LEVELS), I(CAVITY_LEVELS))
-transmon_driveI = kron(1im*(create(TRANSMON_LEVELS) - annihilate(TRANSMON_LEVELS)), I(CAVITY_LEVELS))
-
-cavity_driveR = kron(I(TRANSMON_LEVELS), create(CAVITY_LEVELS) + annihilate(CAVITY_LEVELS))
-cavity_driveI = kron(I(TRANSMON_LEVELS),  1im * (create(CAVITY_LEVELS) - annihilate(CAVITY_LEVELS)))
-
-H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
-
-ψ1 = kron(TRANSMON_G, cavity_state(0))
-ψf = kron(TRANSMON_G, cavity_state(1))
-
-# bounds on controls
-
-qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
-
-cavity_a_bounds = fill(0.03, length(H_drives) - 2)
-
-a_bounds = [qubit_a_bounds; cavity_a_bounds]
-
-system = QuantumSystem(
-    H_drift,
-    H_drives,
+system = MultiModeSystem(
+    transmon_levels,
+    cavity_levels,
     ψ1,
     ψf,
-    a_bounds
 )
 
 T                = 300
@@ -69,7 +31,6 @@ phase_flip       = false
 # pin_first_qstate = parse(Bool,    ARGS[6])
 # phase_flip       = parse(Bool,    ARGS[7])
 
-
 options = Options(
     max_iter = iter,
     max_cpu_time = 100000.0,
@@ -83,17 +44,9 @@ u_bounds = BoundsConstraint(
     system.vardim
 )
 
-energy_con = EqualityConstraint(
-    2:T-1,
-    [CAVITY_LEVELS, 2 * CAVITY_LEVELS, 3 * CAVITY_LEVELS, 4 * CAVITY_LEVELS],
-    0.0,
-    system.vardim;
-    name="highest energy level constraints"
-)
+cons = AbstractConstraint[u_bounds]
 
-cons = AbstractConstraint[u_bounds, energy_con]
-
-experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * "_mode_constrained"
+experiment = "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * "_mode_constrained"
 
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"

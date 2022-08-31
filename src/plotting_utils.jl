@@ -259,7 +259,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
 end
 
 function plot_multimode(
-    system::QuantumSystem,
+    system::AbstractQuantumSystem,
     traj::Trajectory,
     path::String;
     components=nothing,

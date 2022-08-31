@@ -15,7 +15,9 @@ using Symbolics
 # objective functions
 #
 
-struct QuantumObjective
+abstract type AbstractObjective end
+
+struct QuantumObjective <: AbstractObjective
     L::Function
     ∇L::Function
     ∇²L::Union{Function, Nothing}
@@ -111,6 +113,22 @@ function QuantumObjective(
 
     return QuantumObjective(L, ∇L, ∇²L, ∇²L_structure)
 end
+
+abstract type AbstractRegularizer end
+
+struct MultiModeRegularizer <: AbstractRegularizer
+    L::Function
+    ∇L::Function
+    ∇²L::Union{Function, Nothing}
+    ∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
+end
+
+function MultiModeRegularizer(
+
+)
+end
+
+
 
 
 #
