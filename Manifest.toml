@@ -592,15 +592,9 @@ version = "1.1.2"
 
 [[deps.FunctionWrappersWrappers]]
 deps = ["FunctionWrappers"]
-<<<<<<< HEAD
-git-tree-sha1 = "2da4f223fbc4328b389bcce5f3e93dbe71678590"
-uuid = "77dc65aa-8811-40c2-897b-53d922fa7daf"
-version = "0.1.0"
-=======
 git-tree-sha1 = "a5e6e7f12607e90d71b09e6ce2c965e41b337968"
 uuid = "77dc65aa-8811-40c2-897b-53d922fa7daf"
 version = "0.1.1"
->>>>>>> origin
 
 [[deps.Future]]
 deps = ["Random"]
