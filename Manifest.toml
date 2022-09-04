@@ -12,15 +12,9 @@ version = "0.1.3+0"
 
 [[deps.AbstractAlgebra]]
 deps = ["GroupsCore", "InteractiveUtils", "LinearAlgebra", "MacroTools", "Markdown", "Random", "RandomExtensions", "SparseArrays", "Test"]
-<<<<<<< HEAD
-git-tree-sha1 = "4a502c003026ecdcac4b100cfc1d14f63eccede7"
-uuid = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
-version = "0.27.3"
-=======
 git-tree-sha1 = "ba2beb5f2a3170a0ef87953daefd97135cf46ecd"
 uuid = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 version = "0.27.4"
->>>>>>> origin
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
