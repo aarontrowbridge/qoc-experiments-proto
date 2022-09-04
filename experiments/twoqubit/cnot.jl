@@ -1,7 +1,7 @@
-using QubitControl
+using Pico
 using LinearAlgebra
 
-iter = 5000
+iter = 100
 
 const EXPERIMENT_NAME = "CNOT"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/twoqubit/cnot/")
@@ -29,19 +29,19 @@ J = 0.1 * 2π
 # [0.0, 1/sqrt(2) + 0im, 0, 1/sqrt(2)]
 # ]
 
-    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) -
     #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
     #            gcouple*kron(GATES[:Z], GATES[:Z])
-    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) + 
+    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) +
     #            J*(kron(GATES[:Z], GATES[:Z]))
     # H_drift = J*kron(GATES[:Z], GATES[:Z])
 H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z]
 
 H_drive = [kron(create(2), annihilate(2)) + kron(annihilate(2), create(2)),
            1im*(kron(create(2), annihilate(2)) - kron(annihilate(2), create(2))),
-           kron(create(2) + annihilate(2), I(2)), 
+           kron(create(2) + annihilate(2), I(2)),
            kron(I(2), create(2) + annihilate(2))]
-            
+
 #H_drive = [kron(create(2) + annihilate(2), I(2)), kron(I(2), create(2) + annihilate(2)), kron(I(2), number(2))]
 
 control_bounds = [2π * 0.5 for x in 1:length(H_drive)]
@@ -49,16 +49,16 @@ control_bounds = [2π * 0.5 for x in 1:length(H_drive)]
 system = QuantumSystem(
     H_drift,
     H_drive,
-    ψ1 = ψ1,
-    ψf = ψf,
-    control_bounds = control_bounds
+    ψ1,
+    ψf,
+    control_bounds
 )
 
 T = 100
 Δt = 0.1
 Q = 200.
 R = 0.01
-cost = infidelity_cost
+cost = :infidelity_cost
 eval_hess = true
 pinqstate = false
 
@@ -69,8 +69,8 @@ options = Options(
 )
 
 prob = QuantumControlProblem(
-    system,
-    T;
+    system;
+    T=T,
     Δt = Δt,
     Q = Q,
     R = R,
@@ -94,8 +94,8 @@ plot_twoqubit(
 
 #infidelity = iso_infidelity(final_statei(prob.trajectory, system, i = 4), ket_to_iso(ψf[4]))
 for j in 1:4
-    display(final_statei(prob.trajectory, system, i = j))
-    infidelity = iso_infidelity(final_statei(prob.trajectory, system, i = j), ket_to_iso(ψf[j]))
+    display(final_state_i(prob.trajectory, system, i = j))
+    infidelity = iso_infidelity(final_state_i(prob.trajectory, system, i = j), ket_to_iso(ψf[j]))
     println("Infidelity = $infidelity" )
 end
 #display(final_statei(prob.trajectory, system, i = 3))

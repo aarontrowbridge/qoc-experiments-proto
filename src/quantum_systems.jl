@@ -2,10 +2,12 @@ module QuantumSystems
 
 export AbstractQuantumSystem
 
-export QuantumSystem 
+export QuantumSystem
 export TransmonSystem
 
 using ..QuantumLogic
+
+using HDF5
 
 using LinearAlgebra
 
@@ -14,10 +16,11 @@ Im2 = [
     1  0
 ]
 
-
 G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
 abstract type AbstractQuantumSystem end
+
+# TODO: make subtypes: SingleQubitSystem, TwoQubitSystem, TransmonSystem, MultimodeSystem, etc.
 
 struct QuantumSystem <: AbstractQuantumSystem
     n_wfn_states::Int
@@ -32,83 +35,39 @@ struct QuantumSystem <: AbstractQuantumSystem
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
     control_bounds::Vector{Float64}
-    ψ̃1::Vector{Float64}
+    ψ̃init::Vector{Float64}
     ψ̃goal::Vector{Float64}
     ∫a::Bool
 end
 
-function QuantumSystem(
-    hf_path::String;
-    return_data=false,
-    kwargs...
-)
-    h5open(hf_path, "r") do hf
 
-        H_drift = hf["H_drift"][:, :]
-
-        H_drives = [
-            copy(transpose(hf["H_drives"][:, :, i]))
-                for i = 1:size(hf["H_drives"], 3)
-        ]
-
-        ψ1 = vcat(transpose(hf["psi1"][:, :])...)
-        ψf = vcat(transpose(hf["psif"][:, :])...)
-
-        system = QuantumSystem(
-            H_drift,
-            H_drives,
-            ψ1 = ψ1,
-            ψf = ψf,
-            kwargs...
-        )
-
-        if return_data
-
-            data = Dict()
-
-            controls = copy(transpose(hf["controls"][:, :]))
-            data["controls"] = controls
-
-            ts = hf["tlist"][:]
-            data["T"] = length(ts)
-            data["Δt"] = ts[2] - ts[1]
-
-            return system, data
-        else
-            return system
-        end
-    end
-end
-
+# TODO: move ψinit and ψgoal into prob def
 
 function QuantumSystem(
     H_drift::Matrix,
-    H_drive::Union{Matrix{T}, Vector{Matrix{T}}};
-    ψ1::Union{Vector{C1}, Vector{Vector{C1}}},
-    ψf::Union{Vector{C2}, Vector{Vector{C2}}},
-    control_bounds::Vector{Float64},
+    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
+    ψinit::Union{Vector{C1}, Vector{Vector{C1}}},
+    ψgoal::Union{Vector{C2}, Vector{Vector{C2}}},
+    control_bounds::Vector{Float64};
+    ∫a=false,
     control_order=2,
-    ∫a = false,
-    phase = nothing
+    goal_phase=0.0
 ) where {C1 <: Number, C2 <: Number, T <: Number}
 
-    if !isnothing(phase)
-        @assert isa(phase, Float64)
-        ψf = exp(1im * phase) * ψf
-    end
-
-    if isa(ψ1, Vector{C1})
+    if isa(ψinit, Vector{C1})
         nqstates = 1
-        isodim = 2 * length(ψ1)
-        ψ̃1 = ket_to_iso(ψ1)
-        ψ̃goal = ket_to_iso(ψf)
+        isodim = 2 * length(ψinit)
+        ψ̃init = ket_to_iso(ψinit)
+        ψgoal *= exp(im * goal_phase)
+        ψ̃goal = ket_to_iso(ψgoal)
     else
-        @assert isa(ψf, Vector{Vector{C2}})
-        nqstates = length(ψ1)
-        @assert length(ψf) == nqstates
-        isodim = 2 * length(ψ1[1])
-        ψ̃1 = vcat(ket_to_iso.(ψ1)...)
-        ψ̃goal = vcat(ket_to_iso.(ψf)...)
+        @assert isa(ψgoal, Vector{Vector{C2}})
+        nqstates = length(ψinit)
+        @assert length(ψgoal) == nqstates
+        isodim = 2 * length(ψinit[1])
+        ψ̃init = vcat(ket_to_iso.(ψinit)...)
+        ψgoal[1] *= exp(im * goal_phase)
+        ψ̃goal = vcat(ket_to_iso.(ψgoal)...)
     end
 
     G_drift = G(H_drift)
@@ -145,7 +104,7 @@ function QuantumSystem(
         G_drift,
         G_drive,
         control_bounds,
-        ψ̃1,
+        ψ̃init,
         ψ̃goal,
         ∫a
     )
@@ -163,9 +122,62 @@ struct TransmonSystem <: AbstractQuantumSystem
     control_order::Int
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
-    ψ̃1::Vector{Float64}
+    ψ̃init::Vector{Float64}
     ψ̃goal::Vector{Float64}
     ∫a::Bool
+end
+
+
+
+
+
+
+
+
+
+
+function QuantumSystem(
+    hf_path::String;
+    return_data=false,
+    kwargs...
+)
+    h5open(hf_path, "r") do hf
+
+        H_drift = hf["H_drift"][:, :]
+
+        H_drives = [
+            copy(transpose(hf["H_drives"][:, :, i]))
+                for i = 1:size(hf["H_drives"], 3)
+        ]
+
+        ψinit = vcat(transpose(hf["psi1"][:, :])...)
+        ψgoal = vcat(transpose(hf["psif"][:, :])...)
+
+
+        qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
+        cavity_a_bounds = fill(0.03, length(H_drives) - 2)
+        a_bounds = [qubit_a_bounds; cavity_a_bounds]
+
+        system = QuantumSystem(
+            H_drift,
+            H_drives,
+            ψinit,
+            ψgoal,
+            a_bounds,
+            kwargs...
+        )
+
+        if return_data
+            data = Dict()
+            controls = copy(transpose(hf["controls"][:, :]))
+            data["controls"] = controls
+            Δt = hf["tlist"][2] - hf["tlist"][1]
+            data["Δt"] = Δt
+            return system, data
+        else
+            return system
+        end
+    end
 end
 
 end

@@ -1,7 +1,7 @@
 # Fdb version 3
-["pdflatex"] 1659473430 "/Users/aaron/work/RExLab/QubitControl.jl/notes/notes.tex" "/Users/aaron/work/RExLab/QubitControl.jl/notes/notes.pdf" "notes" 1659473431
-  "/Users/aaron/work/RExLab/QubitControl.jl/notes/notes.aux" 1659473431 1610 65c981d6aba4f1c37308f7f38f264ace ""
-  "/Users/aaron/work/RExLab/QubitControl.jl/notes/notes.tex" 1659473430 12840 c94978ca992cfbd29f2072ab4ff79d75 ""
+["pdflatex"] 1659473430 "/Users/aaron/work/RExLab/Pico.jl/notes/notes.tex" "/Users/aaron/work/RExLab/Pico.jl/notes/notes.pdf" "notes" 1659473431
+  "/Users/aaron/work/RExLab/Pico.jl/notes/notes.aux" 1659473431 1610 65c981d6aba4f1c37308f7f38f264ace ""
+  "/Users/aaron/work/RExLab/Pico.jl/notes/notes.tex" 1659473430 12840 c94978ca992cfbd29f2072ab4ff79d75 ""
   "/dev/null" 1659473431 0 d41d8cd98f00b204e9800998ecf8427e ""
   "/usr/local/texlive/2019/texmf-dist/fonts/map/fontname/texfonts.map" 1511824771 3332 103109f5612ad95229751940c61aada0 ""
   "/usr/local/texlive/2019/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy5.tfm" 1246382020 1120 1e8878807317373affa7f7bba4cf2f6a ""
@@ -99,8 +99,8 @@
   (generated)
   "notes.out"
   "notes.pdf"
-  "/Users/aaron/work/RExLab/QubitControl.jl/notes/notes.pdf"
+  "/Users/aaron/work/RExLab/Pico.jl/notes/notes.pdf"
   "notes.aux"
   "notes.toc"
   "notes.log"
-  "/Users/aaron/work/RExLab/QubitControl.jl/notes/notes.log"
+  "/Users/aaron/work/RExLab/Pico.jl/notes/notes.log"

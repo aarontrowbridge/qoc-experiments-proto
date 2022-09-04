@@ -1,4 +1,4 @@
-using QubitControl
+using Pico
 using Test
 
 using ForwardDiff
@@ -23,10 +23,10 @@ J = 0.1 * 2π
 ψf = apply.(:sqrtiSWAP, ψ1)
 
 
-    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) - 
+    # H_drift = -(ω1/2 + gcouple)*kron(GATES[:Z], I(2)) -
     #            (ω2/2 + gcouple)*kron(I(2), GATES[:Z]) +
     #            gcouple*kron(GATES[:Z], GATES[:Z])
-    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) + 
+    # H_drift = ω1*kron(number(2), I(2)) + ω2*kron(I(2), number(2)) +
     #            J*(kron(GATES[:Z], GATES[:Z]))
     # H_drift = J*kron(GATES[:Z], GATES[:Z])
 H_drift = zeros(4,4) #ω1/2 * kron(GATES[:Z], I(2)) + ω2/2 * kron(I(2), GATES[:Z]
@@ -111,7 +111,7 @@ Z = 2 * rand(system.vardim * T) .- 1
 
 # setting up objective struct
 
-obj = SystemObjective(
+obj = QuantumObjective(
     system,
     cost_fn,
     T,
@@ -178,7 +178,7 @@ for integrator in integrators
 
     # setting up dynamics struct
 
-    dyns = SystemDynamics(
+    dyns = QuantumDynamics(
         system,
         integrator,
         T,

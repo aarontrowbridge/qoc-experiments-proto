@@ -17,15 +17,15 @@ import Ipopt
 abstract type AbstractPICOEvaluator <: MOI.AbstractNLPEvaluator end
 
 struct QuantumEvaluator <: AbstractPICOEvaluator
-    dynamics::SystemDynamics
-    objective::SystemObjective
+    dynamics::QuantumDynamics
+    objective::QuantumObjective
     eval_hessian::Bool
 end
 
 function QuantumEvaluator(
     system::AbstractQuantumSystem,
     integrator::Symbol,
-    cost_fn::Function,
+    cost_fn::Symbol,
     eval_hessian::Bool,
     T::Int,
     Δt::Float64,
@@ -33,7 +33,7 @@ function QuantumEvaluator(
     R::Float64
 )
 
-    dynamics = SystemDynamics(
+    dynamics = QuantumDynamics(
         system,
         integrator,
         T,
@@ -41,7 +41,7 @@ function QuantumEvaluator(
         eval_hessian
     )
 
-    objective = SystemObjective(
+    objective = QuantumObjective(
         system,
         cost_fn,
         T,
@@ -58,7 +58,7 @@ function QuantumEvaluator(
 end
 
 struct MinTimeEvaluator <: AbstractPICOEvaluator
-    dynamics::SystemDynamics
+    dynamics::QuantumDynamics
     objective::MinTimeObjective
     eval_hessian::Bool
 end
@@ -72,7 +72,7 @@ function MinTimeEvaluator(
     eval_hessian::Bool
 )
 
-    dynamics = MinTimeSystemDynamics(
+    dynamics = MinTimeQuantumDynamics(
         system,
         integrator,
         T,

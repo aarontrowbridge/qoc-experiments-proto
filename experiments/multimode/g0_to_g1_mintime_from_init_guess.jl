@@ -1,5 +1,5 @@
 WDIR = joinpath(@__DIR__, "../../")
-using QubitControl
+using Pico
 using HDF5
 
 hf_path = "notebooks/g0_to_g1_multimode_system_data.h5"
