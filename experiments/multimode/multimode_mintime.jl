@@ -19,7 +19,7 @@ iter = 10000
 
 resolves = 10
 
-prob = QuantumMinTimeProblem(
+prob = MinTimeQuantumControlProblem(
     subprob_data;
     Rᵤ=Rᵤ,
     Rₛ=Rₛ,
@@ -89,7 +89,7 @@ for i = 1:resolves
 
     prob_data = load_data(save_path)
 
-    global prob = QuantumMinTimeProblem(
+    global prob = MinTimeQuantumControlProblem(
         prob_data;
         Rᵤ=Rᵤ,
         Rₛ=Rₛ,

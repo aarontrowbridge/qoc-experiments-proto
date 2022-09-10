@@ -1,5 +1,6 @@
 module Dynamics
 
+export AbstractDynamics
 export QuantumDynamics
 export MinTimeQuantumDynamics
 
@@ -16,7 +17,7 @@ using SparseArrays
 #
 
 @views function dynamics(
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     integrator::AbstractQuantumIntegrator,
     xₜ₊₁::AbstractVector,
     xₜ::AbstractVector,
@@ -45,7 +46,9 @@ using SparseArrays
     return [δψ̃s; δaugs]
 end
 
-struct QuantumDynamics
+abstract type AbstractDynamics end
+
+struct QuantumDynamics <: AbstractDynamics
     F::Function
     ∇F::Function
     ∇F_structure::Vector{Tuple{Int, Int}}
@@ -54,11 +57,11 @@ struct QuantumDynamics
 end
 
 function QuantumDynamics(
-    sys::AbstractQuantumSystem,
+    sys::QuantumSystem,
     integrator::Symbol,
     T::Int,
-    Δt::Float64,
-    eval_hessian::Bool
+    Δt::Float64;
+    eval_hessian=true
 )
     sys_integrator = eval(integrator)(sys)
 
@@ -526,13 +529,11 @@ end
 #
 #
 
-# TODO: reimplement
-
 function MinTimeQuantumDynamics(
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     integrator::Symbol,
-    T::Int,
-    eval_hessian::Bool
+    T::Int;
+    eval_hessian=true
 )
 
     sys_integrator = eval(integrator)(sys)
@@ -591,7 +592,7 @@ function MinTimeQuantumDynamics(
             for k = 1:sys.isodim # kth row of ψ̃ⁱᵏₜ
                 kj = (
                     index(i, k, sys.isodim),
-                    sys.n_wfn_states + sys.∫a*sys.ncontrols + j
+                    sys.n_wfn_states + sys.∫a * sys.ncontrols + j
                 )
                 push!(∇ₜf_structure, kj)
             end
@@ -793,8 +794,6 @@ function MinTimeQuantumDynamics(
                                 # jth column
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                #index(2, j, sys.ncontrols)
                                 index(1 + sys.∫a, j, sys.ncontrols)
                             )
                             push!(μ∇²F_structure, kⁱjₜ)
@@ -810,8 +809,6 @@ function MinTimeQuantumDynamics(
                                 # kth row
                                 index(t, 0, sys.vardim) +
                                 sys.n_wfn_states +
-                                # FIXME: assumes ∫a exists here
-                                # index(2, k, sys.ncontrols),
                                 index(1 + sys.∫a, k, sys.ncontrols),
 
                                 # jⁱth column

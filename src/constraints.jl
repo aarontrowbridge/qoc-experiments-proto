@@ -4,6 +4,8 @@ export problem_constraints
 export constrain!
 
 export AbstractConstraint
+
+export L1SlackConstraint
 export EqualityConstraint
 export BoundsConstraint
 export TimeStepBoundsConstraint
@@ -219,9 +221,56 @@ function (con::TimeStepBoundsConstraint)(
     end
 end
 
+struct L1SlackConstraint <: AbstractConstraint
+    s1_indices::AbstractArray{Int}
+    s2_indices::AbstractArray{Int}
+    x_indices::AbstractArray{Int}
+    name::String
+
+    function L1SlackConstraint(
+        s1_indices::AbstractArray{Int},
+        s2_indices::AbstractArray{Int},
+        x_indices::AbstractArray{Int};
+        name="unmamed L1 slack constraint"
+    )
+        @assert length(s1_indices) == length(s2_indices) == length(x_indices)
+        return new(s1_indices, s2_indices, x_indices, name)
+    end
+end
+
+function (con::L1SlackConstraint)(
+    opt::Ipopt.Optimizer,
+    vars::Vector{MOI.VariableIndex}
+)
+    for (s1, s2, x) in zip(
+        con.s1_indices,
+        con.s2_indices,
+        con.x_indices
+    )
+        MOI.add_constraints(
+            opt,
+            vars[s1],
+            MOI.GreaterThan(0.0)
+        )
+        MOI.add_constraints(
+            opt,
+            vars[s2],
+            MOI.GreaterThan(0.0)
+        )
+        t1 = MOI.ScalarAffineTerm(1.0, vars[s1])
+        t2 = MOI.ScalarAffineTerm(-1.0, vars[s2])
+        t3 = MOI.ScalarAffineTerm(-1.0, vars[x])
+        MOI.add_constraints(
+            opt,
+            MOI.ScalarAffineFunction([t1, t2, t3], 0.0),
+            MOI.EqualTo(0.0)
+        )
+    end
+end
+
 
 function problem_constraints(
-    system::AbstractQuantumSystem,
+    system::AbstractSystem,
     T::Int;
     pin_first_qstate=false
 )

@@ -36,7 +36,7 @@ struct QuantumCost
     isodim::Int
 
     function QuantumCost(
-        sys::AbstractQuantumSystem,
+        sys::AbstractSystem,
         cost::Symbol = :infidelity_cost
     )
         if cost == :energy_cost
