@@ -1,7 +1,13 @@
 module Objectives
 
+export Objective
+
 export QuantumObjective
 export MinTimeObjective
+
+export QuadraticRegularizer
+export QuadraticSmoothnessRegularizer
+export L1SlackRegularizer
 
 using ..Utils
 using ..QuantumSystems
@@ -17,377 +23,364 @@ using Symbolics
 
 abstract type AbstractObjective end
 
-struct QuantumObjective <: AbstractObjective
-    L::Function
-    ∇L::Function
-    ∇²L::Union{Function, Nothing}
-    ∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
+struct Objective <: AbstractObjective
+	L::Function
+	∇L::Function
+	∇²L::Union{Function, Nothing}
+	∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
+    terms::Vector{Dict}
 end
 
-function QuantumObjective(
-    system::AbstractQuantumSystem,
-    cost_fn::Symbol,
-    T::Int,
-    Q::Float64,
-    R::Float64,
-    eval_hessian::Bool
+function Base.:+(obj1::Objective, obj2::Objective)
+	L = Z -> obj1.L(Z) + obj2.L(Z)
+	∇L = Z -> obj1.∇L(Z) + obj2.∇L(Z)
+	if isnothing(obj1.∇²L) && isnothing(obj2.∇²L)
+		∇²L = Nothing
+		∇²L_structure = Nothing
+	elseif isnothing(obj1.∇²L)
+		∇²L = Z -> obj2.∇²L(Z)
+		∇²L_structure = obj2.∇²L_structure
+	elseif isnothing(obj2.∇²L)
+		∇²L = Z -> obj1.∇²L(Z)
+		∇²L_structure = obj1.∇²L_structure
+	else
+		∇²L = Z -> vcat(obj1.∇²L(Z), obj2.∇²L(Z))
+		∇²L_structure = vcat(
+			obj1.∇²L_structure,
+			obj2.∇²L_structure
+		)
+	end
+    terms = vcat(obj1.terms, obj2.terms)
+	return Objective(L, ∇L, ∇²L, ∇²L_structure, terms)
+end
+
+Base.:+(obj::Objective, ::Nothing) = obj
+
+function Objective(terms::Vector{Dict})
+    return +(Objective.(terms)...)
+end
+
+function Objective(term::Dict)
+    return eval(term[:type])(; delete!(term, :type)...)
+end
+
+function QuantumObjective(;
+	system::QuantumSystem=nothing,
+	cost_fn=infidelity_cost,
+	T=nothing,
+	Q=100.0,
+	eval_hessian=true
 )
-    cost = QuantumCost(system, cost_fn)
+    @assert !isnothing(system) "system must be specified"
+    @assert !isnothing(T) "T must be specified"
 
-    @views function L(Z::AbstractVector{F}) where F
-        ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
-        obj = 0.0
-        for t = 1:T-1
-            uₜ = Z[slice(
-                t,
-                system.nstates + 1,
-                system.vardim,
-                system.vardim
-            )]
-            obj += R / 2 * sum(uₜ.^2)
-        end
-        return Q * cost(ψ̃T) + obj
-    end
-
-    ∇c = QuantumCostGradient(cost)
-
-    @views function ∇L(Z::AbstractVector{F}) where F
-        ∇ = zeros(F, system.vardim * T)
-
-        for t = 1:T-1
-            uₜ_slice = slice(
-                t,
-                system.nstates + 1,
-                system.vardim,
-                system.vardim
-            )
-            uₜ = Z[uₜ_slice]
-            ∇[uₜ_slice] = R * uₜ
-        end
-
-        ψ̃T_slice = slice(T, system.n_wfn_states, system.vardim)
-        ψ̃T = Z[ψ̃T_slice]
-        ∇[ψ̃T_slice] = Q * ∇c(ψ̃T)
-
-        return ∇
-    end
-
-    ∇²L = nothing
-    ∇²L_structure = nothing
-
-    if eval_hessian
-        ∇²c = QuantumCostHessian(cost)
-
-        ∇²L_structure = []
-
-        # uₜ Hessian structure (eq. 17)
-        for t = 1:T-1
-            uₜ_slice = slice(
-                t,
-                system.nstates + 1,
-                system.vardim,
-                system.vardim
-            )
-            append!(
-                ∇²L_structure,
-                collect(zip(uₜ_slice, uₜ_slice))
-            )
-        end
-
-        # ℓⁱs Hessian structure (eq. 17)
-        append!(
-            ∇²L_structure,
-            structure(∇²c, T, system.vardim)
-        )
-
-        ∇²L = Z::AbstractVector -> begin
-            Hs = fill(R, system.ncontrols * (T - 1))
-            ψ̃T = view(
-                Z,
-                slice(T, system.n_wfn_states, system.vardim)
-            )
-            append!(Hs, Q * ∇²c(ψ̃T))
-            return Hs
-        end
-    end
-
-    return QuantumObjective(L, ∇L, ∇²L, ∇²L_structure)
-end
-
-abstract type AbstractRegularizer end
-
-struct MultiModeRegularizer <: AbstractRegularizer
-    L::Function
-    ∇L::Function
-    ∇²L::Union{Function, Nothing}
-    ∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
-end
-
-function MultiModeRegularizer(
-
-)
-end
-
-
-
-
-#
-# min time objective hessian
-#
-
-struct MinTimeObjective
-    L::Function
-    ∇L::Function
-    ∇²L::Union{Function, Nothing}
-    ∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
-end
-
-function MinTimeObjective(
-    sys::AbstractQuantumSystem,
-    T::Int,
-    Rᵤ::Float64,
-    Rₛ::Float64,
-    eval_hessian::Bool
-)
-
-    total_time(Z::AbstractVector) =
-        sum(Z[(end - (T - 1) + 1):end])
-
-    @views function u_smoothness_regulator(Z::AbstractVector)
-        ∑Δu² = 0.0
-
-        for t = 1:T-2
-
-            uₜ₊₁ = Z[
-                slice(
-                    t + 1,
-                    sys.nstates + 1,
-                    sys.vardim,
-                    sys.vardim
-                )
-            ]
-
-            uₜ = Z[
-                slice(
-                    t,
-                    sys.nstates + 1,
-                    sys.vardim,
-                    sys.vardim
-                )
-            ]
-
-            Δu = uₜ₊₁ - uₜ
-
-            ∑Δu² += dot(Δu, Δu)
-        end
-
-        return 0.5 * Rₛ * ∑Δu²
-    end
-
-    @views function u_amplitude_regulator(Z::AbstractVector)
-        ∑u² = 0.0
-        for t = 1:T-1
-            uₜ = Z[
-                slice(
-                    t,
-                    sys.nstates + 1,
-                    sys.vardim,
-                    sys.vardim
-                )
-            ]
-            ∑u² += dot(uₜ, uₜ)
-        end
-        return 0.5 * Rᵤ * ∑u²
-    end
-
-    L = z -> +(
-        total_time(z),
-        u_smoothness_regulator(z),
-        u_amplitude_regulator(z)
+    params = Dict(
+        :type => :QuantumObjective,
+        :system => system,
+        :cost_fn => cost_fn,
+        :T => T,
+        :Q => Q,
+        :eval_hessian => eval_hessian
     )
 
+	cost = QuantumCost(system, cost_fn)
 
-    #
-    # gradient of min time objective
-    #
+	@views function L(Z::AbstractVector{F}) where F
+		ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
+		return Q * cost(ψ̃T)
+	end
 
-    ∇L = (Z::AbstractVector) -> begin
+	∇c = QuantumCostGradient(cost)
 
-        ∇ = zeros(typeof(Z[1]), sys.vardim * T + T - 1)
+	@views function ∇L(Z::AbstractVector{F}) where F
+		∇ = zeros(F, length(Z))
+		ψ̃T_slice = slice(T, system.n_wfn_states, system.vardim)
+		ψ̃T = Z[ψ̃T_slice]
+		∇[ψ̃T_slice] = Q * ∇c(ψ̃T)
+		return ∇
+	end
 
-        ∇[end - (T - 1) + 1:end] .= 1.0
+	∇²L = nothing
+	∇²L_structure = nothing
 
-        # u amplitude regulator gradient
+	if eval_hessian
+		∇²c = QuantumCostHessian(cost)
 
-        for t = 1:T-1
-            uₜ_slice = slice(
-                t,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
-            ∇[uₜ_slice] = Rᵤ * Z[uₜ_slice]
-        end
+		# ℓⁱs Hessian structure (eq. 17)
+		∇²L_structure = structure(∇²c, T, system.vardim)
 
+		∇²L = Z::AbstractVector -> begin
+			ψ̃T = view(
+				Z,
+				slice(T, system.n_wfn_states, system.vardim)
+			)
+			return Q * ∇²c(ψ̃T)
+		end
+	end
 
-        # u smoothness regulator gradient
+	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+end
 
-        for t = 1:T-2
+function QuadraticRegularizer(;
+	indices::AbstractVector=nothing,
+	vardim::Int=nothing,
+	times::AbstractVector{Int}=nothing,
+	R=1.0,
+	eval_hessian=true
+)
 
-            uₜ_slice = slice(
-                t,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
+    @assert !isnothing(indices) "indices must be specified"
+    @assert !isnothing(vardim) "vardim must be specified"
+    @assert !isnothing(times) "times must be specified"
 
-            uₜ₊₁_slice = slice(
-                t + 1,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
+    params = Dict(
+        :type => :QuadraticRegularizer,
+        :indices => indices,
+        :vardim => vardim,
+        :times => times,
+        :R => R,
+        :eval_hessian => eval_hessian
+    )
 
-            uₜ₊₁ = Z[uₜ₊₁_slice]
+	@views function L(Z::AbstractVector)
+		cost = 0.0
+		for t in times
+			vₜ = Z[slice(t, indices, vardim)]
+			cost += R / 2 * sum(vₜ.^2)
+		end
+		return cost
+	end
 
-            uₜ = Z[uₜ_slice]
+	@views function ∇L(Z::AbstractVector{F}) where F
+		∇ = zeros(F, length(Z))
+		for t in times
+			vₜ_slice = slice(t, indices, vardim)
+			vₜ = Z[vₜ_slice]
+			∇[vₜ_slice] = R * vₜ
+		end
+		return ∇
+	end
 
-            Δu = uₜ₊₁ - uₜ
+	∇²L = nothing
+	∇²L_structure = nothing
 
-            ∇[uₜ_slice] += -Rₛ * Δu
+	if eval_hessian
 
-            ∇[uₜ₊₁_slice] += Rₛ * Δu
-        end
+		∇²L_structure = []
 
-        return ∇
-    end
+		# vₜ Hessian structure (eq. 17)
+		for t in times
+			vₜ_slice = slice(
+				t,
+				indices,
+				vardim
+			)
+			append!(
+				∇²L_structure,
+				collect(zip(vₜ_slice, vₜ_slice))
+			)
+		end
 
+		∇²L = Z -> fill(R, length(indices) * length(times))
+	end
 
-    #
-    # Hessian of min time objective
-    #
-
-    ∇²L = nothing
-    ∇²L_structure = nothing
-
-    if eval_hessian
-
-        ∇²L_structure = []
-
-
-        # u amplitude regulator Hessian structure
-
-        for t = 1:T-1
-
-            uₜ_slice = slice(
-                t,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
-
-            append!(
-                ∇²L_structure,
-                collect(zip(uₜ_slice, uₜ_slice))
-            )
-        end
-
-
-        # u smoothness regulator Hessian main diagonal structure
-
-        for t = 1:T-1
-
-            uₜ_slice = slice(
-                t,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
-
-            # main diagonal (2 if t ≂̸ 1 or T-1) * Rₛ I
-            # components: ∂²uₜSₜ
-            append!(
-                ∇²L_structure,
-                collect(
-                    zip(
-                        uₜ_slice,
-                        uₜ_slice
-                    )
-                )
-            )
-        end
-
-
-        # u smoothness regulator Hessian off diagonal structure
-
-        for t = 1:T-2
-
-            uₜ_slice = slice(
-                t,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
-
-            uₜ₊₁_slice = slice(
-                t + 1,
-                sys.nstates + 1,
-                sys.vardim,
-                sys.vardim
-            )
-
-
-            # off diagonal -Rₛ I components: ∂uₜ₊₁∂uₜSₜ
-
-            append!(
-                ∇²L_structure,
-                collect(
-                    zip(
-                        uₜ_slice,
-                        uₜ₊₁_slice
-                    )
-                )
-            )
-        end
-
-
-        ∇²L = Z::AbstractVector -> begin
-
-            H = []
-
-
-            # u amplitude regulator Hessian values
-
-            for t = 1:T-1
-                append!(H, Rᵤ * ones(sys.ncontrols))
-            end
-
-
-            # u smoothness regulator Hessian main diagonal values
-
-            append!(H, Rₛ * ones(sys.ncontrols))
-
-            for t = 2:T-2
-                append!(H, 2 * Rₛ * ones(sys.ncontrols))
-            end
-
-            append!(H, Rₛ * ones(sys.ncontrols))
-
-
-            # u smoothness regulator Hessian off diagonal values
-
-            for t = 1:T-2
-                append!(H, -Rₛ * ones(sys.ncontrols))
-            end
-
-            return H
-        end
-    end
-
-    return MinTimeObjective(L, ∇L, ∇²L, ∇²L_structure)
+	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
 end
 
 
+function QuadraticSmoothnessRegularizer(;
+	indices::AbstractVector=nothing,
+	vardim::Int=nothing,
+    times::AbstractVector{Int}=nothing,
+	R=1.0,
+	eval_hessian=true
+)
+    @assert !isnothing(indices) "indices must be specified"
+    @assert !isnothing(vardim) "vardim must be specified"
+    @assert !isnothing(times) "times must be specified"
+
+    params = Dict(
+        :type => :QuadraticSmoothnessRegularizer,
+        :indices => indices,
+        :vardim => vardim,
+        :times => times,
+        :R => R,
+        :eval_hessian => eval_hessian
+    )
+
+	@views function L(Z::AbstractVector)
+		∑Δv² = 0.0
+		for t in times[1:end-1]
+			vₜ₊₁ = Z[slice(t + 1, indices, vardim)]
+			vₜ = Z[slice(t, indices, vardim)]
+			Δv = vₜ₊₁ - vₜ
+			∑Δv² += dot(Δv, Δv)
+		end
+		return 0.5 * R * ∑Δv²
+	end
+
+	∇L = (Z::AbstractVector) -> begin
+
+		∇ = zeros(typeof(Z[1]), length(Z))
+
+		for t in times[1:end-1]
+
+			vₜ_slice = slice(t, indices, vardim)
+			vₜ₊₁_slice = slice(t + 1, indices, vardim)
+
+			vₜ = Z[vₜ_slice]
+			vₜ₊₁ = Z[vₜ₊₁_slice]
+
+			Δv = vₜ₊₁ - vₜ
+
+			∇[vₜ_slice] += -R * Δv
+			∇[vₜ₊₁_slice] += R * Δv
+		end
+		return ∇
+	end
+
+	if eval_hessian
+
+		∇²L_structure = []
+
+		# u smoothness regularizer Hessian main diagonal structure
+
+		for t in times
+
+			vₜ_slice = slice(t, indices, vardim)
+
+			# main diagonal (2 if t != 1 or T-1) * Rₛ I
+			# components: ∂²vₜSₜ
+
+			append!(
+				∇²L_structure,
+				collect(
+					zip(
+						vₜ_slice,
+						vₜ_slice
+					)
+				)
+			)
+		end
+
+
+		# u smoothness regularizer Hessian off diagonal structure
+
+		for t in times[1:end-1]
+
+			vₜ_slice = slice(t, indices, vardim)
+			vₜ₊₁_slice = slice(t + 1, indices, vardim)
+
+			# off diagonal -Rₛ I components: ∂vₜ₊₁∂vₜSₜ
+
+			append!(
+				∇²L_structure,
+				collect(
+					zip(
+						vₜ_slice,
+						vₜ₊₁_slice
+					)
+				)
+			)
+		end
+
+
+		∇²L = Z::AbstractVector -> begin
+
+			H = []
+
+			# u smoothness regularizer Hessian main diagonal values
+
+			append!(H, R * ones(length(indices)))
+
+			for t in times[2:end-1]
+				append!(H, 2 * R * ones(length(indices)))
+			end
+
+			append!(H, R * ones(length(indices)))
+
+
+			# u smoothness regularizer Hessian off diagonal values
+
+			for t in times[1:end-1]
+				append!(H, -R * ones(length(indices)))
+			end
+
+			return H
+		end
+	end
+
+	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+end
+
+
+function L1SlackRegularizer(;
+    s1_indices::AbstractVector{Int}=nothing,
+    s2_indices::AbstractVector{Int}=nothing,
+    α::Vector{Float64}=fill(1.0, length(s1_indices)),
+    eval_hessian=true
+)
+
+    @assert !isnothing(s1_indices) "s1_indices must be specified"
+    @assert !isnothing(s2_indices) "s2_indices must be specified"
+
+    params = Dict(
+        :type => :L1SlackRegularizer,
+        :s1_indices => s1_indices,
+        :s2_indices => s2_indices,
+        :α => α,
+        :eval_hessian => eval_hessian
+    )
+
+    L(Z) = dot(α, Z[s1_indices] + Z[s2_indices])
+
+    ∇L = Z -> begin
+        ∇ = zeros(typeof(Z[1]), length(Z))
+        ∇[s1_indices] += α
+        ∇[s2_indices] += α
+        return ∇
+    end
+
+    if eval_hessian
+        ∇²L_structure = []
+        ∇²L = Z -> []
+    else
+        ∇²L_structure = nothing
+        ∇²L = nothing
+    end
+
+    return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+end
+
+
+function MinTimeObjective(;T::Int=nothing, eval_hessian=true)
+
+    @assert !isnothing(T) "T must be specified"
+
+    params = Dict(
+        :type => :MinTimeObjective,
+        :T => T,
+        :eval_hessian => eval_hessian
+    )
+
+	L(Z::AbstractVector) = sum(Z[(end - (T - 1) + 1):end])
+
+	∇L = (Z::AbstractVector) -> begin
+		∇ = zeros(typeof(Z[1]), length(Z))
+		∇[end - (T - 1) + 1:end] .= 1.0
+		return ∇
+	end
+
+	if eval_hessian
+		∇²L = Z -> []
+		∇²L_structure = []
+	else
+		∇²L = nothing
+		∇²L_structure = nothing
+	end
+
+	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+end
 
 
 end

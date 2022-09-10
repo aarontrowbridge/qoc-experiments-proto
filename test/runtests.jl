@@ -47,7 +47,11 @@ T = 5
 @assert T > 4 "mintime objective Hessian is set up for T > 4"
 
 Q = 200.0
-R = 2.0
+R = 1.0
+Rᵤ = 1.0
+Rₛ = 1.0
+
+
 
 eval_hessian = true
 
@@ -110,136 +114,166 @@ Z = 2 * rand(system.vardim * T) .- 1
 #
 
 
-# setting up objective struct
+# definining objectives
 
-obj = QuantumObjective(
-    system,
-    cost_fn,
-    T,
-    Q,
-    R,
+quantum_obj = QuantumObjective(;
+    system=system,
+    cost_fn=cost_fn,
+    T=T,
+    Q=Q,
     eval_hessian
 )
 
-# getting analytic gradient
-
-∇L = obj.∇L(Z)
-
-
-
-# test gradient of objective with FiniteDiff
-
-# ∇L_finite_diff = FiniteDiff.finite_difference_gradient(obj.L, Z)
-
-# @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
-
-
-# test gradient of objective with ForwardDiff
-
-∇L_forward_diff = ForwardDiff.gradient(obj.L, Z)
-
-@test all(isapprox.(∇L, ∇L_forward_diff, atol=ATOL))
-
-
-# sparse objective Hessian data
-
-∇²L = dense(
-    obj.∇²L(Z),
-    obj.∇²L_structure,
-    (system.vardim * T, system.vardim * T)
+u_regularizer = QuadraticRegularizer(;
+    indices=system.nstates .+ (1:system.ncontrols),
+    vardim=system.vardim,
+    times=1:T-1,
+    R=R,
+    eval_hessian=eval_hessian
 )
 
+mintime_obj = MinTimeObjective(;
+    T=T,
+    eval_hessian=true
+)
 
+u_smoothness_regularizer = QuadraticSmoothnessRegularizer(;
+    indices=system.nstates .+ (1:system.ncontrols),
+    vardim=system.vardim,
+    times=1:T-1,
+    R=Rᵤ,
+    eval_hessian=true
+)
 
-# test hessian of objective with FiniteDiff
+@testset "objective and dynamics derivatives" begin
 
-# ∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
+@testset "testing quantum objective + regularizer" begin
 
-# show_diffs(∇²L, ∇²L_finite_diff)
-
-# @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
-
-
-# test hessian of objective with ForwardDiff
-
-∇²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
-
-@test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
-
-
-#
-# testing dynamics derivatives
-#
-
-Δt = 0.01
-
-integrators = [:SecondOrderPade, :FourthOrderPade]
-
-for integrator in integrators
-
-    # setting up dynamics struct
-
-    dyns = QuantumDynamics(
-        system,
-        integrator,
-        T,
-        Δt,
-        eval_hessian
-    )
-
-
-    # dynamics Jacobian
-
-    ∇F = dense(
-        dyns.∇F(Z),
-        dyns.∇F_structure,
-        (system.nstates * (T - 1), system.vardim * T)
-    )
+    obj = quantum_obj + u_regularizer
 
 
 
-    # test dynamics Jacobian vs finite diff
+    # getting analytic gradient
 
-    # ∇F_finite_diff =
-    #     FiniteDiff.finite_difference_jacobian(dyns.F, Z)
-
-    # @test all(isapprox.(∇F, ∇F_finite_diff, atol=ATOL))
+    ∇L = obj.∇L(Z)
 
 
-    # test dynamics Jacobian vs forward diff
 
-    ∇F_forward_diff =
-        ForwardDiff.jacobian(dyns.F, Z)
+    # test gradient of objective with FiniteDiff
 
-    @test all(isapprox.(∇F, ∇F_forward_diff, atol=ATOL))
+    # ∇L_finite_diff = FiniteDiff.finite_difference_gradient(obj.L, Z)
+
+    # @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
 
 
-    # Hessian of Lagrangian set up
+    # test gradient of objective with ForwardDiff
 
-    μ = randn(system.nstates * (T - 1))
+    ∇L_forward_diff = ForwardDiff.gradient(obj.L, Z)
 
-    μ∇²F = dense(
-        dyns.μ∇²F(Z, μ),
-        dyns.μ∇²F_structure,
+    @test all(isapprox.(∇L, ∇L_forward_diff, atol=ATOL))
+
+
+    # sparse objective Hessian data
+
+    ∇²L = dense(
+        obj.∇²L(Z),
+        obj.∇²L_structure,
         (system.vardim * T, system.vardim * T)
     )
 
-    HofL(Z) = dot(μ, dyns.F(Z))
-
-    # test dynanamics Hessian of Lagrangian vs finite diff
-
-    # HofL_finite_diff =
-    #     FiniteDiff.finite_difference_hessian(HofL, Z)
-
-    # @test all(isapprox.(μ∇²F, HofL_finite_diff, atol=ATOL))
 
 
-    # test dynamics Hessian of Lagrangian vs forward diff
+    # test hessian of objective with FiniteDiff
 
-    HofL_forward_diff =
-        ForwardDiff.hessian(HofL, Z)
+    # ∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
 
-    @test all(isapprox.(μ∇²F, HofL_forward_diff, atol=ATOL))
+    # show_diffs(∇²L, ∇²L_finite_diff)
+
+    # @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+
+
+    # test hessian of objective with ForwardDiff
+
+    ∇²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
+
+    @test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+
+
+    #
+    # testing dynamics derivatives
+    #
+
+    Δt = 0.01
+
+    integrators = [:SecondOrderPade, :FourthOrderPade]
+
+    for integrator in integrators
+
+        # setting up dynamics struct
+
+        dyns = QuantumDynamics(
+            system,
+            integrator,
+            T,
+            Δt;
+            eval_hessian=eval_hessian
+        )
+
+
+        # dynamics Jacobian
+
+        ∇F = dense(
+            dyns.∇F(Z),
+            dyns.∇F_structure,
+            (system.nstates * (T - 1), system.vardim * T)
+        )
+
+
+
+        # test dynamics Jacobian vs finite diff
+
+        # ∇F_finite_diff =
+        #     FiniteDiff.finite_difference_jacobian(dyns.F, Z)
+
+        # @test all(isapprox.(∇F, ∇F_finite_diff, atol=ATOL))
+
+
+        # test dynamics Jacobian vs forward diff
+
+        ∇F_forward_diff =
+            ForwardDiff.jacobian(dyns.F, Z)
+
+        @test all(isapprox.(∇F, ∇F_forward_diff, atol=ATOL))
+
+
+        # Hessian of Lagrangian set up
+
+        μ = randn(system.nstates * (T - 1))
+
+        μ∇²F = dense(
+            dyns.μ∇²F(Z, μ),
+            dyns.μ∇²F_structure,
+            (system.vardim * T, system.vardim * T)
+        )
+
+        HofL(Z) = dot(μ, dyns.F(Z))
+
+        # test dynanamics Hessian of Lagrangian vs finite diff
+
+        # HofL_finite_diff =
+        #     FiniteDiff.finite_difference_hessian(HofL, Z)
+
+        # @test all(isapprox.(μ∇²F, HofL_finite_diff, atol=ATOL))
+
+
+        # test dynamics Hessian of Lagrangian vs forward diff
+
+        HofL_forward_diff =
+            ForwardDiff.hessian(HofL, Z)
+
+        @test all(isapprox.(μ∇²F, HofL_forward_diff, atol=ATOL))
+    end
+
 end
 
 
@@ -247,66 +281,162 @@ end
 # test mintime objective derivatives
 #
 
-Z_mintime = 2 * rand(system.vardim * T + T - 1) .- 1
+@testset "testing mintime objective + regularizer + smoothness regularizer " begin
 
-Rᵤ = 1e-3
-Rₛ = 1e-3
+    Z_mintime = 2 * rand(system.vardim * T + T - 1) .- 1
 
-mintime_obj = MinTimeObjective(
-    system,
-    T,
-    Rᵤ,
-    Rₛ,
-    true
-)
+    obj = mintime_obj + u_regularizer + u_smoothness_regularizer
 
-# getting analytic gradient
+    # getting analytic gradient
 
-∇L = mintime_obj.∇L(Z_mintime)
+    ∇L = obj.∇L(Z_mintime)
 
 
-# test gradient of mintime objective with FiniteDiff
+    # test gradient of mintime objective with FiniteDiff
 
-# ∇L_finite_diff =
-#     FiniteDiff.finite_difference_gradient(
-#         mintime_obj.L,
-#         Z_mintime
-#     )
+    # ∇L_finite_diff =
+    #     FiniteDiff.finite_difference_gradient(
+    #         obj.L,
+    #         Z_mintime
+    #     )
 
-# @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
+    # @test all(isapprox.(∇L, ∇L_finite_diff, atol=ATOL))
 
-# test gradient of mintime objective with ForwardDiff
+    # test gradient of mintime objective with ForwardDiff
 
-∇L_forward_diff =
-    ForwardDiff.gradient(mintime_obj.L, Z_mintime)
+    ∇L_forward_diff =
+        ForwardDiff.gradient(obj.L, Z_mintime)
 
-@test all(isapprox.(∇L, ∇L_forward_diff, atol=ATOL))
-
-
-# sparse mintime objective Hessian data
-
-∇²L = dense(
-    mintime_obj.∇²L(Z_mintime),
-    mintime_obj.∇²L_structure,
-    (system.vardim * T + T - 1, system.vardim * T + T - 1)
-)
-
-# test hessian of mintime objective with FiniteDiff
-
-# ∇²L_finite_diff =
-#     FiniteDiff.finite_difference_hessian(
-#         mintime_obj.L,
-#         Z_mintime
-#     )
-
-# show_diffs(∇²L, ∇²L_finite_diff)
-
-# @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+    @test all(isapprox.(∇L, ∇L_forward_diff, atol=ATOL))
 
 
-# test hessian of mintime objective with ForwardDiff
+    # sparse mintime objective Hessian data
 
-∇²L_forward_diff =
-    ForwardDiff.hessian(mintime_obj.L, Z_mintime)
+    ∇²L = dense(
+        obj.∇²L(Z_mintime),
+        obj.∇²L_structure,
+        (system.vardim * T + T - 1, system.vardim * T + T - 1)
+    )
 
-@test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+    # test hessian of mintime objective with FiniteDiff
+
+    # ∇²L_finite_diff =
+    #     FiniteDiff.finite_difference_hessian(
+    #         obj.L,
+    #         Z_mintime
+    #     )
+
+    # show_diffs(∇²L, ∇²L_finite_diff)
+
+    # @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+
+
+    # test hessian of mintime objective with ForwardDiff
+
+    ∇²L_forward_diff =
+        ForwardDiff.hessian(obj.L, Z_mintime)
+
+    @test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+
+end
+
+@testset "slack variable objective" begin
+    options = Options(
+        max_iter=50,
+        print_level=0,
+    )
+
+    slack_prob = QuantumControlProblem(
+        system;
+        L1_regularized_states=[1, system.isodim],
+        options=options,
+    )
+
+    solve!(slack_prob)
+
+    Z_slack_prob = get_variables(slack_prob)
+
+    slack_obj = filter!(slack_prob.objective_terms) do term
+        term[:type] == :L1SlackRegularizer
+    end[1] |> Objective
+
+    ∇L = slack_obj.∇L(Z_slack_prob)
+
+    # test gradient of slack variable objective with ForwardDiff
+
+    ∇L_forward_diff =
+        ForwardDiff.gradient(slack_obj.L, Z_slack_prob)
+
+    @test all(isapprox.(∇L, ∇L_forward_diff; atol=ATOL))
+
+    slack_con = filter!(slack_prob.constraints) do con
+        con isa L1SlackConstraint
+    end[1]
+
+    # test slack constraint is satisfied on solved problem
+    s1 = Z_slack_prob[slack_con.s1_indices]
+    s2 = Z_slack_prob[slack_con.s2_indices]
+    x = Z_slack_prob[slack_con.x_indices]
+
+    @test all(isapprox.(s1 - s2, x; atol=ATOL))
+end
+
+end
+
+"""
+    testing saving and loading of problems
+"""
+
+@testset "testing saving and loading of problems" begin
+
+
+    fixed_time_save_path = generate_file_path(
+        "jld2",
+        "test_save",
+        pwd()
+    )
+
+    prob = QuantumControlProblem(system)
+
+    save_problem(prob, fixed_time_save_path)
+
+    min_time_save_path = generate_file_path(
+        "jld2",
+        "test_save",
+        pwd()
+    )
+
+    min_time_prob = MinTimeQuantumControlProblem(system)
+
+    save_problem(min_time_prob, min_time_save_path)
+
+
+
+    @testset "fixed time problems" begin
+        prob_loaded = load_problem(fixed_time_save_path)
+        data_loaded = load_data(fixed_time_save_path)
+
+        @test prob_loaded isa QuantumControlProblem
+        @test data_loaded isa ProblemData
+
+        @test data_loaded.type == :FixedTime
+    end
+
+    @testset "min time problems" begin
+        min_time_prob_loaded = load_problem(min_time_save_path)
+        min_time_data_loaded = load_data(min_time_save_path)
+
+
+        @test min_time_prob_loaded isa MinTimeQuantumControlProblem
+        @test min_time_data_loaded isa ProblemData
+        @test min_time_data_loaded.type == :MinTime
+    end
+
+    @test min_time_save_path[1:end-6] * "0" == fixed_time_save_path[1:end-5]
+
+    rm(fixed_time_save_path)
+    rm(min_time_save_path)
+
+
+
+end

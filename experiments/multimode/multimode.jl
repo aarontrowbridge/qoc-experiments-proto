@@ -15,13 +15,15 @@ system = MultiModeSystem(
     ψf,
 )
 
-T                = 300
-Δt               = 1.5
+T                = 500
+Δt               = 0.8
 R                = 1.0
-iter             = 10_000
+iter             = 100
 resolves         = 10
 pin_first_qstate = true
 phase_flip       = false
+mode_con         = true
+αval             = 0.25
 
 # T                = parse(Int,     ARGS[1])
 # Δt               = parse(Float64, ARGS[2])
@@ -46,20 +48,36 @@ u_bounds = BoundsConstraint(
 
 cons = AbstractConstraint[u_bounds]
 
-experiment = "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * "_mode_constrained"
+experiment = "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * (mode_con ? "_mode_constrained_alpha_$(αval)" : "")
 
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
-prob = QuantumControlProblem(
-    system;
-    T=T,
-    Δt=Δt,
-    R=R,
-    pin_first_qstate=pin_first_qstate,
-    options=options,
-    constraints=cons
-)
+if mode_con
+    prob = QuantumControlProblem(
+        system;
+        T=T,
+        Δt=Δt,
+        R=R,
+        pin_first_qstate=pin_first_qstate,
+        options=options,
+        constraints=cons,
+        L1_regularized_states=[1,2,3,4] .* cavity_levels,
+        α = fill(αval, 4),
+    )
+else
+    prob = QuantumControlProblem(
+        system;
+        T=T,
+        Δt=Δt,
+        R=R,
+        pin_first_qstate=pin_first_qstate,
+        options=options,
+        constraints=cons
+    )
+end
+
+
 
 for i = 1:resolves
     resolve = "_resolve_$i"
@@ -73,8 +91,8 @@ for i = 1:resolves
         experiment * resolve,
         data_dir
     )
-    plot_multimode(prob.system, prob.trajectory, plot_path)
+    plot_multimode_split(prob, plot_path)
     solve!(prob, save_path=save_path)
-    plot_multimode(prob.system, prob.trajectory, plot_path)
-    global prob = load_prob(save_path)
+    plot_multimode_split(prob, plot_path)
+    global prob = load_problem(save_path)
 end

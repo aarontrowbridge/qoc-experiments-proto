@@ -2,7 +2,6 @@ module Utils
 
 export index
 export slice
-export generate_file_path
 
 """
 this module contains helper functions for indexing and taking slices of the full problem variable vector
@@ -32,6 +31,7 @@ Z[slice(t, pos1, pos2, dim)]      = zₜ[pos1:pos2]
 Z[slice(t, pos, dim)]             = zₜ[1:pos]
 Z[slice(t, dim)]                  = zₜ[1:dim]
 Z[slice(t, dim; stretch=stretch)] = zₜ[1:(dim + stretch)]
+Z[slice(t, indices, dim)]         = zₜ[indices]
 
 the functions are also used to access the zₜ vectors, e.g.
 
@@ -41,7 +41,7 @@ zₜ[n_wfn_states .+ slice(2, ncontrols)]          = aₜ
 zₜ[n_wfn_states .+ slice(augdim + 1, ncontrols)] = uₜ = ddaₜ
 """
 
-index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
+index(t::Int, pos::Int, dim::Int) = dim * (t - 1) + pos
 
 index(t, dim) = index(t, dim, dim)
 
@@ -53,37 +53,7 @@ slice(t, pos, dim) = slice(t, 1, pos, dim)
 
 slice(t, dim; stretch=0) = slice(t, 1, dim + stretch, dim)
 
-function generate_file_path(extension, file_name, path)
-    # Ensure the path exists.
-    mkpath(path)
-
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory.
-    max_numeric_suffix = -1
-    for (_, _, files) in walkdir(path)
-        for file_name_ in files
-            if occursin("$(file_name)", file_name_) && occursin(".$(extension)", file_name_)
-
-                numeric_suffix = parse(
-                    Int,
-                    split(split(file_name_, "_")[end], ".")[1]
-                )
-
-                max_numeric_suffix = max(
-                    numeric_suffix,
-                    max_numeric_suffix
-                )
-            end
-        end
-    end
-
-    file_path = joinpath(
-        path,
-        file_name *
-        "_$(lpad(max_numeric_suffix + 1, 5, '0')).$(extension)"
-    )
-
-    return file_path
-end
+slice(t::Int, indices::AbstractVector{Int}, dim::Int) =
+    dim * (t - 1) .+ indices
 
 end
