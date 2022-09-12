@@ -48,4 +48,8 @@ include("problems.jl")
 include("plotting_utils.jl")
 @reexport using .PlottingUtils
 
+include("iterative_learning.jl")
+@reexport using .IterativeLearning
+
+
 end
