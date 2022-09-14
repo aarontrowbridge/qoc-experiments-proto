@@ -61,6 +61,7 @@ prob = QuantumControlProblem(
 )
 
 function g(x, sys::QuantumSystem)
+    #x[1:sys.n_wfn_states]
     y = []
     for i = 1:sys.nqstates
         ψ_i = x[slice(i, sys.isodim)]
@@ -73,6 +74,8 @@ end
 
 function exp_rollout(utraj::Matrix{Float64})
     state = [ket_to_iso(ψg); ket_to_iso(ψe); zeros(4)]
+    ys = []
+    ts = []
     for k in 1:size(utraj,2)
         G = system.G_drift + 0.01*get_mat_iso(-1im * sigmaz()) + state[end - 3] * system.G_drives[1] + state[end-2] * system.G_drives[2]
         h_prop = exp(G * Δt)
@@ -81,11 +84,13 @@ function exp_rollout(utraj::Matrix{Float64})
         controls = state[9:10] + state[11:12] .* Δt
         dcontrols = state[11:12] + utraj[:, k] .* Δt
         state = [state1_; state2_; controls; dcontrols]
+        append!(ys, [g(state, system)])
+        append!(ts, k+1)
     end
-    return [g(state, system)], [T]
+    return ys, ts
 end
 
-ilc_prob = ILCProblem(prob, g, exp_rollout, 6)
-answer = solve_ilc!(ilc_prob; iter = 1)
+ilc_prob = ILCProblem(prob, g, exp_rollout, system.n_wfn_states)
+answer, jku = solve_ilc!(ilc_prob; iter = 1)
 
-print(answer)
+println(answer)

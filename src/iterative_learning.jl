@@ -144,8 +144,8 @@ function solve_ilc!(
     ilc::ILCProblem; 
     iter=3,
     tol=1e-4, 
-    qs=fill(1., ilc.n),
-    qfs=fill(200., ilc.n),
+    qs=[fill(1., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
+    qfs=[fill(8000., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
     R=0.01
     )   
     
@@ -164,8 +164,10 @@ function solve_ilc!(
     Q = sparse(Diagonal(qs))
     Qf = sparse(Diagonal(qfs))
     R = sparse(Diagonal(fill(R, m)))
-    S = spzeros(d, d)
+    S = sparse(Diagonal(fill(1,d)))
+    Sf = sparse(Diagonal(fill(8000., d)))
 
+    S = spzeros(d,d)
     A = ilc.A
     B = ilc.B
     C = ilc.C
@@ -208,8 +210,10 @@ function solve_ilc!(
         errs = zeros(d*(T-1))
         
         for (y, t) in zip(ys, ts)
-            errs[d*(t-2) .+ (1:d)] .= y - ilc.ỹs[t]
+            errs[d*(t-2) .+ (1:d)] .= -(y - ilc.ỹs[t])
         end
+
+        println(errs)
 
         cbnds = [repeat(ilc.control_bounds, T-2); 
                 zeros(length(ilc.control_bounds))]
@@ -235,7 +239,7 @@ function solve_ilc!(
         it += 1
     end
 
-    return ilc.exp_rollout(ilc.utraj)
+    return ilc.exp_rollout(ilc.utraj)   
 
 end
 
