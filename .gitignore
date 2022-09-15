@@ -5,3 +5,4 @@ data/
 output.txt
 docs/build/
 output.txt
+.github/workflows/documentation.yml
