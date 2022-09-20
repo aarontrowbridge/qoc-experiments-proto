@@ -172,10 +172,10 @@ function solve_ilc!(
     B = ilc.B
     C = ilc.C
 
-    H = blockdiag(kron(I(T-2), blockdiag(R, Q, S)), R, Qf, S)
+    H = blockdiag(kron(I(T-2), blockdiag(R, Q, S)), R, Qf, Sf)
 
     #total dimension of our vector is (n+m+d)*(T-1)
-    q = zeros((n+m+d)*(T-1))
+    
     #dynamics constraints
     D = spzeros(n*(T-1), (n+m+d)*(T-1))
     D[1:n, 1:m] .= B[1]
@@ -207,6 +207,9 @@ function solve_ilc!(
         @assert all(t -> 1 <= t <= T, ts)
         @assert length(ys) == length(ts)
 
+        q = zeros((n+m+d)*(T-1))
+
+        
         errs = zeros(d*(T-1))
         
         for (y, t) in zip(ys, ts)
@@ -214,6 +217,13 @@ function solve_ilc!(
         end
 
         println(errs)
+
+        for k = 1:T-2
+            q[(m+n) + (m+n+d)*(k-1) .+ (1:d)] .= S*(-errs[(k-1)*d .+ (1:d)])
+        end
+
+        q[(m+n) + (m+n+d)*(T-2) .+ (1:d)] .= Sf*(-errs[(T-2)*d .+ (1:d)])
+        
 
         cbnds = [repeat(ilc.control_bounds, T-2); 
                 zeros(length(ilc.control_bounds))]

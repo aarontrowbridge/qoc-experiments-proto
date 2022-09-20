@@ -90,7 +90,7 @@ function exp_rollout(utraj::Matrix{Float64})
     return ys, ts
 end
 
-ilc_prob = ILCProblem(prob, g, exp_rollout, system.n_wfn_states)
+ilc_prob = ILCProblem(prob, g, exp_rollout, 6)
 answer, jku = solve_ilc!(ilc_prob; iter = 1)
 
 println(answer)
