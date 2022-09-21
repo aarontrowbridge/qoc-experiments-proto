@@ -2,7 +2,7 @@ using Pico
 using JLD2
 
 data_dir = "data/multimode/fixed_time/no_guess/problems"
-experiment = "g0_to_g1_T_500_dt_0.8_R_1.0_iter_1000_resolve_10_00000"
+experiment = "g0_to_g1_T_500_dt_0.8_R_1.0_iter_1000_resolve_9_00000"
 
 data_path = joinpath(data_dir, experiment*".jld2")
 
@@ -11,7 +11,8 @@ data_path = joinpath(data_dir, experiment*".jld2")
 R        = 1.0
 iter     = 500
 resolves = 10
-αval     = 0.1
+αval     = 2.0
+mode_con = true
 
 u_bounds = BoundsConstraint(
     1:data.trajectory.T,
@@ -26,25 +27,36 @@ u_bounds = BoundsConstraint(
 
 cons = AbstractConstraint[u_bounds]
 
-plot_dir = "plots/multimode/fixed_time/reloaded"
-data_dir = "data/multimode/fixed_time/no_guess/problems"
+plot_dir = "plots/multimode/fixed_time/guess"
+data_dir = "data/multimode/fixed_time/guess/problems"
 
 options = Options(
     max_iter = iter,
     max_cpu_time = 100000.0,
 )
 
-prob = QuantumControlProblem(
-    data.system,
-    data.trajectory;
-    R=R,
-    options=options,
-    constraints=cons,
-    L1_regularized_states=14 .* [1, 2, 3, 4],
-    α=fill(αval, 4)
-)
+if mode_con
+    prob = QuantumControlProblem(
+        data.system,
+        data.trajectory;
+        R=R,
+        options=options,
+        constraints=cons,
+        L1_regularized_states=14 .* [1, 2, 3, 4],
+        α=fill(αval, 4)
+    )
+    info = "_reload_iter_$(iter)_alpha_$(αval)"
+else
+    prob = QuantumControlProblem(
+        data.system,
+        data.trajectory;
+        R=R,
+        options=options,
+        constraints=cons
+    )
+    info = "_reload_iter_$(iter)"
+end
 
-info = "_L1_alpha_$(αval)"
 
 for i = 1:resolves
     resolve = "_resolve_$i"

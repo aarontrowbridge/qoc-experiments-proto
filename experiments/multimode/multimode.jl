@@ -1,6 +1,4 @@
 using Pico
-using LinearAlgebra
-using JLD2
 
 transmon_levels = 2
 cavity_levels = 14
@@ -15,15 +13,15 @@ system = MultiModeSystem(
     ψf,
 )
 
-T                = 500
-Δt               = 0.8
-R                = 1.0
-iter             = 100
+T                = 400
+Δt               = 5.0
+R                = 200.0
+iter             = 2000
 resolves         = 10
-pin_first_qstate = true
+pin_first_qstate = false
 phase_flip       = false
 mode_con         = true
-αval             = 0.25
+αval             = 0.5
 
 # T                = parse(Int,     ARGS[1])
 # Δt               = parse(Float64, ARGS[2])
@@ -48,7 +46,7 @@ u_bounds = BoundsConstraint(
 
 cons = AbstractConstraint[u_bounds]
 
-experiment = "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * (mode_con ? "_mode_constrained_alpha_$(αval)" : "")
+experiment = "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * (mode_con ? "_alpha_$(αval)" : "")
 
 plot_dir = "plots/multimode/fixed_time/no_guess"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
@@ -76,8 +74,6 @@ else
         constraints=cons
     )
 end
-
-
 
 for i = 1:resolves
     resolve = "_resolve_$i"

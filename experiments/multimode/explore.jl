@@ -1,15 +1,15 @@
 using Pico
 using JLD2
 
-data_dir = "data/multimode/fixed_time/no_guess/problems"
+data_dir = "data/multimode/fixed_time/guess/problems"
 
-plot_dir = "plots/multimode/fixed_time/reloaded"
+plot_dir = "plots/multimode/fixed_time/guess"
 
 prob_name =
-    "g0_to_g1_T_500_dt_0.8_R_1.0_iter_1000_resolve_10_00000"
+    "g0_to_g1_T_500_dt_0.8_R_1.0_iter_1000_resolve_9_00000_reload_iter_500_alpha_1.0_resolve_4_00000"
 
 data_path = joinpath(data_dir, prob_name*".jld2")
-plot_path = joinpath(plot_dir, prob_name*"_highest_states_pre_reg.png")
+plot_path = joinpath(plot_dir, prob_name*"_highest_states.png")
 
 prob_data = load_data(data_path)
 
