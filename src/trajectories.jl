@@ -255,13 +255,25 @@ end
 function pop_components(
     traj::Trajectory,
     sys::AbstractSystem;
-    i = 1,
-    components = nothing
+    i=1,
+    components=nothing
 )
     if isnothing(components)
-        pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])) for t = 1:traj.T]
+        pops = [
+            abs2.(
+                iso_to_ket(
+                    traj.states[t][slice(i, sys.isodim)]
+                )
+            ) for t = 1:traj.T
+        ]
     else
-        pops = [abs2.(iso_to_ket(traj.states[t][slice(i, sys.isodim)])[components]) for t = 1:traj.T]
+        pops = [
+            abs2.(
+                iso_to_ket(
+                    traj.states[t][slice(i, sys.isodim)]
+                )[components]
+            ) for t = 1:traj.T
+        ]
     end
     return pops
 end
