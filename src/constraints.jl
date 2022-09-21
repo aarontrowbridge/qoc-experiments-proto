@@ -300,15 +300,14 @@ function problem_constraints(
     @assert length(system.control_bounds) ==
         length(system.G_drives)
 
-    for cntrl_index in 1:system.ncontrols
+    for j = 1:system.ncontrols
         cntrl_bound = BoundsConstraint(
             2:T-1,
             system.n_wfn_states +
-            system.∫a * system.ncontrols +
-            cntrl_index,
-            system.control_bounds[cntrl_index],
+            system.∫a * system.ncontrols + j,
+            system.control_bounds[j],
             system.vardim;
-            name="constraint on control $(cntrl_index)"
+            name="constraint on control $(j)"
         )
         push!(cons, cntrl_bound)
     end
