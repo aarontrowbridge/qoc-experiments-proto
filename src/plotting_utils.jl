@@ -520,49 +520,23 @@ function plot_single_qubit(
     path::String;
     fig_title=nothing
 )
-    path_parts = split(path, "/")
-    dir = joinpath(path_parts[1:end-1])
-    if !isdir(dir)
-        mkpath(dir)
-    end
+    mkpath(dirname(path))
 
-    fig = Figure(resolution=(1200, 1500))
+    fig = Figure(resolution=(1200, 800))
 
-    ψs = wfn_components_matrix(traj, system)
+    ψs = pop_matrix(traj, system)
 
-    ψax = Axis(fig[1:2, :]; title="qubit components", xlabel=L"t")
+    ψax = Axis(fig[1, :]; title="qubit components", xlabel=L"t")
     series!(ψax, traj.times, ψs;
-        labels=[
-            L"\psi_1^R",
-            L"\psi_2^R",
-            L"\psi_1^I",
-            L"\psi_2^I"]
+        labels=[L"|\langle 0 | \psi \rangle|^2", L"|\langle 1 | \psi \rangle|^2"],
     )
 
     axislegend(ψax; position=:lb)
 
-    for j = 0:system.control_order
+    as = controls_matrix(traj, system)
 
-        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
-
-        series!(
-            ax_j,
-            traj.times,
-            jth_order_controls_matrix(traj, system, j);
-            labels = [
-                j == 0 ?
-                latexstring("a_$k (t)") :
-                latexstring(
-                    "\\mathrm{d}^{",
-                    j == 1 ? "" : "$j",
-                    "}_t a_$k"
-                )
-                for k = 1:system.ncontrols
-            ]
-        )
-
-        axislegend(ax_j; position=:lt)
-    end
+    a_ax = Axis(fig[2, :]; xlabel=L"t")
+    series!(a_ax, traj.times, as; labels=[L"a(t)"])
 
     # TODO: weird plotting behavior, fix this
 
@@ -672,13 +646,14 @@ function plot_twoqubit(
     system::QuantumSystem,
     traj::Trajectory,
     path::String;
-    fig_title = nothing,
-    i = 3
+    fig_title=nothing,
+    i=3,
+    show_augmented_controls=false
 )
-    fig = Figure(resolution=(1200, 1500))
+    fig = Figure(resolution=(1200, 1000))
     pops = pop_matrix(traj, system, i=i)
     #need to rewrite this for arbitrary number of levels
-    ψax = Axis(fig[1:2, :]; title="Population", xlabel=L"t")
+    ψax = Axis(fig[1, :]; title="Population", xlabel=L"t")
     series!(ψax, traj.times, pops;
         labels=[
             "|00⟩",
@@ -690,27 +665,43 @@ function plot_twoqubit(
 
     axislegend(ψax; position=:lb)
 
-    for j = 0:system.control_order
+    if show_augmented_controls
+        for j = 0:system.control_order
 
-        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+            ax_j = Axis(fig[2 + j, :]; xlabel = L"t")
+
+            series!(
+                ax_j,
+                traj.times,
+                jth_order_controls_matrix(traj, system, j);
+                labels = [
+                    j == 0 ?
+                    latexstring("a_$k (t)") :
+                    latexstring(
+                        "\\mathrm{d}^{",
+                        j == 1 ? "" : "$j",
+                        "}_t a_$k"
+                    )
+                    for k = 1:system.ncontrols
+                ]
+            )
+
+            axislegend(ax_j; position=:lt)
+        end
+    else
+        ax = Axis(fig[2, :]; xlabel = L"t")
 
         series!(
-            ax_j,
+            ax,
             traj.times,
-            jth_order_controls_matrix(traj, system, j);
+            controls_matrix(traj, system);
             labels = [
-                j == 0 ?
-                latexstring("a_$k (t)") :
-                latexstring(
-                    "\\mathrm{d}^{",
-                    j == 1 ? "" : "$j",
-                    "}_t a_$k"
-                )
+                latexstring("a_$k (t)")
                 for k = 1:system.ncontrols
             ]
         )
 
-        axislegend(ax_j; position=:lt)
+        axislegend(ax; position=:lt)
     end
 
     # if !isnothing(fig_title)
