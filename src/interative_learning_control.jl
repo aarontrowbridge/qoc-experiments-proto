@@ -57,7 +57,8 @@ function QuantumILCProblem(
     Ȳ::MeasurementData;
     Q=1.0,
     R=1.0,
-    integrator=:FourthOrderPade
+    integrator=:FourthOrderPade,
+    correction_term=true
 )
     dims = (
         z = size(Ẑ.states[1], 1) + size(Ẑ.actions[1], 1),
@@ -73,7 +74,10 @@ function QuantumILCProblem(
 
     f = eval(integrator)(sys)
 
-    A = build_constraint_matrix(f, g, Ẑ, Ŷ, Ȳ, dims)
+    A = build_constraint_matrix(
+        f, g, Ẑ, Ŷ, Ȳ, dims;
+        correction_term=correction_term
+    )
 
     H = build_hessian(Q, R, dims)
 
