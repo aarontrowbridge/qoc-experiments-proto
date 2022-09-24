@@ -6,7 +6,6 @@ export measure
 
 using ..Trajectories
 using ..QuantumSystems
-using ..Dynamics
 using ..Integrators
 using ..Utils
 
@@ -48,7 +47,6 @@ struct QuantumILCProblem <: ILCProblem
     A::SparseMatrixCSC{Float64, Int}
     dims::NamedTuple
 end
-
 
 function QuantumILCProblem(
     sys::QuantumSystem,
