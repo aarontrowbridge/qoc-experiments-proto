@@ -169,18 +169,15 @@ function build_dynamics_constraint_jacobian(
         xₜ₊₁ = X̂.states[t + 1]
 
         ∂xₜfₜ = ∇f(uₜ, X̂.Δt, false)
-
         ∇fₜ[1:dims.x, 1:dims.x] = sparse(∂xₜfₜ)
 
-        ∂uʲₜfₜs = [∇f(xₜ₊₁, xₜ, uₜ, X̂.Δt, j) for j = 1:dims.u]
-
-        for (j, ∂uʲₜfₜ) in enumerate(∂uʲₜfₜs)
+        for j = 1:dims.u
+            ∂uʲₜfₜ = ∇f(xₜ₊₁, xₜ, uₜ, X̂.Δt, j)
             ∇fₜ[1:dims.x, dims.x + j] = sparse(∂uʲₜfₜ)
         end
 
         ∂xₜ₊₁fₜ = ∇f(uₜ, X̂.Δt, true)
-
-        ∇fₜ[1:dims.x, dims.z .+ (1:dims.x)] = ∂xₜ₊₁fₜ
+        ∇fₜ[1:dims.x, dims.z .+ (1:dims.x)] = sparse(∂xₜ₊₁fₜ)
 
         ∇F[
             slice(t, dims.x),
