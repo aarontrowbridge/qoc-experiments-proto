@@ -1,0 +1,254 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{physics}
+
+\setlength{\parindent}{0pt}
+
+\newcommand{\isopsi}{\tilde \psi}
+
+\title{Iterative Learning Control with Measurements}
+\author{Aaron Trowbridge}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Setup}
+
+Given a nominal state trajectory $\hat{x}(t)$ and control trajectory $u(t)$, we apply the controls to the experimental system and retrieve a set of measurements (abusing notation) $y(t)$ from the (possibly hidden) experimental trajectory $\bar x (t)$. Schematically we have:
+
+$$
+u(t) \longrightarrow \bar x (u(t), t) \longrightarrow g(\bar x(t), t) = \bar y(t)
+$$
+
+ 
+which coincides with the simplified model situation:
+
+$$
+u(t) \longrightarrow \hat x (u(t), t) \longrightarrow g(\hat x(t), t) = \hat y(t)
+$$
+
+
+We now have two sets of measurements: 
+
+\begin{itemize}
+  \item $\hat y(t)$ : the nominal measurement
+  \item $\bar y(t)$ : the experimental measurement
+\end{itemize}
+
+\section*{Problem Formulation}
+
+Let us write
+
+$$
+\bar x (t) = \hat x (t) + \epsilon(t)
+$$
+
+
+where $\epsilon(t)$ is the error in the experimental trajectory.  To correct for this error, we can find a correction term $\Delta x(t)$ s.t.
+
+$$
+g(\bar x + \Delta x) = g(\hat x + \epsilon + \Delta x ) = \hat y
+$$
+
+For example, if $g(x) = x$ is the identity function, i.e. we are trying to track the trajectory:
+
+$$
+\Delta x = - \epsilon
+$$
+
+The real problem involves finding the corresponding correction to the controls: $\Delta u(t)$. This involves setting up a quadratic optimization problem.
+
+\newpage
+\subsection*{Quadratic Correction Problem}
+
+The goal is now to go from the measurement error $\Delta y$ to a state correction $\Delta x$ and a control correction $\Delta u$ by simultaneously solving two linear systems.  Schematically:
+
+$$
+\Delta y \xrightarrow[g]{M \cdot \Delta x = \Delta y} \Delta x \xrightarrow[f]{D \cdot \Delta z = 0} \Delta u
+$$
+
+\subsubsection*{Measurement Correction to State Correction}
+
+With $\Delta y \equiv \bar y - \hat y$, we have
+
+\begin{align*}
+  \bar y &= g(\bar x) \\
+  &= g(\hat x + \epsilon) \\ 
+  &\approx g(\hat x) + \nabla g(\hat x) \cdot \epsilon \\
+  &= \hat y + \nabla g(\hat x) \cdot \epsilon
+\end{align*}
+
+ 
+which, with writing $\nabla \hat g = \nabla g(\hat x)$ yields
+
+$$
+\Delta y \approx \nabla \hat g \cdot \epsilon
+$$
+
+
+and since $g: \mathbb{R}^n \to \mathbb{R}^m$ where $m \leq n$, $\nabla g$ is not necessarily invertible, but we can use the Moore-Penrose pseudoinverse here to get a guess for $\epsilon$:
+
+$$
+\boxed{
+\epsilon \approx \qty(\nabla \hat g)^+ \cdot \Delta y \equiv \hat \epsilon
+}
+$$
+
+
+
+To tie the experimental measurements to the model measurements we require 
+
+\begin{align*}
+\hat y &= g(\bar x + \Delta x) \\ 
+&\approx \bar y + \nabla g(\bar x) \cdot \Delta x \\
+\end{align*}
+
+
+which yields the condition
+
+\begin{equation}
+  \boxed{
+  \nabla g(\bar x) \cdot \Delta x = - \Delta y
+  }
+\end{equation}
+
+
+
+where
+
+\begin{align*}
+  \nabla g(\bar x)_i^j &= \nabla g(\hat x + \epsilon)_i^j \\
+  & \approx  \nabla g(\hat x + \hat \epsilon)_i^j \\
+  &= \nabla g(\hat x)_i^j + \sum_k \qty(\nabla^2 g(\hat x))_i^{jk} \ \hat \epsilon_k \\
+  &= \nabla \hat g_i^j + \sum_{kl} \qty(\nabla^2 \hat g)_i^{jk} \ \qty(\qty(\nabla \hat g)^+)_k^l \Delta y_l 
+\end{align*}
+
+\newpage
+\subsubsection*{State Correction to Control Correction}
+
+To propagate the state correction to the control correction, we utilize the dynamics constraint, $f(z_t, z_{t+1}) = 0$, where we define the \textit{knot point} 
+
+$$
+z_t =\mqty(x_t \\ u_t)
+$$
+
+
+Let's write $\vb{z}_t = \mqty(z_t \\ z_{t+1})$. Then we have
+
+\begin{align*}
+0 &= f( \hat{\vb{z}}_t + \Delta {\vb{z}}_t) \\
+&\approx f(\hat{\vb{z}}_t) + \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t \\
+\end{align*}
+
+
+which yields
+
+\begin{equation}
+  \boxed{
+  \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0
+  }
+\end{equation}
+
+
+\subsubsection*{Putting it all together}
+
+We seek to find the solution to
+
+\begin{align*}
+  \underset{\Delta x_{1:T},\ \Delta u_{1:T}}{\text{minimize}} & \quad \sum_t \Delta x^\top_t Q \Delta x_t + \Delta u^\top_t R \Delta u_t \\
+  \text{subject to} \ & \quad \nabla g(\bar x_\tau) \cdot \Delta x_\tau = - \Delta y_\tau \quad \forall \tau \\
+  & \quad \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0 \quad \forall t
+\end{align*}
+
+
+where the $\tau$s are the measurement times.
+
+\hfill
+
+
+Building the KKT matrix from this problem, we can solve the system and extract $\Delta u(t)$ and repeat the procedure until convergence.
+
+\newpage
+\subsubsection*{KKT Matrix (for just single quantum state and controls)}
+
+Below we use:
+
+\begin{itemize}
+  \item $n = \dim z_t = \dim x_t + \dim u_t $ 
+  \item $d = \dim x_t = \dim f(z_t, z_{t+1}) $ 
+  \item $c = \dim u_t$  
+  \item $m = \dim y_t$ 
+  \item $M = \#\text{ of measurements}$
+\end{itemize}
+
+
+
+For a trajectory $Z = \text{vec}(z_{1:T})$, we need to construct the matrix
+
+$$
+\mqty(
+  H & A^\top \\
+  A & 0
+)
+$$
+
+
+where $H$ is the Hessian of the cost function:
+
+$$
+H = \bigoplus_{t=1}^T \qty(Q \oplus R) = I^{T \times T} \otimes \qty(Q \oplus R)
+$$
+
+
+and $A$ is the constraint Jacobian:
+
+$$
+A = \mqty(
+  \nabla F \\
+  \nabla G
+)
+$$
+
+with 
+
+$$
+\nabla F = \mqty(
+  \nabla f(\hat{\vb{z}}_1) \\
+  & \ddots \\
+  & & \nabla f(\hat{\vb{z}}_{T-1})
+) \in \mathbb{R}^{d (T - 1) \times n T}
+$$
+
+and
+
+$$
+\nabla G = \mqty(
+  \ddots \\
+  & \nabla g(\bar x_{\tau}) \ \vb{0}^{m \times (a + c)} \\
+  & & \ddots
+) \in \mathbb{R}^{m M \times n T}
+$$
+
+where $\tau = t_1, \dots, t_M$ are the measurement times.
+
+\hfill
+
+For the constraints we then have
+
+$$
+\nabla F \cdot \Delta Z = 0
+\quad \text{and} \quad
+\nabla G \cdot \Delta Z = - \Delta Y
+$$
+
+where again
+
+$$
+\Delta Y = \bar Y - \hat Y
+$$
+ 
+\end{document}

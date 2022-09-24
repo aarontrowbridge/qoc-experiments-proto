@@ -120,6 +120,8 @@ function Jacobian(integrator::AbstractQuantumIntegrator)
         return SecondOrderPadeJacobian(integrator)
     elseif isa(integrator, FourthOrderPade)
         return FourthOrderPadeJacobian(integrator)
+    else
+        @error "$(typeof(integrator)) Jacobian not implemented"
     end
 end
 
@@ -130,7 +132,9 @@ struct SecondOrderPadeJacobian
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    function SecondOrderPadeJacobian(integrator::AbstractQuantumIntegrator)
+    function SecondOrderPadeJacobian(
+        integrator::AbstractQuantumIntegrator
+    )
         return new(integrator.G_drift, integrator.G_drives)
     end
 end
@@ -217,7 +221,7 @@ end
 anticom(A::Matrix, B::Matrix) = A * B + B * A
 
 
-# Jacobian of 4th order Pade integrator with respect to ψ̃ⁱₜ
+# Jacobian of 4th order Pade integrator with respect to ψ̃ⁱₜ₍₊₁₎
 
 function (J::FourthOrderPadeJacobian)(
     aₜ::AbstractVector,
@@ -243,9 +247,11 @@ function (J::FourthOrderPadeJacobian)(
     Δt::Real,
     j::Int
 )
-    Gʲ_anticom_Gₜ = G(aₜ, J.G_drift_anticoms[j], J.G_drive_anticoms[:, j])
+    Gʲ_anticom_Gₜ =
+        G(aₜ, J.G_drift_anticoms[j], J.G_drive_anticoms[:, j])
     Gʲ = J.G_drives[j]
-    return -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) + Δt^2 / 9 * Gʲ_anticom_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+    return -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
+        Δt^2 / 9 * Gʲ_anticom_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
 end
 
 

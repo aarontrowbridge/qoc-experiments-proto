@@ -1,15 +1,19 @@
 module InterativeLearningControl
 
 export QuantumILCProblem
+export MeasurementData
+export measure
 
-using ..Problems
 using ..Trajectories
 using ..QuantumSystems
 using ..Dynamics
 using ..Integrators
+using ..Utils
 
 using LinearAlgebra
 using SparseArrays
+using ForwardDiff
+using Einsum
 using OSQP
 
 struct MeasurementData
@@ -42,7 +46,7 @@ struct QuantumILCProblem <: ILCProblem
     Ȳ::MeasurementData
     H::SparseMatrixCSC{Float64, Int}
     A::SparseMatrixCSC{Float64, Int}
-
+    dims::NamedTuple
 end
 
 
@@ -55,93 +59,132 @@ function QuantumILCProblem(
     R=1.0,
     integrator=:FourthOrderPade
 )
-    Ŷ = measure(Ẑ, g, Ȳ.times, Ȳ.ydim)
-    H = build_hessian(Q, R, sys.vardim, sys.ncontrols, Ẑ.T)
-    A = build_constraint_matrix(sys, Ẑ, g, Ŷ, Ȳ, integrator)
-    return QuantumILCProblem(sys, Ẑ, g, Ŷ, Ȳ, H, A)
+    dims = (
+        z = size(Ẑ.states[1], 1) + size(Ẑ.actions[1], 1),
+        x = size(Ẑ.states[1], 1),
+        f = size(Ẑ.states[1], 1),
+        u = size(Ẑ.actions[1], 1),
+        y = Ȳ.ydim,
+        T = Ẑ.T,
+        M = length(Ȳ.times)
+    )
+
+    Ŷ = measure(Ẑ, g, Ȳ.times, dims.y)
+
+    f = eval(integrator)(sys)
+
+    A = build_constraint_matrix(f, g, Ẑ, Ŷ, Ȳ, dims)
+
+    H = build_hessian(Q, R, dims)
+
+    return QuantumILCProblem(sys, Ẑ, g, Ŷ, Ȳ, H, A, dims)
 end
 
 function build_hessian(
     Q::Float64,
     R::Float64,
-    xdim::Int,
-    udim::Int,
-    T::Int
+    dims::NamedTuple
 )
-    Hₜ = spdiagm(0 => [Q * ones(xdim); R * ones(udim)])
-    H = kron(sparse(I(T)), Hₜ)
+    Hₜ = spdiagm([Q * ones(dims.x); R * ones(dims.u)])
+    H = kron(sparse(I(dims.T)), Hₜ)
     return H
 end
 
 function build_constraint_matrix(
-    sys::QuantumSystem,
-    X̂::Trajectory,
+    f::AbstractQuantumIntegrator,
+    g::Function,
+    Ẑ::Trajectory,
+    Ŷ::MeasurementData,
+    Ȳ::MeasurementData,
+    dims::NamedTuple;
+    correction_term=true
+)
+    ∇F = build_dynamics_constraint_jacobian(f, Ẑ, dims)
+
+    ∇G = build_measurement_constraint_jacobian(
+        g, Ŷ, Ȳ, dims;
+        correction_term=correction_term
+    )
+
+    A = sparse_vcat(∇F, ∇G)
+
+    return A
+end
+
+function build_measurement_constraint_jacobian(
     g::Function,
     Ŷ::MeasurementData,
     Ȳ::MeasurementData,
-    integrator::Symbol
+    dims::NamedTuple;
+    correction_term=true
 )
-    ∇f̂s = build_dynamics_jacobians(sys, X̂, integrator)
-    ∇ḡs = build_measurement_jacobians(sys, g, Ȳ)
+    ∇g(x) = ForwardDiff.jacobian(g, x)
 
-    As = []
-
-    A₁ = sparse_vcat(
-        ∇f̂s[1],
-        sparse_hcat(
-            ∇ḡs[1],
-            spzeros(
-                Ŷ.ydim,
-                sys.n_aug_states + sys.ncontrols
-            )
-        ),
-        sparse_hcat(
-            spzeros(
-                sys.n_aug_states + sys.ncontrols,
-                sys.n_wfn_states
-            ),
-            sparse(I(sys.n_aug_states + sys.ncontrols))
-        )
-    )
-
-    push!(As, A₁)
-
-    for t = 2:X̂.T-1
-        Aₜ = sparse_vcat(
-            ∇f̂s[t],
-            sparse_hcat(
-                ∇ḡs[t],
-                spzeros(
-                    Ŷ.ydim,
-                    sys.n_aug_states + sys.ncontrols
-                )
-            ),
-        )
-        push!(As, Aₜ)
+    function ∇²g(x)
+        H = ForwardDiff.jacobian(u -> vec(∇g(u)), x)
+        return reshape(H, dims.y, dims.x, dims.x)
     end
 
-    A_T = sparse_vcat(
-        sparse_hcat(
-            ∇ḡs[X̂.T],
-            spzeros(
-                Ŷ.ydim,
-                sys.n_aug_states + sys.ncontrols
-            )
-        ),
-        sparse_hcat(
-            spzeros(
-                sys.n_aug_states + sys.ncontrols,
-                sys.n_wfn_states
-            ),
-            sparse(I(sys.n_aug_states + sys.ncontrols))
-        )
-    )
+    ∇G = spzeros(dims.y * dims.M, dims.z * dims.T)
 
-    push!(As, A_T)
+    Δys = Ȳ.ys .- Ŷ.ys
 
-    A = foldr(blockdiag, As)
+    for (i, (τᵢ, Δyᵢ)) in enumerate(zip(Ȳ.times, Δys))
 
-    return A
+        ∇gᵢ = ∇g(Ẑ.states[τᵢ])
+
+        if correction_term
+            ∇²gᵢ = ∇²g(Ẑ.states[τᵢ])
+            ϵ̂ᵢ = pinv(∇gᵢ) * Δyᵢ
+            @einsum ∇gᵢ[j, k] += ∇²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+        end
+
+        ∇G[
+            slice(i, dims.y),
+            slice(τᵢ, dims.x, dims.z)
+        ] = sparse(∇gᵢ)
+    end
+
+    return ∇G
+end
+
+function build_dynamics_constraint_jacobian(
+    f::AbstractQuantumIntegrator,
+    X̂::Trajectory,
+    dims::NamedTuple
+)
+    ∇f = Jacobian(f)
+
+    ∇F = spzeros(dims.x * (dims.T - 1), dims.z * dims.T)
+
+    for t = 1:dims.T - 1
+        ∇fₜ = spzeroes(dims.x, 2 * dims.z)
+
+        xₜ = X̂.states[t]
+        uₜ = X̂.actions[t]
+        xₜ₊₁ = X̂.states[t + 1]
+
+        ∂xₜfₜ = ∇f(uₜ, X̂.Δt, false)
+
+        ∇fₜ[1:dims.x, 1:dims.x] = sparse(∂xₜfₜ)
+
+        ∂uʲₜfₜs = [∇f(xₜ₊₁, xₜ, uₜ, X̂.Δt, j) for j = 1:dims.u]
+
+        for (j, ∂uʲₜfₜ) in enumerate(∂uʲₜfₜs)
+            ∇fₜ[1:dims.x, dims.x + j] = sparse(∂uʲₜfₜ)
+        end
+
+        ∂xₜ₊₁fₜ = ∇f(uₜ, X̂.Δt, true)
+
+        ∇fₜ[1:dims.x, dims.z .+ (1:dims.x)] = ∂xₜ₊₁fₜ
+
+        ∇F[
+            slice(t, dims.x),
+            slice(t, dims.z; stretch=dims.z)
+        ] = ∇fₜ
+    end
+
+    return ∇F
 end
 
 

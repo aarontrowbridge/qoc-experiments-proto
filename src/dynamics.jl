@@ -39,8 +39,15 @@ using SparseArrays
     aₜ = augsₜ[slice(1 + sys.∫a, sys.ncontrols)]
 
     for i = 1:sys.nqstates
+
         ψ̃ⁱslice = slice(i, sys.isodim)
-        δψ̃s[ψ̃ⁱslice] = integrator(xₜ₊₁[ψ̃ⁱslice], xₜ[ψ̃ⁱslice], aₜ, Δt)
+
+        δψ̃s[ψ̃ⁱslice] = integrator(
+            xₜ₊₁[ψ̃ⁱslice],
+            xₜ[ψ̃ⁱslice],
+            aₜ,
+            Δt
+        )
     end
 
     return [δψ̃s; δaugs]
