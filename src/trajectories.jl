@@ -89,6 +89,17 @@ struct Trajectory
     Δt::Float64
 end
 
+function Base.:+(traj1::Trajectory, traj2::Trajectory)
+    states = traj1.states .+ traj2.states
+    actions = traj1.actions .+ traj2.actions
+    return Trajectory(
+        states,
+        actions,
+        traj1.times,
+        traj1.T,
+        traj1.Δt
+    )
+end
 
 # constructor for case of given controls
 

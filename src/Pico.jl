@@ -57,4 +57,7 @@ include("problem_solvers.jl")
 include("plotting_utils.jl")
 @reexport using .PlottingUtils
 
+include("interative_learning_control.jl")
+@reexport using .InterativeLearningControl
+
 end

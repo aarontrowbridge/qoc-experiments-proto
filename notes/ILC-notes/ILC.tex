@@ -3,6 +3,7 @@
 \usepackage{amsmath}
 \usepackage{amsfonts}
 \usepackage{physics}
+\usepackage[ruled]{algorithm2e}
 
 \setlength{\parindent}{0pt}
 
@@ -172,6 +173,16 @@ where the $\tau$s are the measurement times.
 
 Building the KKT matrix from this problem, we can solve the system and extract $\Delta u(t)$ and repeat the procedure until convergence.
 
+\hfill
+
+This problem, which returns $\Delta Z$ is referred to as 
+
+$$
+\boxed{
+\Delta Z = \textsf{QuadraticProblem}(\hat Z, \Delta Y)
+}
+$$
+
 \newpage
 \subsubsection*{KKT Matrix (for just single quantum state and controls)}
 
@@ -250,5 +261,39 @@ where again
 $$
 \Delta Y = \bar Y - \hat Y
 $$
+
+\newpage
+
+\section*{ILC Algorithm}
+
+\begin{algorithm}
+  \caption{Iterative Control Learning}
+  \KwData{
+    $\hat Z^\text{goal}$,
+    $\textsf{tol} > 0$,
+    $\textsf{max\_iter} \gg 0$
+}
+  \KwResult{$U$}
+  $Y^\text{goal} \gets \textsf{measure}(\hat Z^\text{goal}) = \text{vec}(y_{\tau_1:\tau_M})$\\
+  $\hat Z \gets \hat Z^\text{goal}$\\
+  $U \gets \textsf{controls}(\hat Z) = \text{vec}(u_{1:T})$ \\
+  $\bar Y \gets \textsf{experiment}(U) = \text{vec}(\bar y_{\tau_1:\tau_M})$\\
+  $\Delta Y \gets \bar Y - Y^\text{goal}$ \\
+  $k \gets 1$\\
+  \While{$\qty|\Delta Y| > \textsf{tol}$}{
+    \If{$k > \textsf{max\_iter}$}{
+      \textbf{break} 
+    }
+    $\Delta Z \gets \textsf{QuadraticProblem}(\hat Z, \Delta Y)$\\
+    $\hat Z \gets \hat Z + \Delta Z $\\
+    $U \gets \textsf{controls}(\hat Z)$\\
+    $\bar Y \gets \textsf{experiment}(U)$\\
+    $\Delta Y \gets \bar Y - Y^\text{goal}$\\
+    $k \gets k + 1$\\
+  }
+  \Return{$U$}
+\end{algorithm}
+
+
  
 \end{document}

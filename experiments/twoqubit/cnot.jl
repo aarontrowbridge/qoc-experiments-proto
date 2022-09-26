@@ -1,10 +1,11 @@
 using Pico
 using LinearAlgebra
 
-iter = 5000
+iter = 500
 
-const EXPERIMENT_NAME = "CNOT"
-plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/twoqubit/cnot/")
+experiment = "cnot_iter_$(iter)"
+plot_dir = "plots/twoqubit/cnot"
+plot_path = generate_file_path("png", experiment, plot_dir)
 
 ω1 =  2π * 3.5 #GHz
 ω2 = 2π * 3.9 #GHz
@@ -80,8 +81,10 @@ prob = QuantumControlProblem(
     options = options
 )
 
+save_dir = "data/twoqubit/cnot"
+save_path = generate_file_path("jld2", experiment, save_dir)
 
-solve!(prob)
+solve!(prob; save_path=save_path)
 
 plot_twoqubit(
     system,

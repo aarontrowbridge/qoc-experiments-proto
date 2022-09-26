@@ -1,6 +1,7 @@
 module Integrators
 
-export AbstractQuantumIntegrator
+export AbstractIntegrator
+export QuantumIntegrator
 
 export Exponential
 export SecondOrderPade
@@ -13,8 +14,6 @@ export FourthOrderPadeJacobian
 
 export SecondOrderPadeHessian
 export FourthOrderPadeHessian
-
-export G
 
 using ..Utils
 using ..QuantumSystems
@@ -38,16 +37,18 @@ end
 # integrator types
 #
 
-abstract type AbstractQuantumIntegrator end
+abstract type AbstractIntegrator end
+
+abstract type QuantumIntegrator <: AbstractIntegrator end
 
 
 # exponential
 
-struct Exponential <: AbstractQuantumIntegrator
+struct Exponential <: QuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    Exponential(sys::AbstractSystem) =
+    Exponential(sys::QuantumSystem) =
         new(sys.G_drift, sys.G_drives)
 end
 
@@ -64,11 +65,11 @@ end
 
 # 2nd order Pade integrator
 
-struct SecondOrderPade <: AbstractQuantumIntegrator
+struct SecondOrderPade <: QuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    SecondOrderPade(sys::AbstractSystem) =
+    SecondOrderPade(sys::QuantumSystem) =
         new(sys.G_drift, sys.G_drives)
 end
 
@@ -88,11 +89,11 @@ end
 
 # 4th order Pade integrator
 
-struct FourthOrderPade <: AbstractQuantumIntegrator
+struct FourthOrderPade <: QuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
-    FourthOrderPade(sys::AbstractSystem) =
+    FourthOrderPade(sys::QuantumSystem) =
         new(sys.G_drift, sys.G_drives)
 end
 
@@ -115,7 +116,7 @@ end
 # Jacobians
 #
 
-function Jacobian(integrator::AbstractQuantumIntegrator)
+function Jacobian(integrator::QuantumIntegrator)
     if isa(integrator, SecondOrderPade)
         return SecondOrderPadeJacobian(integrator)
     elseif isa(integrator, FourthOrderPade)
@@ -133,7 +134,7 @@ struct SecondOrderPadeJacobian
     G_drives::Vector{Matrix}
 
     function SecondOrderPadeJacobian(
-        integrator::AbstractQuantumIntegrator
+        integrator::QuantumIntegrator
     )
         return new(integrator.G_drift, integrator.G_drives)
     end
@@ -180,7 +181,7 @@ struct FourthOrderPadeJacobian
     G_drive_anticoms::Symmetric
 
     function FourthOrderPadeJacobian(
-        integrator::AbstractQuantumIntegrator
+        integrator::QuantumIntegrator
     )
         ncontrols = length(integrator.G_drives)
 
@@ -261,7 +262,7 @@ struct SecondOrderPadeHessian
     G_drives::Vector{Matrix}
     isodim::Int
 
-    function SecondOrderPadeHessian(sys::AbstractSystem)
+    function SecondOrderPadeHessian(sys::QuantumSystem)
         return new(
             sys.G_drives,
             sys.isodim
@@ -298,7 +299,7 @@ struct FourthOrderPadeHessian
     nqstates::Int
     isodim::Int
 
-    function FourthOrderPadeHessian(sys::AbstractSystem)
+    function FourthOrderPadeHessian(sys::QuantumSystem)
         drive_anticoms = fill(
             zeros(size(sys.G_drift)),
             sys.ncontrols,

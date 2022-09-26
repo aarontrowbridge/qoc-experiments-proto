@@ -18,7 +18,7 @@ using SparseArrays
 
 @views function dynamics(
     sys::AbstractSystem,
-    integrator::AbstractQuantumIntegrator,
+    integrator::QuantumIntegrator,
     xₜ₊₁::AbstractVector,
     xₜ::AbstractVector,
     uₜ::AbstractVector,
