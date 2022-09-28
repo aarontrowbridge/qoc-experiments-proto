@@ -91,6 +91,6 @@ function exp_rollout(utraj::Matrix{Float64})
 end
 
 ilc_prob = ILCProblem(prob, g, exp_rollout, 6)
-answer, jku = solve_ilc!(ilc_prob; iter = 1)
+answer, jku = solve_ilc!(ilc_prob; iter = 2)
 
-println(answer)
+println(answer[end])

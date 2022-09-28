@@ -60,6 +60,7 @@ struct ILCProblem
     A::Vector{SparseArrays.SparseMatrixCSC{Float64, Int64}}
     B::Vector{SparseArrays.SparseMatrixCSC{Float64, Int64}}
     C::Vector{SparseArrays.SparseMatrixCSC{Float64, Int64}}
+    Cinv::Vector{SparseArrays.SparseMatrixCSC{Float64, Int64}}
 end
 
 function ILCProblem(
@@ -104,6 +105,7 @@ function ILCProblem(
     A = fill(spzeros(n, n), T-1)
     B = fill(spzeros(n, m), T-1)
     C = fill(spzeros(d, n),T)
+    Cinv = fill(spzeros(n, d), T)
 
     for k = 1:(T-1)
         A[k] .= sparse(ForwardDiff.jacobian(x->discrete_dynamics(x, unom[:,k], sys, traj.Δt), xnom[:,k]))
@@ -112,6 +114,7 @@ function ILCProblem(
 
     for k = 1:T
         C[k] .= sparse(ForwardDiff.jacobian(x -> g(x, sys), xnom[:,k]))
+        Cinv[k]  .= sparse(pinv(Matrix(C[k])))
     end
 
     ctraj = zeros(2*sys.ncontrols, T)
@@ -135,7 +138,8 @@ function ILCProblem(
         sys.control_bounds,
         A, 
         B,
-        C
+        C,
+        Cinv
     )
     
 end
@@ -149,7 +153,9 @@ function solve_ilc!(
     R=0.01
     )   
     
-    print(ilc.exp_rollout(ilc.utraj))
+    #answer, adj = print(ilc.exp_rollout(ilc.utraj))
+
+    #print(answer[end])
 
     @assert length(qs) == ilc.n
     @assert length(qfs) == ilc.n
@@ -171,9 +177,15 @@ function solve_ilc!(
     A = ilc.A
     B = ilc.B
     C = ilc.C
+    Cinv = ilc.Cinv
+    
+    diag = map(x -> [R, Q, x'*Q*x], Cinv)
+    diag = reduce(vcat, diag)
+    deleteat!(diag, (length(diag) - 2):length(diag))
+    deleteat!(diag, 1:3)
+    #H = blockdiag(kron(I(T-2), blockdiag(R, Q, S)), R, Qf, Sf)
 
-    H = blockdiag(kron(I(T-2), blockdiag(R, Q, S)), R, Qf, Sf)
-
+    H = blockdiag(diag..., R, Qf, Cinv[end]' * Qf * Cinv[end])
     #total dimension of our vector is (n+m+d)*(T-1)
     
     #dynamics constraints
@@ -207,6 +219,8 @@ function solve_ilc!(
         @assert all(t -> 1 <= t <= T, ts)
         @assert length(ys) == length(ts)
 
+        println("Iter $(it): $(ys[end])")
+
         q = zeros((n+m+d)*(T-1))
 
         
@@ -216,13 +230,13 @@ function solve_ilc!(
             errs[d*(t-2) .+ (1:d)] .= -(y - ilc.ỹs[t])
         end
 
-        println(errs)
-
+        #println(errs[end])
+        #S, Sf
         for k = 1:T-2
-            q[(m+n) + (m+n+d)*(k-1) .+ (1:d)] .= S*(-errs[(k-1)*d .+ (1:d)])
+            q[(m+n) + (m+n+d)*(k-1) .+ (1:d)] .= Cinv[k+1]'*Q*Cinv[k+1]*(-errs[(k-1)*d .+ (1:d)])
         end
 
-        q[(m+n) + (m+n+d)*(T-2) .+ (1:d)] .= Sf*(-errs[(T-2)*d .+ (1:d)])
+        q[(m+n) + (m+n+d)*(T-2) .+ (1:d)] .= Cinv[end]'*Qf*Cinv[end]*(-errs[(T-2)*d .+ (1:d)])
         
 
         cbnds = [repeat(ilc.control_bounds, T-2); 
@@ -237,7 +251,7 @@ function solve_ilc!(
                     eps_dual_inf=1e-8, polish=1)
         results = OSQP.solve!(qp)
         ztraj = results.x
-        print(U*ztraj)
+        #print(U*ztraj)
         Δu = reshape(U*ztraj, 2, :)
         
         ilc.utraj .= ilc.utraj + Δu
