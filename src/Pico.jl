@@ -54,10 +54,10 @@ include("problem_utils.jl")
 include("problem_solvers.jl")
 @reexport using .ProblemSolvers
 
+include("iterative_learning_control.jl")
+@reexport using .IterativeLearningControl
+
 include("plotting_utils.jl")
 @reexport using .PlottingUtils
-
-include("interative_learning_control.jl")
-@reexport using .InterativeLearningControl
 
 end

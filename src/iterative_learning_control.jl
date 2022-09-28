@@ -1,4 +1,4 @@
-module InterativeLearningControl
+module IterativeLearningControl
 
 export ILCProblem
 export solve!
@@ -154,6 +154,7 @@ struct QuadraticProblem
     ∇²g::Function
     Q::Float64
     R::Float64
+    u_bounds::Vector{Float64}
     correction_term::Bool
     settings::Dict
     dims::NamedTuple
@@ -164,6 +165,7 @@ function QuadraticProblem(
     g::Function,
     Q::Float64,
     R::Float64,
+    u_bounds::Vector{Float64},
     correction_term::Bool,
     settings::Dict,
     xdim::Int,
@@ -195,6 +197,7 @@ function QuadraticProblem(
         ∇²g,
         Q,
         R,
+        u_bounds,
         correction_term,
         settings,
         dims
@@ -205,13 +208,9 @@ function (QP::QuadraticProblem)(
     Ẑ::Trajectory,
     ΔY::MeasurementData,
 )
-    f_cons = zeros(QP.dims.x * (QP.dims.T - 1))
-    g_cons = -vcat(ΔY.ys...)
-    cons = [f_cons; g_cons]
-
     H = build_hessian(QP.Q, QP.R, QP.dims)
 
-    A = build_constraint_matrix(
+    A, lb, ub = build_constraint_matrix(
         QP,
         Ẑ,
         ΔY
@@ -223,8 +222,8 @@ function (QP::QuadraticProblem)(
         model;
         P=H,
         A=A,
-        l=cons,
-        u=cons,
+        l=lb,
+        u=ub,
         QP.settings...
     )
 
@@ -263,7 +262,7 @@ end
 @inline function build_constraint_matrix(
     QP::QuadraticProblem,
     Ẑ::Trajectory,
-    ΔY::MeasurementData
+    ΔY::MeasurementData,
 )
     ∇F = build_dynamics_constraint_jacobian(QP, Ẑ)
 
@@ -273,9 +272,48 @@ end
         ΔY
     )
 
-    A = sparse_vcat(∇F, ∇G)
+    C = build_constrols_constraint_matrix(QP)
 
-    return A
+    f_cons = zeros(QP.dims.x * (QP.dims.T - 1))
+    g_cons = -vcat(ΔY.ys...)
+    u_lb = -foldr(vcat, fill(QP.u_bounds, Ẑ.T - 1)) -
+        vcat(Ẑ.actions[1:Ẑ.T - 1]...)
+    u_ub = foldr(vcat, fill(QP.u_bounds, Ẑ.T - 1)) -
+        vcat(Ẑ.actions[1:Ẑ.T - 1]...)
+
+    lb = vcat(f_cons, g_cons, u_lb, zeros(QP.dims.u))
+    ub = vcat(f_cons, g_cons, u_ub, zeros(QP.dims.u))
+
+
+    A = sparse_vcat(∇F, ∇G, C)
+
+    return A, lb, ub
+end
+
+@inline function build_constrols_constraint_matrix(
+    QP::QuadraticProblem
+)
+    C = spzeros(
+        QP.dims.u * QP.dims.T,
+        QP.dims.z * QP.dims.T
+    )
+
+    for t = 1:QP.dims.T
+        C[
+            slice(
+                t,
+                QP.dims.u
+            ),
+            slice(
+                t,
+                QP.dims.x + 1,
+                QP.dims.z,
+                QP.dims.z
+            )
+        ] = sparse(I(QP.dims.u))
+    end
+
+    return C
 end
 
 @inline function build_measurement_constraint_jacobian(
@@ -352,6 +390,7 @@ mutable struct ILCProblem
     QP::QuadraticProblem
     Ygoal::MeasurementData
     Ȳs::Vector{MeasurementData}
+    Us::Vector{Matrix{Float64}}
     experiment::QuantumExperiment
     settings::Dict
 
@@ -362,15 +401,18 @@ mutable struct ILCProblem
         integrator=:FourthOrderPade,
         Q=1.0,
         R=1.0,
+        u_bounds=[2π * 0.5 for j = 1:sys.ncontrols],
         correction_term=true,
         verbose=true,
-        max_iter=1_000,
+        max_iter=100,
         tol=1e-6,
         norm_p=Inf,
-        QP_max_iter=1_000,
+        QP_max_iter=1000,
         QP_verbose=false,
         QP_settings=Dict(),
     )
+        @assert length(u_bounds) == sys.ncontrols
+
         ILC_settings = Dict(
             :max_iter => max_iter,
             :tol => tol,
@@ -393,6 +435,7 @@ mutable struct ILCProblem
         QP = QuadraticProblem(
             f, experiment.g,
             Q, R,
+            u_bounds,
             correction_term,
             QP_settings,
             xdim,
@@ -415,6 +458,7 @@ mutable struct ILCProblem
             QP,
             Ygoal,
             MeasurementData[],
+            Matrix{Float64}[],
             experiment,
             ILC_settings
         )
@@ -422,8 +466,10 @@ mutable struct ILCProblem
 end
 
 function ProblemSolvers.solve!(prob::ILCProblem)
-    Ȳ = prob.experiment(prob.Ẑ.actions)
+    U = prob.Ẑ.actions
+    Ȳ = prob.experiment(U)
     push!(prob.Ȳs, Ȳ)
+    push!(prob.Us, hcat(U...))
     ΔY = Ȳ - prob.Ygoal
     k = 1
     while norm(ΔY, prob.settings[:norm_p]) > prob.settings[:tol]
@@ -436,11 +482,12 @@ function ProblemSolvers.solve!(prob::ILCProblem)
             println("|ΔY| = ", norm(ΔY, prob.settings[:norm_p]))
             println()
         end
-        push!(prob.Ȳs, Ȳ)
         ΔZ = prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
-        Ȳ = prob.experiment(prob.Ẑ.actions)
+        U = prob.Ẑ.actions
+        Ȳ = prob.experiment(U)
         push!(prob.Ȳs, Ȳ)
+        push!(prob.Us, hcat(U...))
         ΔY = Ȳ - prob.Ygoal
         k += 1
     end

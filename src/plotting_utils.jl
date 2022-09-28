@@ -9,11 +9,13 @@ export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
 export plot_twoqubit
+export animate_ILC_two_qubit
 
 using ..Utils
 using ..Trajectories
 using ..QuantumSystems
 using ..Problems
+using ..IterativeLearningControl
 
 using LaTeXStrings
 using CairoMakie
@@ -711,5 +713,63 @@ function plot_twoqubit(
     save(path, fig)
 
 end
+
+function animate_ILC_two_qubit(
+    prob::ILCProblem,
+    path::String
+)
+    fig = Figure(resolution=(1200, 1200))
+
+    Ygoalax = Axis(fig[1, :]; title="Y goal", xlabel=L"t")
+
+    Ȳax = Axis(fig[2, :]; title="Ȳ", xlabel=L"t")
+
+    Ygoal = hcat(prob.Ygoal.ys...)
+    τs = prob.Ygoal.times
+
+    series!(Ygoalax, τs, Ygoal;
+        labels=[
+            "|00⟩",
+            "|01⟩",
+            "|10⟩",
+            "|11⟩",
+        ]
+    )
+
+    axislegend(Ygoalax; position=:lb)
+
+    Ȳ₁ = hcat(prob.Ȳs[1].ys...)
+
+    Ȳsp = series!(Ȳax, τs, Ȳ₁;
+        labels=[
+            "|00⟩",
+            "|01⟩",
+            "|10⟩",
+            "|11⟩",
+        ]
+    )
+
+    axislegend(Ȳax; position=:lb)
+
+    uax = Axis(fig[3, :]; title="a(t)", xlabel=L"t")
+
+    U₁ = prob.Us[1]
+    ts = prob.Ẑ.times
+
+    Usp = series!(uax, ts, U₁;
+        labels=["a_$j" for j = 1:prob.QP.dims.u]
+    )
+
+    println(path)
+
+    record(fig, path, 2:length(prob.Ȳs); framerate=1) do i
+        Ȳ = hcat(prob.Ȳs[i].ys...)
+        U = prob.Us[i]
+
+        Ȳsp[2] = Ȳ
+        Usp[2] = U
+    end
+end
+
 
 end

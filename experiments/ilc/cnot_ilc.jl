@@ -1,6 +1,6 @@
 using Pico
 
-data_name = "cnot_iter_500_00000"
+data_name = "cnot_iter_500_00002"
 data_dir = "data/twoqubit/cnot"
 data_path = joinpath(data_dir, data_name * ".jld2")
 
@@ -33,7 +33,7 @@ experiment = QuantumExperiment(
     prob.system,
     Ẑ.states[1],
     Ẑ.Δt,
-    g,
+    x -> g(x),
     prob.system.isodim ÷ 2,
     1:Ẑ.T
 )
@@ -42,7 +42,16 @@ prob = ILCProblem(
     prob.system,
     Ẑ,
     experiment;
-    max_iter = 10
+    max_iter=10,
+    QP_verbose=false,
+    correction_term=true,
+    norm_p=Inf,
+
 )
 
 solve!(prob)
+
+plot_dir = "plots/ILC/twoqubit"
+plot_path = generate_file_path("gif", data_name, plot_dir)
+
+animate_ILC_two_qubit(prob, plot_path)
