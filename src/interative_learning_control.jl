@@ -148,7 +148,7 @@ end
 
 
 struct QuadraticProblem
-    f::AbstractIntegrator
+    f::AbstractIntegrator,
     g::Function
     ∇g::Function
     ∇²g::Function
