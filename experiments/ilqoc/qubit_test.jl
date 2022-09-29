@@ -60,16 +60,21 @@ prob = QuantumControlProblem(
     options = options
 )
 
+# function g(x, sys::QuantumSystem)
+#     #x[1:sys.n_wfn_states]
+#     y = []
+#     for i = 1:sys.nqstates
+#         ψ_i = x[slice(i, sys.isodim)]
+#         append!(y, meas_x_iso(ψ_i))
+#         append!(y, meas_y_iso(ψ_i))
+#         append!(y, meas_z_iso(ψ_i))
+#     end
+#     return y 
+# end
+
 function g(x, sys::QuantumSystem)
-    #x[1:sys.n_wfn_states]
-    y = []
-    for i = 1:sys.nqstates
-        ψ_i = x[slice(i, sys.isodim)]
-        append!(y, meas_x_iso(ψ_i))
-        append!(y, meas_y_iso(ψ_i))
-        append!(y, meas_z_iso(ψ_i))
-    end
-    return y 
+    return x[1:sys.n_wfn_states]
+
 end
 
 function exp_rollout(utraj::Matrix{Float64})
@@ -90,7 +95,7 @@ function exp_rollout(utraj::Matrix{Float64})
     return ys, ts
 end
 
-ilc_prob = ILCProblem(prob, g, exp_rollout, 6)
+ilc_prob = ILCProblem(prob, g, exp_rollout, system.n_wfn_states)
 answer, jku = solve_ilc!(ilc_prob; iter = 2)
 
 println(answer[end])
