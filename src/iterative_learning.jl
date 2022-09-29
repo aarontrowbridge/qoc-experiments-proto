@@ -148,7 +148,7 @@ function solve_ilc!(
     iter=3,
     tol=1e-4, 
     qs=[fill(1., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
-    qfs=[fill(8000., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
+    qfs=[fill(80., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
     R=0.01
     )   
     
@@ -169,10 +169,9 @@ function solve_ilc!(
     Q = sparse(Diagonal(qs))
     Qf = sparse(Diagonal(qfs))
     R = sparse(Diagonal(fill(R, m)))
-    S = sparse(Diagonal(fill(1,d)))
-    Sf = sparse(Diagonal(fill(8000., d)))
 
-    S = spzeros(d,d)
+
+    #S = spzeros(d,d)
     A = ilc.A
     B = ilc.B
     C = ilc.C
@@ -182,35 +181,35 @@ function solve_ilc!(
     # diag = reduce(vcat, diag)
     # deleteat!(diag, (length(diag) - 2):length(diag))
     # deleteat!(diag, 1:3)
-    H = blockdiag(kron(I(T-2), blockdiag(R, Q, S)), R, Qf, Sf)
+    H = blockdiag(kron(I(T-2), blockdiag(R, Q)), R, Qf)
 
     #H = blockdiag(diag..., R, Qf, Cinv[end]' * Qf * Cinv[end])
     #total dimension of our vector is (n+m+d)*(T-1)
     
     #dynamics constraints
-    D = spzeros(n*(T-1), (n+m+d)*(T-1))
+    D = spzeros(n*(T-1), (n+m)*(T-1))
     D[1:n, 1:m] .= B[1]
     D[1:n, m .+ (1:n)] .= -I(n)
 
     for k = 1:(T-2)
         D[k*n .+ (1:n), 
-          ((k-1)*(n+d+m) + m) .+ (1:(2*n + m + d))
-         ] .= [A[k+1] spzeros(n, d) B[k+1] -I]
+          ((k-1)*(n+m) + m) .+ (1:(2*n + m))
+         ] .= [A[k+1] B[k+1] -I]
     end
 
     #measurement Constraints
-    M = spzeros(d*(T-1), (n+m+d)*(T-1))
+    M = spzeros(d*(T-1), (n+m)*(T-1))
 
     for k = 1:(T-1)
-        M[(k-1)*d .+ (1:d), (m + (k-1)*(n+d+m)) .+ (1:(n+d))] .= [C[k+1] -I]
+        M[(k-1)*d .+ (1:d), (m + (k-1)*(n+m)) .+ (1:n)] .= C[k+1]
     end
     
     #control bound constraints
-    Cb = kron(I(T-1), [zeros(m, n - m) I zeros(m, d + m)])
+    Cb = kron(I(T-1), [zeros(m, m + n - 2*m) I zeros(m, m)])
 
     #matrix that picks out the Δus
-    U = kron(I(T-1), [I zeros(m, n + d)])
-    X = kron(I(T-1), [zeros(n,m) I zeros(n, d)])
+    U = kron(I(T-1), [I zeros(m, n)])
+    X = kron(I(T-1), [zeros(n,m) I])
     
     it = 0
     while it < iter
@@ -220,7 +219,7 @@ function solve_ilc!(
 
         println("Iter $(it): $(ys[end])")
 
-        q = zeros((n+m+d)*(T-1))
+        q = zeros((n+m)*(T-1))
 
         
         errs = zeros(d*(T-1))
