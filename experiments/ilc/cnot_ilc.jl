@@ -33,8 +33,8 @@ experiment = QuantumExperiment(
     prob.system,
     Ẑ.states[1],
     Ẑ.Δt,
-    x -> g(x),
-    prob.system.isodim ÷ 2,
+    x -> x,
+    prob.system.isodim,
     1:Ẑ.T
 )
 
@@ -42,11 +42,12 @@ prob = ILCProblem(
     prob.system,
     Ẑ,
     experiment;
-    max_iter=10,
-    QP_verbose=false,
+    max_iter=3,
+    QP_verbose=true,
+    QP_max_iter=100000,
     correction_term=true,
     norm_p=Inf,
-
+    R=0.01,
 )
 
 solve!(prob)

@@ -16,6 +16,7 @@ using ..QuantumSystems
 using ..Integrators
 using ..Utils
 using ..ProblemSolvers
+using ..QuantumLogic
 
 using LinearAlgebra
 using SparseArrays
@@ -117,6 +118,12 @@ function second_order_pade(Gₜ::Matrix)
         (Id + Δt / 2 * Gₜ)
 end
 
+
+# TODO:
+# - add noise terms (must correspond to ketdim)
+# - add multiple quantum state functionality here
+# - show fidelity
+
 function (experiment::QuantumExperiment)(
     U::Vector{Vector{Float64}}
 )::MeasurementData
@@ -131,7 +138,7 @@ function (experiment::QuantumExperiment)(
             U[t - 1],
             experiment.sys.G_drift,
             experiment.sys.G_drives
-        )
+        ) + 0.5e-2 * QuantumSystems.G(GATES[:CX])
         Ψ̃[t] = experiment.integrator(Gₜ * experiment.Δt) *
             Ψ̃[t - 1]
     end
@@ -147,9 +154,14 @@ function (experiment::QuantumExperiment)(
 end
 
 
+# TODO:
+# - make more general for arbitrary dynamics
+#   - make work with augmented state
+# - add functionality to store non updating jacobians
+# - OSQP error handling
+
 struct QuadraticProblem
     f::AbstractIntegrator
-    g::Function
     ∇g::Function
     ∇²g::Function
     Q::Float64
@@ -192,7 +204,6 @@ function QuadraticProblem(
 
     return QuadraticProblem(
         f,
-        g,
         ∇g,
         ∇²g,
         Q,
@@ -344,6 +355,7 @@ end
     return ∇G
 end
 
+# TODO: add feat to just store jacobian of goal traj
 @inline function build_dynamics_constraint_jacobian(
     QP::QuadraticProblem,
     Ẑ::Trajectory
@@ -382,6 +394,8 @@ end
 
     return ∇F
 end
+
+
 
 
 mutable struct ILCProblem
