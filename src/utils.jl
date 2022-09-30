@@ -2,7 +2,6 @@ module Utils
 
 export index
 export slice
-export generate_file_path
 
 """
 this module contains helper functions for indexing and taking slices of the full problem variable vector
@@ -32,6 +31,7 @@ Z[slice(t, pos1, pos2, dim)]      = zₜ[pos1:pos2]
 Z[slice(t, pos, dim)]             = zₜ[1:pos]
 Z[slice(t, dim)]                  = zₜ[1:dim]
 Z[slice(t, dim; stretch=stretch)] = zₜ[1:(dim + stretch)]
+Z[slice(t, indices, dim)]         = zₜ[indices]
 
 the functions are also used to access the zₜ vectors, e.g.
 
@@ -41,7 +41,7 @@ zₜ[n_wfn_states .+ slice(2, ncontrols)]          = aₜ
 zₜ[n_wfn_states .+ slice(augdim + 1, ncontrols)] = uₜ = ddaₜ
 """
 
-index(t::Int, pos::Int, dim::Int) = (t - 1) * dim + pos
+index(t::Int, pos::Int, dim::Int) = dim * (t - 1) + pos
 
 index(t, dim) = index(t, dim, dim)
 
@@ -85,5 +85,8 @@ function generate_file_path(extension, file_name, path)
 
     return file_path
 end
+
+slice(t::Int, indices::AbstractVector{Int}, dim::Int) =
+    dim * (t - 1) .+ indices
 
 end

@@ -6,10 +6,10 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 
-MOI.initialize(::AbstractPICOEvaluator, features) = nothing
+MOI.initialize(::PicoEvaluator, features) = nothing
 
 
-function MOI.features_available(evaluator::AbstractPICOEvaluator)
+function MOI.features_available(evaluator::PicoEvaluator)
     if evaluator.eval_hessian
         return [:Grad, :Jac, :Hess]
     else
@@ -21,14 +21,14 @@ end
 # objective and gradient
 
 function MOI.eval_objective(
-    evaluator::AbstractPICOEvaluator,
+    evaluator::PicoEvaluator,
     Z::AbstractVector
 )
     return evaluator.objective.L(Z)
 end
 
 function MOI.eval_objective_gradient(
-    evaluator::AbstractPICOEvaluator,
+    evaluator::PicoEvaluator,
     ∇::AbstractVector,
     Z::AbstractVector
 )
@@ -40,7 +40,7 @@ end
 # constraints and Jacobian
 
 function MOI.eval_constraint(
-    evaluator::AbstractPICOEvaluator,
+    evaluator::PicoEvaluator,
     g::AbstractVector,
     Z::AbstractVector
 )
@@ -48,12 +48,12 @@ function MOI.eval_constraint(
     return nothing
 end
 
-function MOI.jacobian_structure(evaluator::AbstractPICOEvaluator)
+function MOI.jacobian_structure(evaluator::PicoEvaluator)
     return evaluator.dynamics.∇F_structure
 end
 
 function MOI.eval_constraint_jacobian(
-    evaluator::AbstractPICOEvaluator,
+    evaluator::PicoEvaluator,
     J::AbstractVector,
     Z::AbstractVector
 )
@@ -69,14 +69,17 @@ end
 # Hessian of the Lagrangian
 
 function MOI.hessian_lagrangian_structure(
-    evaluator::AbstractPICOEvaluator
+    evaluator::PicoEvaluator
 )
-    structure = vcat(evaluator.objective.∇²L_structure, evaluator.dynamics.μ∇²F_structure)
+    structure = vcat(
+        evaluator.objective.∇²L_structure,
+        evaluator.dynamics.μ∇²F_structure
+    )
     return structure
 end
 
 function MOI.eval_hessian_lagrangian(
-    evaluator::AbstractPICOEvaluator,
+    evaluator::PicoEvaluator,
     H::AbstractVector{T},
     Z::AbstractVector{T},
     σ::T,

@@ -45,6 +45,15 @@ include("constraints.jl")
 include("problems.jl")
 @reexport using .Problems
 
+include("problems_mintime.jl")
+@reexport using .MinTimeProblems
+
+include("problem_utils.jl")
+@reexport using .ProblemUtils
+
+include("problem_solvers.jl")
+@reexport using .ProblemSolvers
+
 include("plotting_utils.jl")
 @reexport using .PlottingUtils
 

@@ -16,10 +16,10 @@ export actions_matrix
 export wfn_components
 export wfn_components_matrix
 export final_state
-export final_state2
+export final_state_i
+export final_state_2
 export pop_components
 export pop_matrix
-export final_statei
 export save_trajectory
 export load_trajectory
 
@@ -37,7 +37,7 @@ function linear_interpolation(x1, xT, T::Int)
 end
 
 function rollout(
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     A::Vector{<:AbstractVector},
     Δt::Real
 )
@@ -93,7 +93,7 @@ end
 # constructor for case of given controls
 
 function Trajectory(
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     controls::Matrix,
     Δt::Real
 )
@@ -166,7 +166,7 @@ function Trajectory(
 end
 
 function Trajectory(
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     T::Int,
     Δt::Float64;
     linearly_interpolate = true,
@@ -204,9 +204,9 @@ end
 
 function jth_order_controls(
     traj::Trajectory,
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     j::Int;
-    d2pi = true
+    d2pi=true
 )
     if sys.∫a
         @assert j ∈ -1:sys.control_order
@@ -240,7 +240,7 @@ actions_matrix(traj::Trajectory) = hcat(traj.actions...)
 
 function wfn_components(
     traj::Trajectory,
-    sys::AbstractQuantumSystem;
+    sys::AbstractSystem;
     i=1,
     components=nothing
 )
@@ -254,7 +254,7 @@ end
 
 function pop_components(
     traj::Trajectory,
-    sys::AbstractQuantumSystem;
+    sys::AbstractSystem;
     i = 1,
     components = nothing
 )
@@ -277,7 +277,7 @@ final_state_2(traj, sys) = final_state_i(traj, sys, 2)
 
 function final_state_i(
     traj::Trajectory,
-    sys::AbstractQuantumSystem,
+    sys::AbstractSystem,
     i::Int
 )
     return traj.states[traj.T][slice(i, sys.isodim)]
@@ -285,7 +285,7 @@ end
 
 # function populations(
 #     traj::Trajectory,
-#     sys::AbstractQuantumSystem,
+#     sys::AbstractSystem,
 #     i = 1,
 #     components=nothing
 # )
@@ -332,7 +332,7 @@ end
 
 function load_controls_matrix_and_times(
     path::String,
-    sys::AbstractQuantumSystem
+    sys::AbstractSystem
 )
     traj = load_trajectory(path)
     controls = controls_matrix(traj, sys)

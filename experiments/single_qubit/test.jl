@@ -35,8 +35,8 @@ system = QuantumSystem(
     a_bounds
 )
 
-T                = 1000
-Δt               = 0.01
+T                = 500
+Δt               = 0.03
 Q                = 200.0
 R                = 2.0
 cost             = :infidelity_cost
@@ -90,7 +90,7 @@ plot_single_qubit(
     fig_title="$gate gate on basis states"
 )
 
-loaded_prob = load_prob(save_path)
+loaded_prob = load_problem(save_path)
 
 solve!(loaded_prob)
 

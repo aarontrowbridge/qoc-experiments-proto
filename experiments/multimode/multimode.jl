@@ -1,65 +1,27 @@
 using Pico
-using LinearAlgebra
-using JLD2
 
+transmon_levels = 2
+cavity_levels = 14
 
-const EXPERIMENT_NAME = "g0_to_g1"
-plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/multimode/fermium/")
+ψ1 = "g0"
+ψf = "g1"
 
-const TRANSMON_LEVELS = 2
-const CAVITY_LEVELS = 14
-
-function cavity_state(level)
-    state = zeros(CAVITY_LEVELS)
-    state[level + 1] = 1.
-    return state
-end
-#const TRANSMON_ID = I(TRANSMON_LEVELS)
-
-TRANSMON_G = [1; zeros(TRANSMON_LEVELS - 1)]
-TRANSMON_E = [zeros(1); 1; zeros(TRANSMON_LEVELS - 2)]
-
-
-CHI = 2π * -0.5469e-3
-KAPPA = 2π * 4e-6
-
-H_drift = 2 * CHI * kron(TRANSMON_E*TRANSMON_E', number(CAVITY_LEVELS)) +
-          (KAPPA/2) * kron(I(TRANSMON_LEVELS), quad(CAVITY_LEVELS))
-
-transmon_driveR = kron(create(TRANSMON_LEVELS) + annihilate(TRANSMON_LEVELS), I(CAVITY_LEVELS))
-transmon_driveI = kron(1im*(create(TRANSMON_LEVELS) - annihilate(TRANSMON_LEVELS)), I(CAVITY_LEVELS))
-
-cavity_driveR = kron(I(TRANSMON_LEVELS), create(CAVITY_LEVELS) + annihilate(CAVITY_LEVELS))
-cavity_driveI = kron(I(TRANSMON_LEVELS),  1im * (create(CAVITY_LEVELS) - annihilate(CAVITY_LEVELS)))
-
-H_drives = [transmon_driveR, transmon_driveI, cavity_driveR, cavity_driveI]
-
-ψ1 = kron(TRANSMON_G, cavity_state(0))
-ψf = kron(TRANSMON_G, cavity_state(1))
-
-# bounds on controls
-
-qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
-
-cavity_a_bounds = fill(0.03, length(H_drives) - 2)
-
-a_bounds = [qubit_a_bounds; cavity_a_bounds]
-
-system = QuantumSystem(
-    H_drift,
-    H_drives,
+system = MultiModeSystem(
+    transmon_levels,
+    cavity_levels,
     ψ1,
     ψf,
-    a_bounds
 )
 
-T                = 300
-Δt               = 1.5
-R                = 1.0
-iter             = 10_000
+T                = 400
+Δt               = 5.0
+R                = 200.0
+iter             = 2000
 resolves         = 10
-pin_first_qstate = true
+pin_first_qstate = false
 phase_flip       = false
+mode_con         = true
+αval             = 0.5
 
 # T                = parse(Int,     ARGS[1])
 # Δt               = parse(Float64, ARGS[2])
@@ -68,7 +30,6 @@ phase_flip       = false
 # resolves         = parse(Int,     ARGS[5])
 # pin_first_qstate = parse(Bool,    ARGS[6])
 # phase_flip       = parse(Bool,    ARGS[7])
-
 
 options = Options(
     max_iter = iter,
@@ -84,30 +45,36 @@ u_bounds = BoundsConstraint(
     system.vardim
 )
 
-energy_con = EqualityConstraint(
-    2:T-1,
-    [CAVITY_LEVELS, 2 * CAVITY_LEVELS, 3 * CAVITY_LEVELS, 4 * CAVITY_LEVELS],
-    0.0,
-    system.vardim;
-    name="highest energy level constraints"
-)
+cons = AbstractConstraint[u_bounds]
 
-cons = AbstractConstraint[u_bounds, energy_con]
-
-experiment = "g0_to_g1_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * "_mode_constrained"
+experiment = "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" * (pin_first_qstate ? "_pinned" : "") * (phase_flip ? "_phase_flip" : "") * (mode_con ? "_alpha_$(αval)" : "")
 
 plot_dir = "plots/multimode/fermium"
 data_dir = "data/multimode/fixed_time/no_guess/problems"
 
-prob = QuantumControlProblem(
-    system;
-    T=T,
-    Δt=Δt,
-    R=R,
-    pin_first_qstate=pin_first_qstate,
-    options=options,
-    constraints=cons
-)
+if mode_con
+    prob = QuantumControlProblem(
+        system;
+        T=T,
+        Δt=Δt,
+        R=R,
+        pin_first_qstate=pin_first_qstate,
+        options=options,
+        constraints=cons,
+        L1_regularized_states=[1,2,3,4] .* cavity_levels,
+        α = fill(αval, 4),
+    )
+else
+    prob = QuantumControlProblem(
+        system;
+        T=T,
+        Δt=Δt,
+        R=R,
+        pin_first_qstate=pin_first_qstate,
+        options=options,
+        constraints=cons
+    )
+end
 
 for i = 1:resolves
     resolve = "_resolve_$i"
@@ -121,8 +88,8 @@ for i = 1:resolves
         experiment * resolve,
         data_dir
     )
-    plot_multimode(prob.system, prob.trajectory, plot_path)
+    plot_multimode_split(prob, plot_path)
     solve!(prob, save_path=save_path)
-    plot_multimode(prob.system, prob.trajectory, plot_path)
-    global prob = load_prob(save_path)
+    plot_multimode_split(prob, plot_path)
+    global prob = load_problem(save_path)
 end

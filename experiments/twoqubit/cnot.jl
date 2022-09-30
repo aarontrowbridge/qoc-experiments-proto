@@ -1,7 +1,7 @@
 using Pico
 using LinearAlgebra
 
-iter = 100
+iter = 5000
 
 const EXPERIMENT_NAME = "CNOT"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/twoqubit/cnot/")
@@ -93,9 +93,9 @@ plot_twoqubit(
 
 
 #infidelity = iso_infidelity(final_statei(prob.trajectory, system, i = 4), ket_to_iso(ψf[4]))
-for j in 1:4
-    display(final_state_i(prob.trajectory, system, i = j))
-    infidelity = iso_infidelity(final_state_i(prob.trajectory, system, i = j), ket_to_iso(ψf[j]))
+for i in 1:4
+    display(final_state_i(prob.trajectory, system, i))
+    infidelity = iso_infidelity(final_state_i(prob.trajectory, system, i), ket_to_iso(ψf[i]))
     println("Infidelity = $infidelity" )
 end
 #display(final_statei(prob.trajectory, system, i = 3))

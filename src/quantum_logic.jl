@@ -8,6 +8,7 @@ export iso_to_ket
 export annihilate
 export create
 export quad
+export cavity_state
 export number
 export normalize
 
@@ -52,6 +53,12 @@ function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
     return ComplexF64.(normalize(U * ψ))
 end
 
+
+"""
+    quantum harmonic oscillator operators
+
+"""
+
 function annihilate(levels::Int)
     return diagm(1 => map(sqrt, 1:levels - 1))
 end
@@ -66,6 +73,12 @@ end
 
 function quad(levels::Int)
     return number(levels)*(number(levels) - I(levels))
+end
+
+function cavity_state(level, cavity_levels)
+    state = zeros(cavity_levels)
+    state[level + 1] = 1.
+    return state
 end
 
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]

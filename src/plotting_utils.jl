@@ -4,6 +4,7 @@ export plot_single_qubit_1_qstate_with_controls
 export plot_single_qubit_2_qstate_with_controls
 export plot_single_qubit_2_qstate_with_seperated_controls
 export plot_multimode
+export plot_multimode_split
 export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
@@ -259,7 +260,7 @@ function plot_single_qubit_2_qstate_with_seperated_controls(
 end
 
 function plot_multimode(
-    system::QuantumSystem,
+    system::AbstractSystem,
     traj::Trajectory,
     path::String;
     components=nothing,
@@ -341,12 +342,13 @@ function plot_multimode(
     save(path, fig)
 end
 
-function plot_single_qubit(
-    system::QuantumSystem,
-    traj::Trajectory,
+function plot_multimode_split(
+    prob::AbstractProblem,
     path::String;
-    fig_title=nothing
+    show_highest_modes=false,
+    show_augs=false
 )
+    # TODO: add this check to all plot functions
     path_parts = split(path, "/")
     dir = joinpath(path_parts[1:end-1])
     if !isdir(dir)
@@ -355,41 +357,186 @@ function plot_single_qubit(
 
     fig = Figure(resolution=(1200, 1500))
 
-    ψs = wfn_components_matrix(traj, system)
+    ketdim = prob.system.isodim ÷ 2
 
-    ψax = Axis(fig[1:2, :]; title="qubit components", xlabel=L"t")
+    if !show_highest_modes
+        ψs1 = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=1:ketdim÷2
+        )
+
+        ψs2 = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=(ketdim÷2 + 1):ketdim
+        )
+
+        ψax1 = Axis(
+            fig[1, :];
+            title="multimode system components 1:$(ketdim÷2)",
+            xlabel=L"t [ns]"
+        )
+
+        ψax2 = Axis(
+            fig[2, :];
+            title="multimode system components $(ketdim÷2 + 1):$ketdim",
+            xlabel=L"t [ns]"
+        )
+
+        series!(
+            ψax1,
+            prob.trajectory.times,
+            ψs1;
+            color=:tab20,
+            labels=["|g$(i)⟩" for i = 0:ketdim÷2 - 1]
+        )
+
+        axislegend(ψax1; position=:lc)
+
+        series!(
+            ψax2,
+            prob.trajectory.times,
+            ψs2;
+            color=:tab20,
+            labels=["|e$(i)⟩" for i = 0:ketdim÷2 - 1]
+        )
+
+        axislegend(ψax2; position=:lc)
+
+
+    else
+
+        ψs1 = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=[1, 2]
+        )
+
+        ψs2 = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=[ketdim÷2, ketdim]
+        )
+
+        ψax1 = Axis(
+            fig[1, :];
+            title="multimode system components 1:2",
+            xlabel=L"t [ns]"
+        )
+
+        ψax2 = Axis(
+            fig[2, :];
+            title="multimode system components 14 & 28",
+            xlabel=L"t [ns]"
+        )
+
+        series!(
+            ψax1,
+            prob.trajectory.times,
+            ψs1;
+            color=:tab10,
+            labels=["|g0⟩", "|g1⟩"]
+        )
+
+        axislegend(ψax1; position=:lc)
+
+        series!(
+            ψax2,
+            prob.trajectory.times,
+            ψs2;
+            color=:tab10,
+            labels=["|g13⟩", "|e13⟩"]
+        )
+
+        axislegend(ψax2; position=:lc)
+
+
+    end
+
+    if show_augs
+        for j = 0:system.control_order
+
+            ax_j = Axis(fig[3 + j, :]; xlabel = L"t [ns]")
+
+            data = jth_order_controls_matrix(
+                prob.trajectory,
+                prob.system,
+                j
+            )
+
+            if j == system.control_order
+                data[:, end] = data[:, end-1]
+            end
+
+            series!(
+                ax_j,
+                prob.trajectory.times,
+                data;
+                labels = [
+                    j == 0 ?
+                    latexstring("a_$k (t)") :
+                    latexstring(
+                        "\\mathrm{d}^{",
+                        j == 1 ? "" : "$j",
+                        "}_t a_$k"
+                    )
+                    for k = 1:prob.system.ncontrols
+                ]
+            )
+
+            axislegend(ax_j; position=:lt)
+        end
+    else
+        ax = Axis(fig[3, :]; xlabel = L"t [ns]")
+
+        data = jth_order_controls_matrix(
+            prob.trajectory,
+            prob.system,
+            0
+        )
+
+        series!(
+            ax,
+            prob.trajectory.times,
+            data;
+            labels = [
+                latexstring("a_$k (t)")
+                    for k = 1:prob.system.ncontrols
+            ]
+        )
+
+        axislegend(ax; position=:lt)
+    end
+    save(path, fig)
+end
+
+
+
+
+function plot_single_qubit(
+    system::QuantumSystem,
+    traj::Trajectory,
+    path::String;
+    fig_title=nothing
+)
+    mkpath(dirname(path))
+
+    fig = Figure(resolution=(1200, 800))
+
+    ψs = pop_matrix(traj, system)
+
+    ψax = Axis(fig[1, :]; title="qubit components", xlabel=L"t")
     series!(ψax, traj.times, ψs;
-        labels=[
-            L"\psi_1^R",
-            L"\psi_2^R",
-            L"\psi_1^I",
-            L"\psi_2^I"]
+        labels=[L"|\langle 0 | \psi \rangle|^2", L"|\langle 1 | \psi \rangle|^2"],
     )
 
     axislegend(ψax; position=:lb)
 
-    for j = 0:system.control_order
+    as = controls_matrix(traj, system)
 
-        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
-
-        series!(
-            ax_j,
-            traj.times,
-            jth_order_controls_matrix(traj, system, j);
-            labels = [
-                j == 0 ?
-                latexstring("a_$k (t)") :
-                latexstring(
-                    "\\mathrm{d}^{",
-                    j == 1 ? "" : "$j",
-                    "}_t a_$k"
-                )
-                for k = 1:system.ncontrols
-            ]
-        )
-
-        axislegend(ax_j; position=:lt)
-    end
+    a_ax = Axis(fig[2, :]; xlabel=L"t")
+    series!(a_ax, traj.times, as; labels=[L"a(t)"])
 
     # TODO: weird plotting behavior, fix this
 
@@ -454,7 +601,7 @@ function plot_transmon(
 end
 
 function plot_transmon_population(
-    system::TransmonSystem,
+    system::QuantumSystem,
     traj::Trajectory,
     path::String;
     fig_title=nothing
@@ -499,13 +646,14 @@ function plot_twoqubit(
     system::QuantumSystem,
     traj::Trajectory,
     path::String;
-    fig_title = nothing,
-    i = 3
+    fig_title=nothing,
+    i=3,
+    show_augmented_controls=false
 )
-    fig = Figure(resolution=(1200, 1500))
+    fig = Figure(resolution=(1200, 1000))
     pops = pop_matrix(traj, system, i=i)
     #need to rewrite this for arbitrary number of levels
-    ψax = Axis(fig[1:2, :]; title="Population", xlabel=L"t")
+    ψax = Axis(fig[1, :]; title="Population", xlabel=L"t")
     series!(ψax, traj.times, pops;
         labels=[
             "|00⟩",
@@ -517,27 +665,43 @@ function plot_twoqubit(
 
     axislegend(ψax; position=:lb)
 
-    for j = 0:system.control_order
+    if show_augmented_controls
+        for j = 0:system.control_order
 
-        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+            ax_j = Axis(fig[2 + j, :]; xlabel = L"t")
+
+            series!(
+                ax_j,
+                traj.times,
+                jth_order_controls_matrix(traj, system, j);
+                labels = [
+                    j == 0 ?
+                    latexstring("a_$k (t)") :
+                    latexstring(
+                        "\\mathrm{d}^{",
+                        j == 1 ? "" : "$j",
+                        "}_t a_$k"
+                    )
+                    for k = 1:system.ncontrols
+                ]
+            )
+
+            axislegend(ax_j; position=:lt)
+        end
+    else
+        ax = Axis(fig[2, :]; xlabel = L"t")
 
         series!(
-            ax_j,
+            ax,
             traj.times,
-            jth_order_controls_matrix(traj, system, j);
+            controls_matrix(traj, system);
             labels = [
-                j == 0 ?
-                latexstring("a_$k (t)") :
-                latexstring(
-                    "\\mathrm{d}^{",
-                    j == 1 ? "" : "$j",
-                    "}_t a_$k"
-                )
+                latexstring("a_$k (t)")
                 for k = 1:system.ncontrols
             ]
         )
 
-        axislegend(ax_j; position=:lt)
+        axislegend(ax; position=:lt)
     end
 
     # if !isnothing(fig_title)
