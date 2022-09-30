@@ -13,7 +13,8 @@ include("exponential.jl")
 
 
 function D(α::Union{ComplexF64, Float64}, mode_levels::Int)
-    exp(α*create(mode_levels) - α' * annihilate(mode_levels))#[1:mode_levels, 1:mode_levels]
+    @assert mode_levels <= 40
+    exp(α*create(40) - α' * annihilate(40))[1:mode_levels, 1:mode_levels]
 end
 
 function phase_op(θ::Float64, mode_levels::Int; ϕ = 0.)
@@ -23,3 +24,5 @@ end
 function W(α::Union{ComplexF64, Float64}, θ::Float64, mode_levels::Int; ϕ = 0.)
     2/π * D(α, mode_levels) * phase_op(θ, mode_levels, ϕ=ϕ) * D(-α, mode_levels)
 end
+
+
