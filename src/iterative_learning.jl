@@ -8,6 +8,8 @@ export solve_ilc!
 export discrete_dynamics
 
 using ..Problems
+using ..ProblemSolvers
+using ..MinTimeProblems
 using ..QuantumSystems
 using ..Utils
 using ..Integrators
@@ -68,10 +70,14 @@ function ILCProblem(
     g::Function,
     exp_rollout::Function,
     d::Int;
-    ỹs=nothing
+    ỹs=nothing,
+    solve=true
 )
-    println("Solving nominal problem...")
-    solve!(nominal_prob)
+    if solve 
+        println("Solving nominal problem...")
+        solve!(nominal_prob)
+    end
+    
     traj = nominal_prob.trajectory
     sys = nominal_prob.system
 
@@ -119,7 +125,7 @@ function ILCProblem(
 
     ctraj = zeros(2*sys.ncontrols, T)
     for k = 1:T
-        ctraj[:, k] .= xnom[end - 3:end, k]
+        ctraj[:, k] .= xnom[end - 2*sys.ncontrols + 1:end, k]
     end
     
     return ILCProblem(
@@ -147,8 +153,8 @@ function solve_ilc!(
     ilc::ILCProblem; 
     iter=3,
     tol=1e-4, 
-    qs=[fill(1., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
-    qfs=[fill(8000., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
+    qs=[fill(10., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
+    qfs=[fill(10., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
     R=0.01
     )   
     
@@ -169,8 +175,8 @@ function solve_ilc!(
     Q = sparse(Diagonal(qs))
     Qf = sparse(Diagonal(qfs))
     R = sparse(Diagonal(fill(R, m)))
-    S = sparse(Diagonal(fill(1,d)))
-    Sf = sparse(Diagonal(fill(8000., d)))
+    S = sparse(Diagonal(fill(10., d)))
+    Sf = sparse(Diagonal(fill(10., d)))
 
     S = spzeros(d,d)
     A = ilc.A
@@ -251,8 +257,8 @@ function solve_ilc!(
         results = OSQP.solve!(qp)
         ztraj = results.x
         #print(U*ztraj)
-        display(reshape(X*ztraj, n, :))
-        Δu = reshape(U*ztraj, 2, :)
+        #display(reshape(X*ztraj, n, :))
+        Δu = reshape(U*ztraj, m, :)
         
         ilc.utraj .= ilc.utraj + Δu
 
