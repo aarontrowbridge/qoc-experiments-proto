@@ -4,8 +4,12 @@ export AbstractIntegrator
 export QuantumIntegrator
 
 export Exponential
+
 export SecondOrderPade
+export second_order_pade
+
 export FourthOrderPade
+export fourth_order_pade
 
 export Jacobian
 
@@ -86,6 +90,12 @@ function (integrator::SecondOrderPade)(
     return ψ̃ₜ₊₁ - ψ̃ₜ - Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
 end
 
+function second_order_pade(Gₜ::Matrix, Δt::Real)
+    Id = I(size(Gₜ, 1))
+    return inv(Id - Δt / 2 * Gₜ) *
+        (Id + Δt / 2 * Gₜ)
+end
+
 
 # 4th order Pade integrator
 
@@ -109,6 +119,12 @@ function (integrator::FourthOrderPade)(
     #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
     return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
         Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
+end
+
+function fourth_order_pade(Gₜ::Matrix, Δt::Real)
+    Id = I(size(Gₜ, 1))
+    return inv(Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) *
+        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2)
 end
 
 

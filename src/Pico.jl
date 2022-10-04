@@ -39,6 +39,9 @@ include("nlmoi.jl")
 include("trajectories.jl")
 @reexport using .Trajectories
 
+include("trajectory_utils.jl")
+@reexport using .TrajectoryUtils
+
 include("constraints.jl")
 @reexport using .Constraints
 

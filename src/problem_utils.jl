@@ -15,6 +15,7 @@ using ..Dynamics
 using ..Evaluators
 using ..Constraints
 using ..Trajectories
+using ..TrajectoryUtils
 using ..Problems
 using ..MinTimeProblems
 
@@ -178,16 +179,8 @@ function get_and_save_controls(
     data_path::String,
     save_path::String
 )
-    path_parts = split(save_path, "/")
-    dir = joinpath(path_parts[1:end-1])
-    if ! isdir(dir)
-        mkpath(dir)
-    end
     data = load_data(data_path)
-    controls = controls_matrix(data.trajectory, data.system)
-    h5open(save_path, "cw") do f
-        f["controls"] = controls
-    end
+    save_controls(data.trajectory, data.system, save_path)
 end
 
 
