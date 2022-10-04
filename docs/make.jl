@@ -26,6 +26,7 @@ makedocs(
         "Getting Started" => "getting_started.md",
         "Manual" => [
             "Systems"                    => "systems.md",
+            "Quantum Logic"              => "quantum_logic.md",
             "Objectives"                 => "objectives.md",
             "Costs"                      => "costs.md",
             "Constraints"                => "constraints.md",
