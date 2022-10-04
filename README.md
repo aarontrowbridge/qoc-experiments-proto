@@ -14,6 +14,8 @@ To install and use this repo on your own machine:
 
 ## Launching the docs
 
+See [Documenter.jl](https://juliadocs.github.io/Documenter.jl/stable/) for more details.
+
 1. run `julia --project=. docs/make.jl` in the shell
 2. in the REPL, run `using LiveServer; serve(dir="docs/build")`
 
