@@ -153,8 +153,8 @@ function solve_ilc!(
     ilc::ILCProblem; 
     iter=3,
     tol=1e-4, 
-    qs=[fill(10., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
-    qfs=[fill(10., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
+    qs=[fill(1., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
+    qfs=[fill(1., ilc.n - 2*ilc.m); zeros(2*ilc.m)],
     R=0.01
     )   
     
@@ -175,8 +175,8 @@ function solve_ilc!(
     Q = sparse(Diagonal(qs))
     Qf = sparse(Diagonal(qfs))
     R = sparse(Diagonal(fill(R, m)))
-    S = sparse(Diagonal(fill(10., d)))
-    Sf = sparse(Diagonal(fill(10., d)))
+    S = sparse(Diagonal(fill(1., d)))
+    Sf = sparse(Diagonal(fill(800., d)))
 
     S = spzeros(d,d)
     A = ilc.A
@@ -204,12 +204,7 @@ function solve_ilc!(
          ] .= [A[k+1] spzeros(n, d) B[k+1] -I]
     end
 
-    #measurement Constraints
-    M = spzeros(d*(T-1), (n+m+d)*(T-1))
-
-    for k = 1:(T-1)
-        M[(k-1)*d .+ (1:d), (m + (k-1)*(n+d+m)) .+ (1:(n+d))] .= [C[k+1] -I]
-    end
+   
     
     #control bound constraints
     Cb = kron(I(T-1), [zeros(m, n - m) I zeros(m, d + m)])
@@ -226,13 +221,13 @@ function solve_ilc!(
 
         println("Iter $(it): $(ys[end])")
 
-        q = zeros((n+m+d)*(T-1))
+        q = zeros((n+m)*(T-1) + d*length(ts))
 
         
-        errs = zeros(d*(T-1))
+        errs = zeros(d*length(ts))
         
         for (y, t) in zip(ys, ts)
-            errs[d*(t-2) .+ (1:d)] .= -(y - ilc.ỹs[t])
+            errs[d*(t-2) .+ (1:d)] .= (y - ilc.ỹs[t])
         end
 
         #println(errs[end])
@@ -242,7 +237,11 @@ function solve_ilc!(
         # end
 
         # q[(m+n) + (m+n+d)*(T-2) .+ (1:d)] .= Cinv[end]'*Qf*Cinv[end]*(-errs[(T-2)*d .+ (1:d)])
-        
+        # for k = 1:T-2
+        #     q[(m+n) + (m+n+d)*(k-1) .+ (1:d)] .= S*(-errs[(k-1)*d .+ (1:d)])
+        # end
+
+        # q[(m+n) + (m+n+d)*(T-2) .+ (1:d)] .= Sf*(-errs[(T-2)*d .+ (1:d)])
 
         cbnds = [repeat(ilc.control_bounds, T-2); 
                 zeros(length(ilc.control_bounds))]

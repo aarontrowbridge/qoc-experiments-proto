@@ -77,12 +77,21 @@ end
 
 # end
 
+function gpop(x, sys::QuantumSystem)
+    y = []
+    append!(y, x[1]^2 + x[3]^2)
+    append!(y, x[2]^2 + x[4]^2)
+    append!(y, x[5]^2 + x[7]^2)
+    append!(y, x[6]^2 + x[8]^2)
+    return y
+end
+
 function exp_rollout(utraj::Matrix{Float64})
     state = [ket_to_iso(ψg); ket_to_iso(ψe); zeros(4)]
     ys = []
     ts = []
     for k in 1:size(utraj,2)
-        G = system.G_drift + 0.01*get_mat_iso(-1im * sigmaz()) + state[end - 3] * system.G_drives[1] + state[end-2] * system.G_drives[2]
+        G = system.G_drift - 0.01*get_mat_iso(-1im * sigmaz()) + state[end - 3] * system.G_drives[1] + state[end-2] * system.G_drives[2]
         h_prop = exp(G * Δt)
         state1_ = h_prop*state[1:4]
         state2_ = h_prop*state[5:8]
@@ -92,11 +101,11 @@ function exp_rollout(utraj::Matrix{Float64})
         append!(ys, [g(state, system)])
         append!(ts, k+1)
     end
-    return ys, ts
+    return [ys[end ÷ 2], ys[end]], [ts[end ÷2], ts[end]]
 end
 
 ilc_prob = ILCProblem(prob, g, exp_rollout, 6)
 println(ilc_prob.ỹs[end])
-answer, jku = solve_ilc!(ilc_prob; iter = 2)
+answer, jku = solve_ilc!(ilc_prob; iter = 3)
 
 println(answer[end])

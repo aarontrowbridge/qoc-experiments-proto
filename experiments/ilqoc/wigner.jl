@@ -26,3 +26,11 @@ function W(α::Union{ComplexF64, Float64}, θ::Float64, mode_levels::Int; ϕ = 0
 end
 
 
+function meas_W_iso(
+    iso_state::Vector{<:Real}, 
+    α::Union{ComplexF64, Float64}, 
+    θ::Float64, 
+    mode_levels::Int; 
+    ϕ = 0.)
+    iso_state' * get_mat_iso(W(α, θ, mode_levels; ϕ=ϕ)) * iso_state
+end
