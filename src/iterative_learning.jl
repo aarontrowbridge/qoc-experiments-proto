@@ -224,7 +224,7 @@ function solve_ilc!(
         q = zeros((n+m)*(T-1) + d*length(ts))
 
         
-        errs = zeros(d*length(ts))
+        errs = zeros(d*length(ts)) 
         
         for (y, t) in zip(ys, ts)
             errs[d*(t-2) .+ (1:d)] .= (y - ilc.ỹs[t])
