@@ -13,6 +13,7 @@ export animate_ILC_two_qubit
 
 using ..Utils
 using ..Trajectories
+using ..TrajectoryUtils
 using ..QuantumSystems
 using ..Problems
 using ..IterativeLearningControl
@@ -409,57 +410,78 @@ function plot_multimode_split(
 
     else
 
-        ψs1 = pop_matrix(
+        ψg0g1 = pop_matrix(
             prob.trajectory,
             prob.system;
             components=[1, 2]
         )
 
-        ψs2 = pop_matrix(
+        ψgNeN = pop_matrix(
             prob.trajectory,
             prob.system;
-            components=[ketdim÷2, ketdim]
+            components=[ketdim÷3, ketdim ÷ 3 * 2]
         )
 
-        ψax1 = Axis(
+        ψfstates = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=[ketdim ÷ 3 * 2 + 1:ketdim...]
+        )
+
+        ψg0g1_ax = Axis(
             fig[1, :];
             title="multimode system components 1:2",
             xlabel=L"t [ns]"
         )
 
-        ψax2 = Axis(
+        ψgNeN_ax = Axis(
             fig[2, :];
             title="multimode system components 14 & 28",
             xlabel=L"t [ns]"
         )
 
+        ψfstates_ax = Axis(
+            fig[3, :];
+            title="multimode system components 29:$(ketdim)",
+            xlabel=L"t [ns]"
+        )
+
         series!(
-            ψax1,
+            ψg0g1_ax,
             prob.trajectory.times,
-            ψs1;
+            ψg0g1;
             color=:tab10,
             labels=["|g0⟩", "|g1⟩"]
         )
 
-        axislegend(ψax1; position=:lc)
+        axislegend(ψg0g1_ax; position=:lc)
 
         series!(
-            ψax2,
+            ψgNeN_ax,
             prob.trajectory.times,
-            ψs2;
+            ψgNeN;
             color=:tab10,
             labels=["|g13⟩", "|e13⟩"]
         )
 
-        axislegend(ψax2; position=:lc)
+        axislegend(ψgNeN_ax; position=:lc)
 
+        series!(
+            ψfstates_ax,
+            prob.trajectory.times,
+            ψfstates;
+            color=:tab20,
+            labels=["|f$(i)⟩" for i = 0:ketdim ÷ 3 - 1]
+        )
+
+        axislegend(ψfstates_ax; position=:lc)
 
     end
 
     if show_augs
         for j = 0:system.control_order
 
-            ax_j = Axis(fig[3 + j, :]; xlabel = L"t [ns]")
+            ax_j = Axis(fig[end - system.control_order + j, :]; xlabel = L"t [ns]")
 
             data = jth_order_controls_matrix(
                 prob.trajectory,
@@ -490,7 +512,7 @@ function plot_multimode_split(
             axislegend(ax_j; position=:lt)
         end
     else
-        ax = Axis(fig[3, :]; xlabel = L"t [ns]")
+        ax = Axis(fig[4, :]; xlabel = L"t [ns]")
 
         data = jth_order_controls_matrix(
             prob.trajectory,
