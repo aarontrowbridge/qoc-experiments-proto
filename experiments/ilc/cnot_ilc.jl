@@ -38,12 +38,16 @@ experiment = QuantumExperiment(
     1:Ẑ.T
 )
 
+
+max_iter = 20
+fps = 5
+
 prob = ILCProblem(
     prob.system,
     Ẑ,
     experiment;
-    max_iter=3,
-    QP_verbose=true,
+    max_iter=max_iter,
+    QP_verbose=false,
     QP_max_iter=100000,
     correction_term=true,
     norm_p=Inf,
@@ -55,4 +59,4 @@ solve!(prob)
 plot_dir = "plots/ILC/twoqubit"
 plot_path = generate_file_path("gif", data_name, plot_dir)
 
-animate_ILC_two_qubit(prob, plot_path)
+animate_ILC_two_qubit(prob, plot_path; fps=fps)

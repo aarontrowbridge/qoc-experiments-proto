@@ -738,7 +738,8 @@ end
 
 function animate_ILC_two_qubit(
     prob::ILCProblem,
-    path::String
+    path::String;
+    fps=5
 )
     fig = Figure(resolution=(1200, 1200))
 
@@ -804,7 +805,7 @@ function animate_ILC_two_qubit(
 
     println(path)
 
-    record(fig, path, 1:length(prob.Ȳs); framerate=1) do i
+    record(fig, path, 1:length(prob.Ȳs); framerate=fps) do i
         Ȳ = hcat(prob.Ȳs[i].ys...)
         ΔY = Ȳ - Ygoal
         U = prob.Us[i]

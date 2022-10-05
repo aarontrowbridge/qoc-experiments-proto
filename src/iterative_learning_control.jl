@@ -166,73 +166,13 @@ function QuadraticProblem(
     g::Function,
     Q::Float64,
     R::Float64,
-    u_bounds::Vector{Float64},
-    correction_term::Bool,
-    settings::Dict,
-    xdim::Int,
-    udim::Int,
-    ydim::Int,
-    T::Int,
-    M::Int,
-)
-    dims = (
-        z=xdim + udim,
-        x=xdim,
-        u=udim,
-        y=ydim,
-        T=T,
-        M=M
-    )
-
-    ∇f(z) = ForwardDiff.jacobian(f, z)
-
-    ∇g(x) = ForwardDiff.jacobian(g, x)
-
-    function ∇²g(x)
-        H = ForwardDiff.jacobian(u -> vec(∇g(u)), x)
-        return reshape(H, dims.y, dims.x, dims.x)
-    end
-
-    return QuadraticProblem(
-        ∇f,
-        ∇g,
-        ∇²g,
-        Q,
-        R,
-        nothing,
-        u_bounds,
-        correction_term,
-        settings,
-        dims,
-        false
-    )
-end
-
-function QuadraticProblem(
-    f::Function,
-    g::Function,
-    Q::Float64,
-    R::Float64,
     Σ::Matrix{Float64},
     u_bounds::Vector{Float64},
     correction_term::Bool,
     settings::Dict,
-    xdim::Int,
-    udim::Int,
-    ydim::Int,
-    T::Int,
-    M::Int,
+    dims::NamedTuple
 )
-    @assert size(Σ, 1) == size(Σ, 2) == ydim
-
-    dims = (
-        z=xdim + udim,
-        x=xdim,
-        u=udim,
-        y=ydim,
-        T=T,
-        M=M
-    )
+    @assert size(Σ, 1) == size(Σ, 2) == dims.y
 
     ∇f(zz) = ForwardDiff.jacobian(f, zz)
 
@@ -254,7 +194,7 @@ function QuadraticProblem(
         correction_term,
         settings,
         dims,
-        true
+        !isnothing(Σ)
     )
 end
 
@@ -265,44 +205,18 @@ function (QP::QuadraticProblem)(
     model = OSQP.Model()
 
     if QP.mle
-        H, ∇ = build_mle_hessian_and_gradient(QP)
+        H, ∇ = build_mle_hessian_and_gradient(QP, Ẑ, ΔY)
         A, lb, ub = build_constraint_matrix(QP, Ẑ, ΔY)
     else
-        H = build_hessian(QP)
+        H = build_regularization_hessian(QP)
         A, lb, ub = build_constraint_matrix(QP, Ẑ, ΔY)
-
     end
-
-    ∇G = build_measurement_constraint_jacobian(
-        QP,
-        Ẑ,
-        ΔY
-    )
-
-    C = build_constrols_constraint_matrix(QP)
-
-    f_cons = zeros(QP.dims.x * (QP.dims.T - 1))
-    g_cons = -vcat(ΔY.ys...)
-
-    u_lb = -foldr(vcat, fill(QP.u_bounds, Ẑ.T - 2)) -
-        vcat(Ẑ.actions[2:Ẑ.T - 1]...)
-
-    u_ub = foldr(vcat, fill(QP.u_bounds, Ẑ.T - 2)) -
-        vcat(Ẑ.actions[2:Ẑ.T - 1]...)
-
-    lb = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_lb, zeros(QP.dims.u))
-    ub = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_ub, zeros(QP.dims.u))
-
-
-    A = sparse_vcat(∇F, ∇G, C)
-
-
-
 
     OSQP.setup!(
         model;
         P=H,
         A=A,
+        q=QP.mle ? ∇ : nothing,
         l=lb,
         u=ub,
         QP.settings...
@@ -330,23 +244,23 @@ function (QP::QuadraticProblem)(
 end
 
 
-@inline function build_hessian(
-    Q::Float64,
-    R::Float64,
-    dims::NamedTuple
+@inline function build_regularization_hessian(
+    QP::QuadraticProblem
 )
-    Hₜ = spdiagm([Q * ones(dims.x); R * ones(dims.u)])
-    H = kron(sparse(I(dims.T)), Hₜ)
+    Hₜ = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
+    H = kron(sparse(I(QP.dims.T)), Hₜ)
     return H
 end
 
 @inline function build_mle_hessian_and_gradient(
-    QP::QuadraticProblem
+    QP::QuadraticProblem,
+    Ẑ::Trajectory,
+    ΔY::MeasurementData
 )
     Hₜreg = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
-    Hreg = kron(sparse(I(QP.dims.T)), Hₜreg)
+    Hreg = build_regularization_hessian(QP)
 
-    Hmle = spzeroes(QP.dims.z * QP.dims.T, QP.dims.z * QP.dims.T)
+    Hmle = spzeros(QP.dims.z * QP.dims.T, QP.dims.z * QP.dims.T)
 
     ∇ = zeros(QP.dims.z * QP.dims.T)
 
@@ -366,7 +280,7 @@ end
 
         Hmle[
             slice(τᵢ, QP.dims.x, QP.dims.z),
-            slice(τᵢ, QP.dimx.x, QP.dims.z)
+            slice(τᵢ, QP.dims.x, QP.dims.z)
         ] = sparse(Hᵢmle)
 
         ∇ᵢmle = ΔY.ys[i]' * QP.Σinv * ∇gᵢ
@@ -501,6 +415,14 @@ end
 end
 
 
+function random_cov_matrix(n::Int; σ=1.0)
+    σs = σ * rand(n)
+    sort!(σs, rev=true)
+    Q = qr(randn(n, n)).Q
+    return Q * Diagonal(σs) * Q'
+end
+
+
 
 
 mutable struct ILCProblem
@@ -520,6 +442,7 @@ mutable struct ILCProblem
         integrator=:FourthOrderPade,
         Q=1.0,
         R=1.0,
+        Σ=random_cov_matrix(experiment.ydim),
         u_bounds=[2π * 0.5 for j = 1:sys.ncontrols],
         correction_term=true,
         verbose=true,
@@ -546,22 +469,31 @@ mutable struct ILCProblem
 
         QP_settings = merge(QP_kw_settings, QP_settings)
 
-        f = eval(integrator)(sys)
+        dynamics = eval(integrator)(sys)
 
-        xdim = size(Ẑgoal.states[1], 1)
-        udim = size(Ẑgoal.actions[1], 1)
+        dims = (
+            x=size(Ẑgoal.states[1], 1),
+            u=size(Ẑgoal.actions[1], 1),
+            z=size(Ẑgoal.states[1], 1) + size(Ẑgoal.actions[1], 1),
+            y=experiment.ydim,
+            T=Ẑgoal.T,
+            M=length(experiment.τs)
+        )
+
+        f = zz -> begin
+            xₜ₊₁ = zz[dims.z .+ (1:dims.x)]
+            xₜ = zz[1:dims.x]
+            uₜ = zz[dims.x .+ (1:dims.u)]
+            return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
+        end
 
         QP = QuadraticProblem(
             f, experiment.g,
-            Q, R,
+            Q, R, Σ,
             u_bounds,
             correction_term,
             QP_settings,
-            xdim,
-            udim,
-            experiment.ydim,
-            Ẑgoal.T,
-            length(experiment.τs)
+            dims
         )
 
         Ygoal = measure(
