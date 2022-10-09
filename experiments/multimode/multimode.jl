@@ -14,14 +14,15 @@ system = MultiModeSystem(
 )
 
 T                = 200
-Δt               = 5.0
+Δt               = 3.0
+Q                = 500.0
 R                = 1.0
 iter             = 2000
 resolves         = 10
 pin_first_qstate = false
 α_transmon       = 20.0
 α_cavity         = 20.0
-u_bound          = 1e-6
+u_bound          = 1e-5
 
 options = Options(
     max_iter = iter,
@@ -30,8 +31,10 @@ options = Options(
 
 u_bounds = BoundsConstraint(
     1:T,
-    system.n_wfn_states .+
-    slice(system.∫a + 1 + system.control_order, system.ncontrols),
+    system.n_wfn_states .+ slice(
+        system.∫a + 1 + system.control_order,
+        system.ncontrols
+    ),
     u_bound,
     system.vardim
 )
@@ -39,7 +42,7 @@ u_bounds = BoundsConstraint(
 cons = AbstractConstraint[u_bounds]
 
 experiment =
-    "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_R_$(R)_iter_$(iter)" *
+    "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_Q_$(Q)_R_$(R)_iter_$(iter)" *
     (pin_first_qstate ? "_pinned" : "") *
     "_u_bound_$(u_bound)" *
     "_alpha_transmon_$(α_transmon)_alpha_cavity_$(α_cavity)"
@@ -79,19 +82,34 @@ prob = QuantumControlProblem(
 )
 
 for i = 1:resolves
+
     resolve = "_resolve_$i"
+
     plot_path = generate_file_path(
         "png",
         experiment * resolve,
         plot_dir
     )
+
     save_path = generate_file_path(
         "jld2",
         experiment * resolve,
         data_dir
     )
-    plot_multimode_split(prob, plot_path; show_highest_modes=true)
+
+    plot_multimode_split(
+        prob,
+        plot_path;
+        show_highest_modes=true
+    )
+
     solve!(prob, save_path=save_path)
-    plot_multimode_split(prob, plot_path; show_highest_modes=true)
+
+    plot_multimode_split(
+        prob,
+        plot_path;
+        show_highest_modes=true
+    )
+
     global prob = load_problem(save_path)
 end
