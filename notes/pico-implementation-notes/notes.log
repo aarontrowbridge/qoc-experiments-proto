@@ -1,10 +1,10 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019) (preloaded format=pdflatex 2019.5.8)  2 AUG 2022 16:50
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019) (preloaded format=pdflatex 2019.5.8)  9 OCT 2022 22:38
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
  %&-line parsing enabled.
-**/Users/aaron/work/RExLab/Pico.jl/notes/notes.tex
-(/Users/aaron/work/RExLab/Pico.jl/notes/notes.tex
+**/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.tex
+(/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.tex
 LaTeX2e <2018-12-01>
 (/usr/local/texlive/2019/texmf-dist/tex/latex/base/article.cls
 Document Class: article 2018/09/03 v1.4i Standard LaTeX document class
@@ -344,7 +344,7 @@ Package: xparse 2019-05-03 L3 Experimental document command parser
 \g__xparse_grabber_int=\count198
 \l__xparse_m_args_int=\count199
 \l__xparse_v_nesting_int=\count266
-)) (/Users/aaron/work/RExLab/Pico.jl/notes/notes.aux)
+)) (/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.aux)
 \openout1 = `notes.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 19.
@@ -373,43 +373,43 @@ Package: gettitlestring 2016/05/16 v1.5 Cleanup title references (HO)
 LaTeX Info: Redefining \ref on input line 19.
 LaTeX Info: Redefining \pageref on input line 19.
 LaTeX Info: Redefining \nameref on input line 19.
- (/Users/aaron/work/RExLab/Pico.jl/notes/notes.out) (/Users/aaron/work/RExLab/Pico.jl/notes/notes.out)
+ (/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.out) (/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.out)
 \@outlinefile=\write3
 \openout3 = `notes.out'.
 
 LaTeX Font Info:    Try loading font information for U+rsfs on input line 21.
  (/usr/local/texlive/2019/texmf-dist/tex/latex/jknapltx/ursfs.fd
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
-) (/Users/aaron/work/RExLab/Pico.jl/notes/notes.toc)
+) (/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.toc)
 \tf@toc=\write4
 \openout4 = `notes.toc'.
 
  [1
 
-{/usr/local/texlive/2019/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [1] [2] [3] [4] [5] [6] [7]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 411.
- [8]
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 411.
- (/Users/aaron/work/RExLab/Pico.jl/notes/notes.aux)
-Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 411.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 411.
+{/usr/local/texlive/2019/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [1] [2] [3] [4] [5] [6] [7] [8] [9] [10]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 526.
+ [11]
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 526.
+ (/Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.aux)
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 526.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 526.
 Package rerunfilecheck Info: File `notes.out' has not changed.
-(rerunfilecheck)             Checksum: F9035712738D1019CEBE6E5E35795222;469.
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 411.
+(rerunfilecheck)             Checksum: 86C277D86C0D8528CCD1B3230BF643DE;734.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 526.
  ) 
 Here is how much of TeX's memory you used:
- 15058 strings out of 492616
- 266866 string characters out of 6129482
+ 15076 strings out of 492616
+ 267354 string characters out of 6129482
  329887 words of memory out of 5000000
- 18889 multiletter control sequences out of 15000+600000
+ 18893 multiletter control sequences out of 15000+600000
  543017 words of font info for 63 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 47i,14n,65p,548b,346s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 47i,16n,65p,566b,346s stack positions out of 5000i,500n,10000p,200000b,80000s
 </usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmbsy10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx9.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmss10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2019/texmf-dist/fonts/type1/public/rsfs/rsfs10.pfb>
-Output written on /Users/aaron/work/RExLab/Pico.jl/notes/notes.pdf (9 pages, 258467 bytes).
+Output written on /Users/aaron/work/RExLab/Pico.jl/notes/pico-implementation-notes/notes.pdf (12 pages, 265441 bytes).
 PDF statistics:
- 218 PDF objects out of 1000 (max. 8388607)
- 182 compressed objects within 2 object streams
- 45 named destinations out of 1000 (max. 500000)
- 65 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 260 PDF objects out of 1000 (max. 8388607)
+ 220 compressed objects within 3 object streams
+ 59 named destinations out of 1000 (max. 500000)
+ 97 words of extra memory for PDF output out of 10000 (max. 10000000)
 

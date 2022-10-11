@@ -6,3 +6,7 @@
 \contentsline {subsection}{\numberline {3.1}Objective Gradient}{4}{subsection.3.1}% 
 \contentsline {subsection}{\numberline {3.2}Dynamics Jacobian}{5}{subsection.3.2}% 
 \contentsline {subsection}{\numberline {3.3}Hessian of the Lagrangian}{7}{subsection.3.3}% 
+\contentsline {section}{\numberline {4}Minimum Time Problem}{9}{section.4}% 
+\contentsline {subsection}{\numberline {4.1}Objective Gradient}{9}{subsection.4.1}% 
+\contentsline {subsection}{\numberline {4.2}Dynamics Jacobian}{10}{subsection.4.2}% 
+\contentsline {subsection}{\numberline {4.3}Hessian of the Lagrangian}{11}{subsection.4.3}% 
