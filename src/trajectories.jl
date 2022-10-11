@@ -18,6 +18,7 @@ export wfn_components_matrix
 export final_state
 export final_state_i
 export final_state_2
+export final_unitary
 export pop_components
 export pop_matrix
 export save_trajectory
@@ -295,6 +296,17 @@ function final_state_i(
     return traj.states[traj.T][slice(i, sys.isodim)]
 end
 
+function final_unitary(
+    traj::Trajectory,
+    sys::AbstractSystem
+)
+    vec_U = traj.states[traj.T][1:sys.n_wfn_states]
+    U = zeros(ComplexF64, sys.nqstates, sys.nqstates)
+    for i = 1:sys.nqstates
+        U[:, i] = iso_to_ket(vec_U[slice(i, sys.isodim)])
+    end
+    return U
+end
 # function populations(
 #     traj::Trajectory,
 #     sys::AbstractSystem,
@@ -304,7 +316,6 @@ end
 
 wfn_components_matrix(args...; kwargs...) =
     hcat(wfn_components(args...; kwargs...)...)
-
 
 #
 # saving and loading trajectories

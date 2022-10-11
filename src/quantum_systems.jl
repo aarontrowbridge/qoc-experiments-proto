@@ -148,6 +148,64 @@ function QuantumSystem(
 end
 
 
+function QuantumSystem(
+    H_drift::Matrix,
+    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
+    U_goal::Matrix{C1},
+    control_bounds::Vector{Float64};
+    ∫a=false,
+    control_order=2,
+) where {C1 <: Number, T <: Number}
+
+    @assert size(U_goal, 1) == size(U_goal, 2)
+    
+    dim = size(U_goal, 1)
+    isodim = 2*dim
+    nqstates = dim
+
+    G_drift = G(H_drift)
+
+    ψ̃init = vcat([ket_to_iso(basis(i, dim)) for i=1:dim]...)
+    ψ̃goal = vcat([ket_to_iso(U_goal[:, i]) for i=1:dim]...)
+
+    if isa(H_drive, Matrix{T})
+        ncontrols = 1
+        G_drive = [G(H_drive)]
+    else
+        ncontrols = length(H_drive)
+        G_drive = G.(H_drive)
+    end
+
+    @assert length(control_bounds) == length(G_drive)
+
+    augdim = control_order + ∫a
+
+    n_wfn_states = nqstates * isodim
+    n_aug_states = ncontrols * augdim
+
+    nstates = n_wfn_states + n_aug_states
+
+    vardim = nstates + ncontrols
+    return QuantumSystem(
+        n_wfn_states,
+        n_aug_states,
+        nstates,
+        nqstates,
+        isodim,
+        augdim,
+        vardim,
+        ncontrols,
+        control_order,
+        G_drift,
+        G_drive,
+        control_bounds,
+        ψ̃init,
+        ψ̃goal,
+        ∫a
+    )
+end
+
+
 """
 ```julia
 MultiModeSystem(
@@ -310,5 +368,25 @@ function QuantumSystem(
         end
     end
 end
+
+
+# struct UnitarySystem <: AbstractSystem
+#     n_u_states::Int
+#     n_aug_states::Int
+#     dim::Int
+#     isodim::Int
+#     augdim::Int
+#     vardim::Int
+#     ncontrols::Int
+#     control_order::Int
+#     G_drift::Matrix{Float64}
+#     G_drives::Vector{Matrix{Float64}}
+#     control_bounds::Vector{Float64}
+#     Ũ_i::Matrix{Float64}
+#     Ũ_goal::Matrix{Float64}
+#     ∫a::Bool
+# end
+
+
 
 end

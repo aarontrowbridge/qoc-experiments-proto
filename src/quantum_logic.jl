@@ -11,6 +11,9 @@ export quad
 export cavity_state
 export number
 export normalize
+export get_mat_iso
+export get_mat_uniso
+export basis
 
 using LinearAlgebra
 
@@ -63,6 +66,7 @@ function annihilate(levels::Int)
     return diagm(1 => map(sqrt, 1:levels - 1))
 end
 
+
 function create(levels::Int)
     return (annihilate(levels))'
 end
@@ -89,6 +93,28 @@ iso_to_ket(ψ̃) =
 
 function normalize(state::Vector{C} where C <: Number)
     return state / norm(state)
+end
+
+function get_mat_iso(mat)
+    mat_r = real(mat)
+    mat_i = imag(mat)
+    return vcat(hcat(mat_r, -mat_i),
+                hcat(mat_i,  mat_r))
+end
+
+function get_mat_uniso(mat)
+    n = size(mat, 1)
+    nby2 = Integer(n/2)
+    i1 = 1:nby2
+    i2 = (nby2 + 1):n
+    return mat[i1, i1] + mat[i2, i1]
+end
+
+function basis(index::Int, dim::Int)
+    if index > dim || index < 1
+        throw(DomainError(index, "Index out of bounds"))
+    end
+    [zeros(index - 1); 1; zeros(dim - index)]
 end
 
 end

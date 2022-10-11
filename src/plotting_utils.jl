@@ -522,7 +522,7 @@ function plot_single_qubit(
 )
     mkpath(dirname(path))
 
-    fig = Figure(resolution=(1200, 800))
+    fig = Figure(resolution=(1200, 1500))
 
     ψs = pop_matrix(traj, system)
 
@@ -533,10 +533,28 @@ function plot_single_qubit(
 
     axislegend(ψax; position=:lb)
 
-    as = controls_matrix(traj, system)
+    for j = 0:system.control_order
 
-    a_ax = Axis(fig[2, :]; xlabel=L"t")
-    series!(a_ax, traj.times, as; labels=[L"a(t)"])
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
+
+        series!(
+            ax_j,
+            traj.times,
+            jth_order_controls_matrix(traj, system, j);
+            labels = [
+                j == 0 ?
+                latexstring("a_$k (t)") :
+                latexstring(
+                    "\\mathrm{d}^{",
+                    j == 1 ? "" : "$j",
+                    "}_t a_$k"
+                )
+                for k = 1:system.ncontrols
+            ]
+        )
+
+        axislegend(ax_j; position=:lt)
+    end
 
     # TODO: weird plotting behavior, fix this
 
