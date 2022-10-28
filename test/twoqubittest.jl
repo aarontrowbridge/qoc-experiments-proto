@@ -189,9 +189,9 @@ for integrator in integrators
 
     # dynamics Jacobian
 
-    ∇F = dense(
-        dyns.∇F(Z),
-        dyns.∇F_structure,
+    ∂F = dense(
+        dyns.∂F(Z),
+        dyns.∂F_structure,
         (system.nstates * (T - 1), system.vardim * T)
     )
 
@@ -199,27 +199,27 @@ for integrator in integrators
 
     # test dynamics Jacobian vs finite diff
 
-    # ∇F_finite_diff =
+    # ∂F_finite_diff =
     #     FiniteDiff.finite_difference_jacobian(dyns.F, Z)
 
-    # @test all(isapprox.(∇F, ∇F_finite_diff, atol=ATOL))
+    # @test all(isapprox.(∂F, ∂F_finite_diff, atol=ATOL))
 
 
     # test dynamics Jacobian vs forward diff
 
-    ∇F_forward_diff =
+    ∂F_forward_diff =
         ForwardDiff.jacobian(dyns.F, Z)
 
-    @test all(isapprox.(∇F, ∇F_forward_diff, atol=ATOL))
+    @test all(isapprox.(∂F, ∂F_forward_diff, atol=ATOL))
 
 
     # Hessian of Lagrangian set up
 
     μ = randn(system.nstates * (T - 1))
 
-    μ∇²F = dense(
-        dyns.μ∇²F(Z, μ),
-        dyns.μ∇²F_structure,
+    μ∂²F = dense(
+        dyns.μ∂²F(Z, μ),
+        dyns.μ∂²F_structure,
         (system.vardim * T, system.vardim * T)
     )
 
@@ -230,7 +230,7 @@ for integrator in integrators
     # HofL_finite_diff =
     #     FiniteDiff.finite_difference_hessian(HofL, Z)
 
-    # @test all(isapprox.(μ∇²F, HofL_finite_diff, atol=ATOL))
+    # @test all(isapprox.(μ∂²F, HofL_finite_diff, atol=ATOL))
 
 
     # test dynamics Hessian of Lagrangian vs forward diff
@@ -238,7 +238,7 @@ for integrator in integrators
     HofL_forward_diff =
         ForwardDiff.hessian(HofL, Z)
 
-    @test all(isapprox.(μ∇²F, HofL_forward_diff, atol=ATOL))
+    @test all(isapprox.(μ∂²F, HofL_forward_diff, atol=ATOL))
 end
 
 

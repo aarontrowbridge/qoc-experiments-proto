@@ -35,8 +35,6 @@ struct MinTimeQuantumControlProblem <: MinTimeProblem
     params::Dict
 end
 
-# TODO: rewrite this constructor (hacky implementation rn)
-
 
 
 function MinTimeQuantumControlProblem(
@@ -116,9 +114,17 @@ function MinTimeQuantumControlProblem(
         mintime_objective +
         mintime_additional_objective
 
+    # Z̄ = [Z; Δt]
+    Z_indices = 1:subprob.params[:n_variables]
+    params[:Z_indices] = Z_indices
+    Δt_indices = subprob.params[:n_variables] .+ (1:T-1)
+    params[:Δt_indices] = Δt_indices
+
     dynamics = MinTimeQuantumDynamics(
         system,
         mintime_integrator,
+        Z_indices,
+        Δt_indices,
         T;
         eval_hessian=mintime_eval_hessian
     )

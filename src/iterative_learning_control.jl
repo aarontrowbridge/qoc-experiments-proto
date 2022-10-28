@@ -301,7 +301,7 @@ end
     Ẑ::Trajectory,
     ΔY::MeasurementData,
 )
-    ∇F = build_dynamics_constraint_jacobian(QP, Ẑ)
+    ∂F = build_dynamics_constraint_jacobian(QP, Ẑ)
 
     f_cons = zeros(QP.dims.x * (QP.dims.T - 1))
 
@@ -314,7 +314,7 @@ end
         vcat(Ẑ.actions[2:Ẑ.T - 1]...)
 
     if QP.mle
-        A = sparse_vcat(∇F, C)
+        A = sparse_vcat(∂F, C)
         lb = vcat(f_cons, zeros(QP.dims.u), u_lb, zeros(QP.dims.u))
         ub = vcat(f_cons, zeros(QP.dims.u), u_ub, zeros(QP.dims.u))
     else
@@ -323,7 +323,7 @@ end
             Ẑ,
             ΔY
         )
-        A = sparse_vcat(∇F, ∇G, C)
+        A = sparse_vcat(∂F, ∇G, C)
         g_cons = -vcat(ΔY.ys...)
         lb = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_lb, zeros(QP.dims.u))
         ub = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_ub, zeros(QP.dims.u))
@@ -391,7 +391,7 @@ end
     QP::QuadraticProblem,
     Ẑ::Trajectory
 )
-    ∇F = spzeros(
+    ∂F = spzeros(
         QP.dims.x * (QP.dims.T - 1),
         QP.dims.z * QP.dims.T
     )
@@ -405,13 +405,13 @@ end
             Ẑ.actions[t + 1]
         ]
 
-        ∇F[
+        ∂F[
             slice(t, QP.dims.x),
             slice(t, QP.dims.z; stretch=QP.dims.z)
         ] = sparse(QP.∇f(zₜ))
     end
 
-    return ∇F
+    return ∂F
 end
 
 
