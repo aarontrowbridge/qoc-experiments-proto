@@ -124,8 +124,8 @@ obj = QuantumObjective(
 # sparse objective Hessian data
 
 H = dense(
-    obj.∇²L(Z),
-    obj.∇²L_structure,
+    obj.∂²L(Z),
+    obj.∂²L_structure,
     (system.vardim * T, system.vardim * T)
 )
 

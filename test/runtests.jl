@@ -36,6 +36,7 @@ system = QuantumSystem(
 )
 
 
+
 """
     Testing derivatives
 
@@ -60,7 +61,7 @@ cost_fn = :infidelity_cost
 
 # absolulte tolerance for approximate tests
 
-const ATOL = 1e-5
+const ATOL = 1e-4
 
 
 
@@ -175,9 +176,9 @@ u_smoothness_regularizer = QuadraticSmoothnessRegularizer(;
 
     # sparse objective Hessian data
 
-    ∇²L = dense(
-        obj.∇²L(Z),
-        obj.∇²L_structure,
+    ∂²L = dense(
+        obj.∂²L(Z),
+        obj.∂²L_structure,
         (system.vardim * T, system.vardim * T)
     )
 
@@ -185,18 +186,18 @@ u_smoothness_regularizer = QuadraticSmoothnessRegularizer(;
 
     # test hessian of objective with FiniteDiff
 
-    # ∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
+    # ∂²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
 
-    # show_diffs(∇²L, ∇²L_finite_diff)
+    # show_diffs(∂²L, ∂²L_finite_diff)
 
-    # @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+    # @test all(isapprox.(∂²L, ∂²L_finite_diff, atol=ATOL))
 
 
     # test hessian of objective with ForwardDiff
 
-    ∇²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
+    ∂²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
 
-    @test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+    @test all(isapprox.(∂²L, ∂²L_forward_diff, atol=ATOL))
 
 
     #
@@ -251,7 +252,7 @@ u_smoothness_regularizer = QuadraticSmoothnessRegularizer(;
         μ = randn(system.nstates * (T - 1))
 
         μ∂²F = dense(
-            dyns.μ∂²F(Z, μ),
+            dyns.μ∂²F(μ, Z),
             dyns.μ∂²F_structure,
             (system.vardim * T, system.vardim * T)
         )
@@ -272,6 +273,8 @@ u_smoothness_regularizer = QuadraticSmoothnessRegularizer(;
             ForwardDiff.hessian(HofL, Z)
 
         @test all(isapprox.(μ∂²F, HofL_forward_diff, atol=ATOL))
+
+        show_diffs(μ∂²F, HofL_forward_diff)
     end
 
 end
@@ -282,8 +285,9 @@ end
 #
 
 @testset "testing mintime objective + regularizer + smoothness regularizer " begin
+    n_variables_mintime = system.vardim * T + T - 1
 
-    Z_mintime = 2 * rand(system.vardim * T + T - 1) .- 1
+    Z_mintime = 2 * rand(n_variables_mintime) .- 1
 
     obj = mintime_obj + u_regularizer + u_smoothness_regularizer
 
@@ -312,32 +316,94 @@ end
 
     # sparse mintime objective Hessian data
 
-    ∇²L = dense(
-        obj.∇²L(Z_mintime),
-        obj.∇²L_structure,
-        (system.vardim * T + T - 1, system.vardim * T + T - 1)
+    ∂²L = dense(
+        obj.∂²L(Z_mintime),
+        obj.∂²L_structure,
+        (n_variables_mintime, n_variables_mintime)
     )
 
     # test hessian of mintime objective with FiniteDiff
 
-    # ∇²L_finite_diff =
+    # ∂²L_finite_diff =
     #     FiniteDiff.finite_difference_hessian(
     #         obj.L,
     #         Z_mintime
     #     )
 
-    # show_diffs(∇²L, ∇²L_finite_diff)
+    # show_diffs(∂²L, ∂²L_finite_diff)
 
-    # @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+    # @test all(isapprox.(∂²L, ∂²L_finite_diff, atol=ATOL))
 
 
     # test hessian of mintime objective with ForwardDiff
 
-    ∇²L_forward_diff =
+    ∂²L_forward_diff =
         ForwardDiff.hessian(obj.L, Z_mintime)
 
-    @test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+    @test all(isapprox.(∂²L, ∂²L_forward_diff, atol=ATOL))
 
+end
+
+@testset "mintime dynamics" begin
+    n_variables_mintime = system.vardim * T + T - 1
+    Δt = rand(T - 1)
+    Z̄ = [Z; Δt]
+
+    μ = randn(system.nstates * (T - 1))
+
+    Z_indices = 1:system.vardim * T
+    Δt_indices = system.vardim * T .+ (1:T-1)
+
+    Δt = 0.01
+
+    integrators = [:SecondOrderPade, :FourthOrderPade]
+
+    for integrator in integrators
+        @info "integrator" integrator
+
+        # setting up dynamics struct
+
+        D = MinTimeQuantumDynamics(
+            system,
+            integrator,
+            Z_indices,
+            Δt_indices,
+            T;
+            eval_hessian=eval_hessian
+        )
+
+        ∂F = dense(
+            D.∂F(Z̄),
+            D.∂F_structure,
+            (system.nstates * (T - 1), n_variables_mintime)
+        )
+
+        # test dynamics Jacobian vs forward diff
+
+        ∂F_forward_diff =
+            ForwardDiff.jacobian(D.F, Z̄)
+
+        @test all(isapprox.(∂F, ∂F_forward_diff, atol=ATOL))
+
+        show_diffs(∂F, ∂F_forward_diff)
+
+        μ∂²F = dense(
+            D.μ∂²F(μ, Z̄),
+            D.μ∂²F_structure,
+            (n_variables_mintime, n_variables_mintime)
+        )
+
+        HofL(Ẑ) = dot(μ, D.F(Ẑ))
+
+        # test dynanamics Hessian of Lagrangian vs forward diff
+
+        HofL_forward_diff =
+            ForwardDiff.hessian(HofL, Z̄)
+
+        @test all(isapprox.(μ∂²F, HofL_forward_diff, atol=ATOL))
+
+        show_diffs(μ∂²F, HofL_forward_diff)
+    end
 end
 
 @testset "slack variable objective" begin
@@ -356,7 +422,7 @@ end
 
     Z_slack_prob = get_variables(slack_prob)
 
-    slack_obj = filter!(slack_prob.objective_terms) do term
+    slack_obj = filter(slack_prob.objective_terms) do term
         term[:type] == :L1SlackRegularizer
     end[1] |> Objective
 

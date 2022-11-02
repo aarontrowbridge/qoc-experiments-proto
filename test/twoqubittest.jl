@@ -142,9 +142,9 @@ obj = QuantumObjective(
 
 # sparse objective Hessian data
 
-∇²L = dense(
-    obj.∇²L(Z),
-    obj.∇²L_structure,
+∂²L = dense(
+    obj.∂²L(Z),
+    obj.∂²L_structure,
     (system.vardim * T, system.vardim * T)
 )
 
@@ -152,18 +152,18 @@ obj = QuantumObjective(
 
 # test hessian of objective with FiniteDiff
 
-# ∇²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
+# ∂²L_finite_diff = FiniteDiff.finite_difference_hessian(obj.L, Z)
 
-# show_diffs(∇²L, ∇²L_finite_diff)
+# show_diffs(∂²L, ∂²L_finite_diff)
 
-# @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+# @test all(isapprox.(∂²L, ∂²L_finite_diff, atol=ATOL))
 
 
 # test hessian of objective with ForwardDiff
 
-∇²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
+∂²L_forward_diff = ForwardDiff.hessian(obj.L, Z)
 
-@test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+@test all(isapprox.(∂²L, ∂²L_forward_diff, atol=ATOL))
 
 
 #
@@ -284,28 +284,28 @@ mintime_obj = MinTimeObjective(
 
 # sparse mintime objective Hessian data
 
-∇²L = dense(
-    mintime_obj.∇²L(Z_mintime),
-    mintime_obj.∇²L_structure,
+∂²L = dense(
+    mintime_obj.∂²L(Z_mintime),
+    mintime_obj.∂²L_structure,
     (system.vardim * T + T - 1, system.vardim * T + T - 1)
 )
 
 # test hessian of mintime objective with FiniteDiff
 
-# ∇²L_finite_diff =
+# ∂²L_finite_diff =
 #     FiniteDiff.finite_difference_hessian(
 #         mintime_obj.L,
 #         Z_mintime
 #     )
 
-# show_diffs(∇²L, ∇²L_finite_diff)
+# show_diffs(∂²L, ∂²L_finite_diff)
 
-# @test all(isapprox.(∇²L, ∇²L_finite_diff, atol=ATOL))
+# @test all(isapprox.(∂²L, ∂²L_finite_diff, atol=ATOL))
 
 
 # test hessian of mintime objective with ForwardDiff
 
-∇²L_forward_diff =
+∂²L_forward_diff =
     ForwardDiff.hessian(mintime_obj.L, Z_mintime)
 
-@test all(isapprox.(∇²L, ∇²L_forward_diff, atol=ATOL))
+@test all(isapprox.(∂²L, ∂²L_forward_diff, atol=ATOL))
