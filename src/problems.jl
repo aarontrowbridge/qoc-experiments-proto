@@ -137,6 +137,9 @@ function QuantumControlProblem(
         s2_indices = n_prob_variables .+
             (n_slack_variables÷2 + 1:n_slack_variables)
 
+        params[:s1_indices] = s1_indices
+        params[:s2_indices] = s2_indices
+
         α = foldr(vcat, [α for t = 1:T])
 
         L1_regularizer = L1SlackRegularizer(

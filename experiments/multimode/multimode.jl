@@ -16,13 +16,13 @@ system = MultiModeSystem(
 T                = 200
 Δt               = 3.0
 Q                = 500.0
-R                = 1.0
+R                = 1.0e-1
 iter             = 2000
 resolves         = 10
 pin_first_qstate = false
 α_transmon       = 20.0
 α_cavity         = 20.0
-u_bound          = 1e-5
+u_bound          = 0.5e-4
 
 options = Options(
     max_iter = iter,
@@ -47,22 +47,20 @@ experiment =
     "_u_bound_$(u_bound)" *
     "_alpha_transmon_$(α_transmon)_alpha_cavity_$(α_cavity)"
 
-plot_dir = "plots/multimode/fixed_time/no_guess"
-data_dir = "data/multimode/fixed_time/no_guess/problems"
+plot_dir = "plots/multimode/fixed_time_update/no_guess"
+data_dir = "data/multimode/fixed_time_update/no_guess/problems"
 
 ketdim = transmon_levels * cavity_levels
 
-highest_cavity_modes =
-    [
-        cavity_levels .* [1, 2];
-        ketdim .+ (cavity_levels .* [1, 2])
-    ]
+highest_cavity_modes = [
+    cavity_levels .* [1, 2];
+    ketdim .+ (cavity_levels .* [1, 2])
+]
 
-transmon_f_states =
-    [
-        2 * cavity_levels .+ [1:cavity_levels...];
-        ketdim .+ (2 * cavity_levels .+ [1:cavity_levels...])
-    ]
+transmon_f_states = [
+    2 * cavity_levels .+ [1:cavity_levels...];
+    ketdim .+ (2 * cavity_levels .+ [1:cavity_levels...])
+]
 
 reg_states = [highest_cavity_modes; transmon_f_states]
 

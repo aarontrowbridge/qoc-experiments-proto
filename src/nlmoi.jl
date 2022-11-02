@@ -72,7 +72,7 @@ function MOI.hessian_lagrangian_structure(
     evaluator::PicoEvaluator
 )
     structure = vcat(
-        evaluator.objective.∇²L_structure,
+        evaluator.objective.∂²L_structure,
         evaluator.dynamics.μ∂²F_structure
     )
     return structure
@@ -86,15 +86,15 @@ function MOI.eval_hessian_lagrangian(
     μ::AbstractVector{T}
 ) where T
 
-    σ∇²Ls = σ * evaluator.objective.∇²L(Z)
+    σ∂²Ls = σ * evaluator.objective.∂²L(Z)
 
-    for (k, σ∇²Lₖ) in enumerate(σ∇²Ls)
-        H[k] = σ∇²Lₖ
+    for (k, σ∂²Lₖ) in enumerate(σ∂²Ls)
+        H[k] = σ∂²Lₖ
     end
 
-    μ∂²Fs = evaluator.dynamics.μ∂²F(Z, μ)
+    μ∂²Fs = evaluator.dynamics.μ∂²F(μ, Z)
 
-    offset = length(evaluator.objective.∇²L_structure)
+    offset = length(evaluator.objective.∂²L_structure)
 
     for (k, μ∂²Fₖ) in enumerate(μ∂²Fs)
         H[offset + k] = μ∂²Fₖ

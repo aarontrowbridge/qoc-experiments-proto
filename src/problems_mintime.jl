@@ -116,8 +116,9 @@ function MinTimeQuantumControlProblem(
 
     # Z̄ = [Z; Δt]
     Z_indices = 1:subprob.params[:n_variables]
-    params[:Z_indices] = Z_indices
     Δt_indices = subprob.params[:n_variables] .+ (1:T-1)
+
+    params[:Z_indices] = Z_indices
     params[:Δt_indices] = Δt_indices
 
     dynamics = MinTimeQuantumDynamics(

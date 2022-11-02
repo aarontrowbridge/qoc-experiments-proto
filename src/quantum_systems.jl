@@ -125,10 +125,11 @@ function MultiModeSystem(
     n_cavities=1, # TODO: add functionality for multiple cavities
     kwargs...
 )
+    @assert transmon_levels ∈ 1:3
     @assert length(ψ1) == length(ψf) == 2
     @assert ψ1[1] in ['g', 'e'] && ψf[1] in ['g', 'e']
-    @assert parse(Int, ψ1[2]) in 0:cavity_levels-2
-    @assert parse(Int, ψf[2]) in 0:cavity_levels-2
+    @assert parse(Int, ψ1[2]) ∈ 0:cavity_levels-2
+    @assert parse(Int, ψf[2]) ∈ 0:cavity_levels-2
 
     if transmon_levels == 2
 

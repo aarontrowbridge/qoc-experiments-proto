@@ -112,6 +112,8 @@ function MinTimeProblems.MinTimeQuantumControlProblem(
     dynamics = MinTimeQuantumDynamics(
         data.system,
         data.params[:mintime_integrator],
+        data.params[:Z_indices],
+        data.params[:Δt_indices],
         data.trajectory.T;
         eval_hessian=data.params[:mintime_eval_hessian]
     )
@@ -244,9 +246,17 @@ function MinTimeProblems.MinTimeQuantumControlProblem(;
         mintime_objective +
         mintime_additional_objective
 
+    Z_indices = 1:system.vardim * T
+    Δt_indices = system.vardim * T .+ (1:T-1)
+
+    params[:Z_indices] = Z_indices
+    params[:Δt_indices] = Δt_indices
+
     dynamics = MinTimeQuantumDynamics(
         system,
         mintime_integrator,
+        Z_indices,
+        Δt_indices,
         T;
         eval_hessian=mintime_eval_hessian
     )
