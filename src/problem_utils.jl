@@ -15,6 +15,7 @@ using ..Dynamics
 using ..Evaluators
 using ..Constraints
 using ..Trajectories
+using ..TrajectoryUtils
 using ..Problems
 using ..MinTimeProblems
 
@@ -169,7 +170,7 @@ function load_problem(path::String)
     end
 end
 
-function load_data(path::String)
+function load_data(path::String)::ProblemData
     @load path data
     return data
 end
@@ -178,16 +179,8 @@ function get_and_save_controls(
     data_path::String,
     save_path::String
 )
-    path_parts = split(save_path, "/")
-    dir = joinpath(path_parts[1:end-1])
-    if ! isdir(dir)
-        mkpath(dir)
-    end
     data = load_data(data_path)
-    controls = controls_matrix(data.trajectory, data.system)
-    h5open(save_path, "cw") do f
-        f["controls"] = controls
-    end
+    save_controls(data.trajectory, data.system, save_path)
 end
 
 
@@ -195,8 +188,8 @@ function MinTimeProblems.MinTimeQuantumControlProblem(;
     subprob_data=nothing,
     Rᵤ=0.001,
     Rₛ=0.001,
-    Δt_lbound=0.1 * subprob_data.trajectory.Δt,
-    Δt_ubound=subprob_data.trajectory.Δt,
+    Δt_lbound=0.2 * subprob_data.trajectory.Δt,
+    Δt_ubound=1.1 * subprob_data.trajectory.Δt,
     mintime_eval_hessian=true,
     mintime_options=Options(),
     mintime_integrator=:FourthOrderPade,
@@ -277,10 +270,10 @@ function MinTimeProblems.MinTimeQuantumControlProblem(;
     )
 
     mintime_n_dynamics_constraints =
-        data.params[:mintime_n_dynamics_constraints]
+        subprob_data.params[:n_dynamics_constraints]
 
     mintime_n_variables =
-        data.params[:mintime_n_variables] + T - 1
+        subprob_data.params[:n_variables] + T - 1
 
     params[:mintime_n_dynamics_constraints] =
         mintime_n_dynamics_constraints

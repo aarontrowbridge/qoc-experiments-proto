@@ -49,7 +49,7 @@ function MOI.eval_constraint(
 end
 
 function MOI.jacobian_structure(evaluator::PicoEvaluator)
-    return evaluator.dynamics.∇F_structure
+    return evaluator.dynamics.∂F_structure
 end
 
 function MOI.eval_constraint_jacobian(
@@ -58,8 +58,8 @@ function MOI.eval_constraint_jacobian(
     Z::AbstractVector
 )
 
-    ∇s = evaluator.dynamics.∇F(Z)
-    for (k, ∇ₖ) in enumerate(∇s)
+    ∂s = evaluator.dynamics.∂F(Z)
+    for (k, ∇ₖ) in enumerate(∂s)
         J[k] = ∇ₖ
     end
     return nothing
@@ -73,7 +73,7 @@ function MOI.hessian_lagrangian_structure(
 )
     structure = vcat(
         evaluator.objective.∇²L_structure,
-        evaluator.dynamics.μ∇²F_structure
+        evaluator.dynamics.μ∂²F_structure
     )
     return structure
 end
@@ -92,12 +92,12 @@ function MOI.eval_hessian_lagrangian(
         H[k] = σ∇²Lₖ
     end
 
-    μ∇²Fs = evaluator.dynamics.μ∇²F(Z, μ)
+    μ∂²Fs = evaluator.dynamics.μ∂²F(Z, μ)
 
     offset = length(evaluator.objective.∇²L_structure)
 
-    for (k, μ∇²Fₖ) in enumerate(μ∇²Fs)
-        H[offset + k] = μ∇²Fₖ
+    for (k, μ∂²Fₖ) in enumerate(μ∂²Fs)
+        H[offset + k] = μ∂²Fₖ
     end
 
     return nothing

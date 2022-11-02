@@ -9,11 +9,14 @@ export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
 export plot_twoqubit
+export animate_ILC_two_qubit
 
 using ..Utils
 using ..Trajectories
+using ..TrajectoryUtils
 using ..QuantumSystems
 using ..Problems
+using ..IterativeLearningControl
 
 using LaTeXStrings
 using CairoMakie
@@ -407,57 +410,78 @@ function plot_multimode_split(
 
     else
 
-        ψs1 = pop_matrix(
+        ψg0g1 = pop_matrix(
             prob.trajectory,
             prob.system;
             components=[1, 2]
         )
 
-        ψs2 = pop_matrix(
+        ψgNeN = pop_matrix(
             prob.trajectory,
             prob.system;
-            components=[ketdim÷2, ketdim]
+            components=[ketdim÷3, ketdim ÷ 3 * 2]
         )
 
-        ψax1 = Axis(
+        ψfstates = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=[ketdim ÷ 3 * 2 + 1:ketdim...]
+        )
+
+        ψg0g1_ax = Axis(
             fig[1, :];
             title="multimode system components 1:2",
             xlabel=L"t [ns]"
         )
 
-        ψax2 = Axis(
+        ψgNeN_ax = Axis(
             fig[2, :];
             title="multimode system components 14 & 28",
             xlabel=L"t [ns]"
         )
 
+        ψfstates_ax = Axis(
+            fig[3, :];
+            title="multimode system components 29:$(ketdim)",
+            xlabel=L"t [ns]"
+        )
+
         series!(
-            ψax1,
+            ψg0g1_ax,
             prob.trajectory.times,
-            ψs1;
+            ψg0g1;
             color=:tab10,
             labels=["|g0⟩", "|g1⟩"]
         )
 
-        axislegend(ψax1; position=:lc)
+        axislegend(ψg0g1_ax; position=:lc)
 
         series!(
-            ψax2,
+            ψgNeN_ax,
             prob.trajectory.times,
-            ψs2;
+            ψgNeN;
             color=:tab10,
             labels=["|g13⟩", "|e13⟩"]
         )
 
-        axislegend(ψax2; position=:lc)
+        axislegend(ψgNeN_ax; position=:lc)
 
+        series!(
+            ψfstates_ax,
+            prob.trajectory.times,
+            ψfstates;
+            color=:tab20,
+            labels=["|f$(i)⟩" for i = 0:ketdim ÷ 3 - 1]
+        )
+
+        axislegend(ψfstates_ax; position=:lc)
 
     end
 
     if show_augs
         for j = 0:system.control_order
 
-            ax_j = Axis(fig[3 + j, :]; xlabel = L"t [ns]")
+            ax_j = Axis(fig[end - system.control_order + j, :]; xlabel = L"t [ns]")
 
             data = jth_order_controls_matrix(
                 prob.trajectory,
@@ -488,7 +512,7 @@ function plot_multimode_split(
             axislegend(ax_j; position=:lt)
         end
     else
-        ax = Axis(fig[3, :]; xlabel = L"t [ns]")
+        ax = Axis(fig[4, :]; xlabel = L"t [ns]")
 
         data = jth_order_controls_matrix(
             prob.trajectory,
@@ -711,5 +735,86 @@ function plot_twoqubit(
     save(path, fig)
 
 end
+
+function animate_ILC_two_qubit(
+    prob::ILCProblem,
+    path::String;
+    fps=5
+)
+    fig = Figure(resolution=(1200, 1200))
+
+    Ygoalax = Axis(fig[1, :]; title="Y goal", xlabel=L"t")
+
+    Ȳax = Axis(fig[2, :]; title="Ȳ", xlabel=L"t")
+
+    Ygoal = hcat(prob.Ygoal.ys...)
+    τs = prob.Ygoal.times
+
+    series!(Ygoalax, τs, Ygoal;
+        color=:seaborn_muted,
+        # labels=[
+        #     "|00⟩",
+        #     "|01⟩",
+        #     "|10⟩",
+        #     "|11⟩",
+        # ]
+    )
+
+    # axislegend(Ygoalax; position=:lb)
+
+    Ȳ₁ = hcat(prob.Ȳs[1].ys...)
+
+    Ȳsp = series!(Ȳax, τs, Ȳ₁;
+        color=:seaborn_muted,
+        # labels=[
+        #     "|00⟩",
+        #     "|01⟩",
+        #     "|10⟩",
+        #     "|11⟩",
+        # ]
+    )
+
+    # axislegend(Ȳax; position=:lb)
+
+    ΔYax = Axis(fig[3, :]; title="ΔY", xlabel=L"t")
+
+    ΔY₁ = Ȳ₁ - Ygoal
+
+    ΔYsp = series!(ΔYax, τs, ΔY₁;
+        color=:seaborn_muted,
+        # labels=[
+        #     "|00⟩",
+        #     "|01⟩",
+        #     "|10⟩",
+        #     "|11⟩",
+        # ]
+    )
+
+    autolimits!(ΔYax)
+
+    # axislegend(ΔYax; position=:lb)
+
+    uax = Axis(fig[4, :]; title="a(t)", xlabel=L"t")
+
+    U₁ = prob.Us[1]
+    ts = prob.Ẑ.times
+
+    Usp = series!(uax, ts, U₁;
+        labels=["a_$j" for j = 1:prob.QP.dims.u]
+    )
+
+    println(path)
+
+    record(fig, path, 1:length(prob.Ȳs); framerate=fps) do i
+        Ȳ = hcat(prob.Ȳs[i].ys...)
+        ΔY = Ȳ - Ygoal
+        U = prob.Us[i]
+
+        Ȳsp[2] = Ȳ
+        ΔYsp[2] = ΔY
+        Usp[2] = U
+    end
+end
+
 
 end

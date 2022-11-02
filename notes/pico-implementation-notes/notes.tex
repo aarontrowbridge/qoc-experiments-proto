@@ -2,6 +2,7 @@
 
 \usepackage[bookmarks]{hyperref}
 \usepackage{amsmath}
+\usepackage{amsfonts}
 \usepackage{mathrsfs}
 \usepackage{physics}
 
@@ -406,6 +407,334 @@ and
   \pdv{\vb{P}_t^{(4), i}}{\isopsi_t^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} - \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)\\
   \pdv{\vb{P}_t^{(4), i}}{\isopsi_{t+1}^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} + \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)
 \end{align}
+
+\section{Minimum Time Problem}
+
+Once a solution has been found for a given \textit{time horizon}, we can solve the time minimization problem below, initialized with the given solution.
+
+\begin{align*}
+  \underset{\Delta t_{1:T-1}}{\underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}}} & 
+  \quad \sum_t \Delta t_t + \frac{R_u}{2} \sum_t \vb{u}_t^2 + \frac{R_s}{2} \sum_t \qty(\vb{u}_{t+1} - \vb{u}_t)^2\\
+  \text{subject to} & \quad \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t, \Delta t_t) = \vb{0}\\
+\end{align*}
+
+For this problem we will define, with $\vb{Z}$ as defined before 
+
+$$
+  \Delta \vb{t} = \mqty(
+    \Delta t_1 \\ 
+    \vdots \\ 
+    \Delta t_{T-1}
+  )
+  \quad \text{and} \quad
+  \vb{\bar Z} = \mqty(\vb{Z} \\ \Delta \vb{t})
+$$
+
+
+\subsection{Objective Gradient}
+
+Let's write the objective function as 
+
+\begin{equation}
+  J = J_{\Delta t} + J_u + J_s
+\end{equation}
+
+then
+
+\begin{equation}
+  \nabla_{\vb{\bar Z}} J = \mqty(
+    \nabla_{\vb{Z}} J \\
+    \nabla_{\vb{\Delta \vb{t}}} J
+  ) = \mqty(
+    \nabla_{\vb{Z}} J_u + \nabla_{\vb{Z}} J_s \\
+    \nabla_{\vb{\Delta \vb{t}}} J_{\Delta t}
+  )
+\end{equation}
+
+where 
+
+\begin{equation}
+  \nabla_{\vb{Z}} J_u = \mqty(
+    \vdots \\ 
+    \vb{0} \\
+    R_u \vb{u}_t \\  
+    \vdots \\ 
+  ), 
+  \quad \quad
+  \nabla_{\vb{Z}} J_s = 
+  % \mqty(
+  %   \vb{0} \\
+  %   -R_s \qty(\vb{u}_2 - \vb{u}_1) \\  
+  %   \vb{0} \\
+  %   R_s \qty(\vb{u}_2 - \vb{u}_1) - R_s \qty(\vb{u}_3 - \vb{u}_2) \\
+  %   \vdots \\ 
+  %   \vb{0} \\
+  %   R_s \qty(\vb{u}_t - \vb{u}_{t-1}) - R_s \qty(\vb{u}_{t+1} - \vb{u}_t) \\
+  %   \vdots \\
+  %   \vb{0} \\
+  %   R_s \qty(\vb{u}_{T-1} - \vb{u}_{T-2})
+  % ) = 
+  \mqty(
+    \vb{0} \\
+    R_s \qty(\vb{u}_1 - \vb{u}_2) \\  
+    \vdots \\ 
+    \vb{0} \\
+    R_s \qty(-\vb{u}_{t-1} + 2\vb{u}_t - \vb{u}_{t+1}) \\
+    \vdots \\
+    \vb{0} \\
+    R_s \qty(-\vb{u}_{T-2} + \vb{u}_{T-1})
+  ),
+\end{equation}
+
+and
+
+\begin{equation}
+  \nabla_{\vb{\Delta \vb{t}}} J_{\Delta t} = \vb{1}_{T-1}
+\end{equation}
+
+
+
+
+
+\subsection{Dynamics Jacobian}
+
+
+We then have, with $\vb{F}$ defined as before (but taking the corresponding $\Delta t_t$):
+
+\begin{equation}
+  \pdv{\vb{F}}{\vb{\bar Z}} = \mqty(
+    \displaystyle \pdv{\vb{F}}{\vb{Z}} &  
+    \displaystyle \pdv{\vb{F}}{\Delta \vb{t}}
+  )
+\end{equation}
+
+where 
+
+\begin{equation}
+  \pdv{\vb{F}}{\Delta \vb{t}} = \mqty(
+    \displaystyle \pdv{\vb{f}_1}{\Delta t_1} \\
+    & \ddots \\
+    & & \displaystyle \pdv{\vb{f}_{T-1}}{\Delta t_{T-1}}
+  )
+\end{equation}
+
+with
+
+\begin{equation}
+  \pdv{\vb{f}_t}{\Delta t_t} = 
+  \mqty(
+    \vdots \\
+    \displaystyle \pdv{\vb{P}^{(n),i}_t}{\Delta t_t} \\
+    \vdots \\
+    -\vb{a}_t \\
+    - \dot{\vb{a}}_t \\
+    - \vb{u}_t \\
+  )
+\end{equation}
+
+and
+
+\begin{align}
+  \pdv{\vb{P}^{(4),i}_t}{\Delta t_t} 
+  &= \qty( -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2) \isopsi^i_{t+1}
+  - \qty(\frac{1}{2} G(\vb{a}_t) + \frac{2\Delta t_t}{9} G(\vb{a}_t)^2) \isopsi^i_t \nonumber\\
+  &= -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t) + \frac{2\Delta t_t}{9} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
+  \pdv{\vb{P}^{(2),i}_t}{\Delta t_t} 
+  &=  -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t)
+\end{align}
+
+\newpage
+
+\subsection{Hessian of the Lagrangian}
+
+As before we will first define the objective Hessian and then the dynamics Lagrangian Hessian
+
+\subsubsection*{Objective Hessian}
+
+Decomposing as before, we have
+
+$$
+\nabla_{\vb{\bar Z}}^2 J = \mqty(
+  \nabla_{\vb{Z}}^2 J_u + \nabla_{\vb{Z}}^2 J_s \\
+  & \nabla_{\vb{\Delta \vb{t}}}^2 J_{\Delta t}
+) = 
+\mqty(
+  \nabla_{\vb{Z}}^2 J_u + \nabla_{\vb{Z}}^2 J_s \\
+  & \vb{0}_{T-1 \times T-1}
+)
+$$
+
+where 
+
+\begin{equation}
+  \nabla_{\vb{Z}}^2 J_u = 
+  \mqty(
+    \ddots \\ 
+    & \vb{0} \\
+    & & R_u I \\  
+    & & & \ddots \\ 
+  )
+\end{equation}
+
+and, showing the upper triangular structure of the Hessian,
+
+\begin{equation}
+  \nabla_{\vb{Z}}^2 J_s =
+  \mqty(
+    \vb{0} & & \vb{0}\\
+    & R_s I & &  -R_s I \\
+    & & \vb{0} & & \vb{0}\\
+    & & & 2 R_s I & & -R_s I \\ 
+    & & & & \vb{0} & & \ddots \\
+    & & & & & 2 R_s I & & -R_s I\\
+    & & & & & & \ddots \\
+    & & & & & & & R_s I \\
+  )
+\end{equation}
+
+
+\subsubsection*{Hessian of the Dynamics Lagrangian}
+
+Defining 
+
+$$
+\mathcal{L}_f = \vb*{\mu} \vdot \vb{F} 
+$$
+
+we want to compute
+
+$$
+\nabla_{\vb{\bar Z}}^2 \mathcal{L}_f = \mqty(
+  \nabla_{\vb{Z}}^2 \mathcal{L}_f & 
+  \nabla^\top_{\Delta \vb{t}} \nabla_{\vb{Z}} \mathcal{L}_f \\
+  \nabla^\top_{\vb{Z}} \nabla_{\Delta \vb{t}} \mathcal{L}_f & 
+  \nabla_{\vb{\Delta \vb{t}}}^2 \mathcal{L}_f
+)
+$$
+
+we have already computed $\nabla_{\vb{Z}}^2 \mathcal{L}_f$ above, so we then have
+
+\begin{equation}
+  \nabla_{\vb{\Delta \vb{t}}}^2 \mathcal{L}_f = 
+  \mqty(
+    \ddots \\
+    & \displaystyle \vec \mu_t \vdot \pdv[2]{\vb{f}_t}{\Delta t_t} \\
+    & & \ddots \\
+  )
+\end{equation}
+
+where
+
+\begin{equation}
+  \vec \mu_t \vdot \pdv[2]{\vb{f}_t}{\Delta t_t} = 
+  \vec \mu_t \vdot \mqty(
+    \vdots \\
+    \displaystyle \pdv[2]{\vb{P}^{(n),i}_t}{\Delta t_t} \\
+    \vdots \\
+    \vb{0} \\
+    \vb{0} \\
+    \vb{0} \\
+  ) = 
+  \sum_i \vec \mu_t^{\isopsi_i} \vdot \pdv[2]{\vb{P}^{(n),i}_t}{\Delta t_t}
+\end{equation}
+
+with 
+
+\begin{align}
+  \pdv[2]{\vb{P}^{(4),i}_t}{\Delta t_t} 
+  &= \frac{2}{9} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
+  \pdv[2]{\vb{P}^{(2),i}_t}{\Delta t_t} 
+  &= \vb{0} 
+\end{align}
+
+
+We also have
+
+\begin{equation}
+  \nabla^\top_{\Delta \vb{t}} \nabla_{\vb{Z}} \mathcal{L}_f 
+  = \mqty(
+    \ddots \\
+    & \qty( \displaystyle \pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_t} )^\top \vec \mu_t \\ 
+    & \qty( \displaystyle \pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_{t+1}} )^\top \vec \mu_t  
+    & \qty( \displaystyle \pdv{\vb{f}_{t+1}}{\Delta t_{t+1}}{\vb{z}_{t+1}} )^\top \vec \mu_{t+1} \\ 
+    & & \qty( \displaystyle \pdv{\vb{f}_{t+1}}{\Delta t_{t+1}}{\vb{z}_{t+2}} )^\top \vec \mu_{t+1} \\ 
+    & & & \ddots \\
+  ) \\ 
+\end{equation}
+
+where
+
+\begin{equation}
+  \qty(\pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_t})^\top \vec \mu_t
+  = \mqty(
+    \vdots \\
+    \qty(
+      \displaystyle \pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\isopsi^i_t}
+    )^\top \vec \mu^{\isopsi^i}_t \\ 
+    \vdots \\
+    \vb{0} \\
+    -\vec \mu^{\int \vb{a}}_t 
+    + \displaystyle \sum_i \qty(\pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\vb{a}_t})^\top \vec \mu^{\isopsi^i}_t \\
+    -\vec \mu^{\vb{a}}_t\\ 
+    -\vec \mu^{\dot{\vb{a}}}_t\\ 
+  )
+\end{equation}
+
+and
+
+\begin{equation}
+  \qty(\pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_{t+1}})^\top \vec \mu_t
+  = \mqty(
+    \vdots \\
+    \qty(\displaystyle \pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\isopsi^i_{t+1}})^\top \vec \mu^{\isopsi^i}_t \\ 
+    \vdots \\
+    \vb{0} \\
+    \vb{0} \\
+    \vb{0} \\
+    \vb{0} \\
+  )
+\end{equation}
+
+with 
+
+\begin{align}
+  \pdv{\vb{P}^{(4),i}_t}{\Delta t_t}{\isopsi^i_t}
+  &= -\qty(\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2) \\ 
+  \pdv{\vb{P}^{(4),i}_t}{\Delta t_t}{\isopsi^i_{t+1}}
+  &= -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2 
+\end{align}
+
+and 
+
+\begin{equation}
+  \pdv{\vb{P}^{(2),i}_t}{\Delta t_t}{\isopsi^i_t}
+  = \pdv{\vb{P}^{(2),i}_t}{\Delta t_t}{\isopsi^i_{t+1}}
+  = -\frac{1}{2} G(\vb{a}_t) 
+\end{equation}
+
+and for the $j$th column of $\pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\vb{a}_t}$ we have
+
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(4),i}}{\Delta t_t}{a^j_t} 
+    = -\frac{1}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) 
+    + \frac{2 \Delta t_t}{9} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
+\end{equation}
+
+and
+
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(2),i}}{\Delta t_t}{a^j_t} 
+    = -\frac{1}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) 
+\end{equation}
+
+
+
+
+
+
+
 
     
 \end{document}

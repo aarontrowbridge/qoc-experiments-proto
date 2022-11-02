@@ -118,6 +118,8 @@ function MultiModeSystem(
     ψf::String; # e.g. "g1" or "e4" or "eN";
     χ=2π * -0.5459e-3,
     κ=2π * 4e-6,
+    χGF=2π * -1.01540302914e-3,
+    α=-2π * 0.143,
     transmon_control_bound=2π * 0.018,
     cavity_control_bound=0.03,
     n_cavities=1, # TODO: add functionality for multiple cavities
@@ -128,8 +130,81 @@ function MultiModeSystem(
     @assert parse(Int, ψ1[2]) in 0:cavity_levels-2
     @assert parse(Int, ψf[2]) in 0:cavity_levels-2
 
-    transmon_g = [1; zeros(transmon_levels - 1)]
-    transmon_e = [zeros(transmon_levels - 1); 1]
+    if transmon_levels == 2
+
+        transmon_g = [1, 0]
+        transmon_e = [0, 1]
+
+        H_drift = 2χ * kron(
+            transmon_e * transmon_e',
+            number(cavity_levels)
+        ) + κ / 2 * kron(
+            I(transmon_levels),
+            quad(cavity_levels)
+        )
+
+        H_drive_transmon_R = kron(
+            create(transmon_levels) + annihilate(transmon_levels),
+            I(cavity_levels)
+        )
+
+        H_drive_transmon_I = kron(
+            im * (create(transmon_levels) -
+                annihilate(transmon_levels)),
+            I(cavity_levels)
+        )
+
+        H_drive_cavity_R = kron(
+            I(transmon_levels),
+            create(cavity_levels) + annihilate(cavity_levels)
+        )
+
+        H_drive_cavity_I = kron(
+            I(transmon_levels),
+            im * (create(cavity_levels) -
+                annihilate(cavity_levels))
+        )
+
+    elseif transmon_levels == 3
+
+        transmon_g = [1, 0, 0]
+        transmon_e = [0, 1, 0]
+        transmon_f = [0, 0, 1]
+
+        H_drift = α / 2 * kron(
+            quad(transmon_levels),
+            I(cavity_levels)
+        ) + 2χ * kron(
+            transmon_e * transmon_e',
+            number(cavity_levels)
+        ) + 2χGF * kron(
+            transmon_f * transmon_f',
+            number(cavity_levels)
+        ) + κ / 2 * kron(
+            I(transmon_levels),
+            quad(cavity_levels)
+        )
+
+        H_drive_transmon_R = kron(
+            create(transmon_levels) + annihilate(transmon_levels),
+            I(cavity_levels)
+        )
+
+        H_drive_transmon_I = kron(
+            1im * (annihilate(transmon_levels) - create(transmon_levels)),
+            I(cavity_levels)
+        )
+
+        H_drive_cavity_R = kron(
+            I(transmon_levels),
+            create(cavity_levels) + annihilate(cavity_levels)
+        )
+
+        H_drive_cavity_I = kron(
+            I(transmon_levels),
+            1im * (annihilate(cavity_levels) - create(cavity_levels))
+        )
+    end
 
     ψinit = kron(
         ψ1[1] == 'g' ? transmon_g : transmon_e,
@@ -139,36 +214,6 @@ function MultiModeSystem(
     ψgoal = kron(
         ψf[1] == 'g' ? transmon_g : transmon_e,
         cavity_state(parse(Int, ψf[2]), cavity_levels)
-    )
-
-    H_drift = 2χ * kron(
-        create(transmon_levels) + annihilate(transmon_levels),
-        I(cavity_levels)
-    ) + κ / 2 * kron(
-        I(transmon_levels),
-        quad(cavity_levels)
-    )
-
-    H_drive_transmon_R = kron(
-        create(transmon_levels) + annihilate(transmon_levels),
-        I(cavity_levels)
-    )
-
-    H_drive_transmon_I = kron(
-        im * (create(transmon_levels) -
-            annihilate(transmon_levels)),
-        I(cavity_levels)
-    )
-
-    H_drive_cavity_R = kron(
-        I(transmon_levels),
-        create(cavity_levels) + annihilate(cavity_levels)
-    )
-
-    H_drive_cavity_I = kron(
-        I(transmon_levels),
-        im * (create(cavity_levels) -
-            annihilate(cavity_levels))
     )
 
     H_drives = [

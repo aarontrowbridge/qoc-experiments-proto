@@ -45,20 +45,20 @@ We now have two sets of measurements:
 Let us write
 
 $$
-\bar x (t) = \hat x (t) + \epsilon(t)
+\bar x (t) = \hat x (t) + e(t)
 $$
 
 
-where $\epsilon(t)$ is the error in the experimental trajectory.  To correct for this error, we can find a correction term $\Delta x(t)$ s.t.
+where $e(t)$ is the error in the experimental trajectory.  To correct for this error, we can find a correction term $\Delta x(t)$ s.t.
 
 $$
-g(\bar x + \Delta x) = g(\hat x + \epsilon + \Delta x ) = \hat y
+g(\bar x + \Delta x) = g(\hat x + e + \Delta x ) = \hat y
 $$
 
 For example, if $g(x) = x$ is the identity function, i.e. we are trying to track the trajectory:
 
 $$
-\Delta x = - \epsilon
+\Delta x = - 
 $$
 
 The real problem involves finding the corresponding correction to the controls: $\Delta u(t)$. This involves setting up a quadratic optimization problem.
@@ -78,24 +78,24 @@ With $\Delta y \equiv \bar y - \hat y$, we have
 
 \begin{align*}
   \bar y &= g(\bar x) \\
-  &= g(\hat x + \epsilon) \\ 
-  &\approx g(\hat x) + \nabla g(\hat x) \cdot \epsilon \\
-  &= \hat y + \nabla g(\hat x) \cdot \epsilon
+  &= g(\hat x + e) \\ 
+  &\approx g(\hat x) + \nabla g(\hat x) \cdot e \\
+  &= \hat y + \nabla g(\hat x) \cdot e  
 \end{align*}
 
  
 which, with writing $\nabla \hat g = \nabla g(\hat x)$ yields
 
 $$
-\Delta y \approx \nabla \hat g \cdot \epsilon
+\Delta y \approx \nabla \hat g \cdot e 
 $$
 
 
-and since $g: \mathbb{R}^n \to \mathbb{R}^m$ where $m \leq n$, $\nabla g$ is not necessarily invertible, but we can use the Moore-Penrose pseudoinverse here to get a guess for $\epsilon$:
+and since $g: \mathbb{R}^n \to \mathbb{R}^m$ where $m \leq n$, $\nabla g$ is not necessarily invertible, but we can use the Moore-Penrose pseudoinverse here to get a guess for $e$:
 
 $$
 \boxed{
-\epsilon \approx \qty(\nabla \hat g)^+ \cdot \Delta y \equiv \hat \epsilon
+e \approx \qty(\nabla \hat g)^+ \cdot \Delta y \equiv \hat e 
 }
 $$
 
@@ -122,9 +122,9 @@ which yields the condition
 where
 
 \begin{align*}
-  \nabla g(\bar x)_i^j &= \nabla g(\hat x + \epsilon)_i^j \\
-  & \approx  \nabla g(\hat x + \hat \epsilon)_i^j \\
-  &= \nabla g(\hat x)_i^j + \sum_k \qty(\nabla^2 g(\hat x))_i^{jk} \ \hat \epsilon_k \\
+  \nabla g(\bar x)_i^j &= \nabla g(\hat x + e)_i^j \\
+  & \approx  \nabla g(\hat x + \hat e)_i^j \\
+  &= \nabla g(\hat x)_i^j + \sum_k \qty(\nabla^2 g(\hat x))_i^{jk} \ \hat e_k \\
   &= \nabla \hat g_i^j + \sum_{kl} \qty(\nabla^2 \hat g)_i^{jk} \ \qty(\qty(\nabla \hat g)^+)_k^l \Delta y_l 
 \end{align*}
 
@@ -160,7 +160,7 @@ which yields
 We seek to find the solution to
 
 \begin{align*}
-  \underset{\Delta x_{1:T},\ \Delta u_{1:T}}{\text{minimize}} & \quad \sum_t \Delta x^\top_t Q \Delta x_t + \Delta u^\top_t R \Delta u_t \\
+  \underset{\Delta x_{1:T},\ \Delta u_{1:T}}{\text{minimize}} & \quad \frac{1}{2} \sum_t \Delta x^\top_t Q \Delta x_t + \Delta u^\top_t R \Delta u_t \\
   \text{subject to} \ & \quad \nabla g(\bar x_\tau) \cdot \Delta x_\tau = - \Delta y_\tau \quad \forall \tau \\
   & \quad \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0 \quad \forall t
 \end{align*}
@@ -261,6 +261,41 @@ where again
 $$
 \Delta Y = \bar Y - \hat Y
 $$
+
+\newpage
+
+\section*{An Alternative Quadratic Problem}
+
+In the regime of noisy measurements, satisfying both the dynamics constraints and the measurement constraints becomes infeasible. To overcome this we we can relax the measurement into a maximum likelihood problem.  To see this let's write
+
+\begin{align*}
+\bar y = \hat y - \nabla g \cdot \Delta x &\implies \bar y \sim \mathcal{N}(\hat y - \nabla g \cdot \Delta x, \Sigma) \\ 
+&\implies \Delta y \sim \mathcal{N}(-\nabla g \cdot \Delta x, \Sigma) \\
+\end{align*}
+
+where $\Sigma$ is the covariance matrix of the measurement noise, which we can get from the experiment.  To make the following clearer, let's define the parameterized distribution over $\Delta y$ as
+
+$$
+p(\Delta x) = \mathcal{N}(-\nabla g \cdot \Delta x, \Sigma)
+$$
+
+then, given an observation $\bar y$, we can find the MLE for the parameter $\Delta x$ as the solution to the following optimization problem:
+
+\begin{align*}
+\max_{\Delta x} \ \log p(\Delta x) \ &\implies \ \min_{\Delta x} \ \frac{1}{2} \qty(\Delta y + \nabla g \cdot \Delta x)^\top \Sigma^{-1} \qty(\Delta y + \nabla g \cdot \Delta x) \\
+&\implies \ \min_{\Delta x} \ \frac{1}{2} \Delta x^\top \nabla g^\top \Sigma^{-1} \nabla g \Delta x + \Delta y^\top \Sigma^{-1} \nabla g \Delta x 
+\end{align*}
+
+We can then augment our initial problem with this objective term and remove the measurement constraint.  This yields the following problem:
+
+\begin{align*}
+  \underset{\Delta x_{1:T},\ \Delta u_{1:T}}{\text{minimize}} & \quad \frac{1}{2} \sum_t \Delta x^\top_t Q \Delta x_t + \Delta u^\top_t R \Delta u_t \\
+  & \quad + \sum_\tau \frac{1}{2} \Delta x_\tau^\top \qty(\nabla g^\top \Sigma^{-1} \nabla g) \Delta x_\tau + \qty(\Delta y_\tau^\top \Sigma^{-1} \nabla g) \Delta x_\tau \\
+  \text{subject to} \ 
+  & \quad \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0 \quad \forall t \\
+  & \quad -u_\text{max} - \hat u_t < \Delta u_t < u_\text{max} - \hat u_t \\
+  & \quad \Delta u_1 = \Delta u_T = 0
+\end{align*}
 
 \newpage
 

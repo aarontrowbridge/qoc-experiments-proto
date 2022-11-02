@@ -4,16 +4,30 @@ export AbstractIntegrator
 export QuantumIntegrator
 
 export Exponential
+
 export SecondOrderPade
+export second_order_pade
+
 export FourthOrderPade
+export fourth_order_pade
 
-export Jacobian
+# jacobians
+export ∂ψ̃ⁱₜ
+export ∂ψ̃ⁱₜ₊₁
+export ∂aₜ
 
-export SecondOrderPadeJacobian
-export FourthOrderPadeJacobian
+# hessians of the lagrangian
+export μₜ∂²aₜ
+export μⁱₜ∂aₜ∂ψ̃ⁱₜ
+export μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁
 
-export SecondOrderPadeHessian
-export FourthOrderPadeHessian
+# min time jacobian and hessians of the lagrangian
+export ∂Δtₜ
+export μₜ∂²Δtₜ
+export μⁱₜ∂Δtₜ∂ψ̃ⁱₜ
+export μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁
+export μₜ∂Δtₜ∂aₜ
+
 
 using ..Utils
 using ..QuantumSystems
@@ -86,220 +100,25 @@ function (integrator::SecondOrderPade)(
     return ψ̃ₜ₊₁ - ψ̃ₜ - Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
 end
 
+function second_order_pade(Gₜ::Matrix, Δt::Real)
+    Id = I(size(Gₜ, 1))
+    return inv(Id - Δt / 2 * Gₜ) *
+        (Id + Δt / 2 * Gₜ)
+end
+
 
 # 4th order Pade integrator
 
 struct FourthOrderPade <: QuantumIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
-
-    FourthOrderPade(sys::QuantumSystem) =
-        new(sys.G_drift, sys.G_drives)
-end
-
-function (integrator::FourthOrderPade)(
-    ψ̃ₜ₊₁::AbstractVector,
-    ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
-    Id = I(size(Gₜ, 1))
-    # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
-    #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
-    return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
-        Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
-end
-
-
-#
-# Jacobians
-#
-
-function Jacobian(integrator::QuantumIntegrator)
-    if isa(integrator, SecondOrderPade)
-        return SecondOrderPadeJacobian(integrator)
-    elseif isa(integrator, FourthOrderPade)
-        return FourthOrderPadeJacobian(integrator)
-    else
-        @error "$(typeof(integrator)) Jacobian not implemented"
-    end
-end
-
-
-# 2nd order Pade integrator Jacobian struct
-
-struct SecondOrderPadeJacobian
-    G_drift::Matrix
-    G_drives::Vector{Matrix}
-
-    function SecondOrderPadeJacobian(
-        integrator::QuantumIntegrator
-    )
-        return new(integrator.G_drift, integrator.G_drives)
-    end
-end
-
-
-# Jacobian of 2nd order Pade integrator with respect to ψ̃ⁱₜ
-
-function (J::SecondOrderPadeJacobian)(
-    aₜ::AbstractVector,
-    Δt::Real,
-    ψ̃ⁱₜ₊₁::Bool
-)
-    Gₜ = G(aₜ, J.G_drift, J.G_drives)
-    Id = I(size(Gₜ, 1))
-    if ψ̃ⁱₜ₊₁
-        return Id - Δt / 2 * Gₜ
-    else
-        return -(Id + Δt / 2 * Gₜ)
-    end
-end
-
-
-# Jacobian of 2nd order Pade integrator with respect to control aʲₜ
-
-function (J::SecondOrderPadeJacobian)(
-    ψ̃ⁱₜ₊₁::AbstractVector,
-    ψ̃ⁱₜ::AbstractVector,
-    aₜ::AbstractVector, # not used here, but kept to match function signature to 4th order P
-    Δt::Real,
-    j::Int
-)
-    Gʲ = J.G_drives[j]
-    return -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ)
-end
-
-
-# 4th order Pade integrator Jacobian struct
-
-struct FourthOrderPadeJacobian
-    G_drift::Matrix
-    G_drives::Vector{Matrix}
-    G_drift_anticoms::Vector{Matrix}
-    G_drive_anticoms::Symmetric
-
-    function FourthOrderPadeJacobian(
-        integrator::QuantumIntegrator
-    )
-        ncontrols = length(integrator.G_drives)
-
-        drive_anticoms = fill(
-            zeros(size(integrator.G_drift)),
-            ncontrols,
-            ncontrols
-        )
-
-        for j = 1:ncontrols
-            for k = 1:j
-                if k == j
-                    drive_anticoms[k, k] =
-                        2 * integrator.G_drives[k]^2
-                else
-                    drive_anticoms[k, j] = anticom(
-                        integrator.G_drives[k],
-                        integrator.G_drives[j]
-                    )
-                end
-            end
-        end
-
-        drift_anticoms = [
-            anticom(G_drive, integrator.G_drift)
-                for G_drive in integrator.G_drives
-        ]
-
-        return new(
-            integrator.G_drift,
-            integrator.G_drives,
-            drift_anticoms,
-            Symmetric(drive_anticoms)
-        )
-    end
-end
-
-anticom(A::Matrix, B::Matrix) = A * B + B * A
-
-
-# Jacobian of 4th order Pade integrator with respect to ψ̃ⁱₜ₍₊₁₎
-
-function (J::FourthOrderPadeJacobian)(
-    aₜ::AbstractVector,
-    Δt::Real,
-    ψ̃ⁱₜ₊₁::Bool
-)
-    Gₜ = G(aₜ, J.G_drift, J.G_drives)
-    Id = I(size(Gₜ, 1))
-    if ψ̃ⁱₜ₊₁
-        return Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2
-    else
-        return -(Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2)
-    end
-end
-
-
-# Jacobian of 2nd order Pade integrator with respect to control aʲₜ
-
-function (J::FourthOrderPadeJacobian)(
-    ψ̃ⁱₜ₊₁::AbstractVector,
-    ψ̃ⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real,
-    j::Int
-)
-    Gʲ_anticom_Gₜ =
-        G(aₜ, J.G_drift_anticoms[j], J.G_drive_anticoms[:, j])
-    Gʲ = J.G_drives[j]
-    return -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-        Δt^2 / 9 * Gʲ_anticom_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-end
-
-
-# 2nd order Pade integrator Hessian struct
-
-struct SecondOrderPadeHessian
-    G_drives::Vector{Matrix}
-    isodim::Int
-
-    function SecondOrderPadeHessian(sys::QuantumSystem)
-        return new(
-            sys.G_drives,
-            sys.isodim
-        )
-    end
-end
-
-
-# Hessian of 2nd order Pade integrator w.r.t. ψ̃ⁱₜ₍₊₁₎ and aʲₜ
-
-@views function (H::SecondOrderPadeHessian)(
-    μₜ::AbstractVector,
-    Δt::Real,
-    i::Int,
-    j::Int,
-    ψ̃ⁱₜ₊₁::Bool
-)
-    Gʲ = H.G_drives[j]
-    μⁱₜ = μₜ[slice(i, H.isodim)]
-    if ψ̃ⁱₜ₊₁
-        return (μⁱₜ)' * (-Δt / 2 * Gʲ)
-    else
-        return -(Δt / 2 * Gʲ)' * μⁱₜ
-    end
-end
-
-
-# 4th order Pade integrator Hessian struct
-
-struct FourthOrderPadeHessian
-    G_drives::Vector{Matrix}
     G_drive_anticoms::Symmetric
     G_drift_anticoms::Vector{Matrix}
     nqstates::Int
     isodim::Int
 
-    function FourthOrderPadeHessian(sys::QuantumSystem)
+    function FourthOrderPade(sys::QuantumSystem)
+
         drive_anticoms = fill(
             zeros(size(sys.G_drift)),
             sys.ncontrols,
@@ -323,6 +142,7 @@ struct FourthOrderPadeHessian
         ]
 
         return new(
+            sys.G_drift,
             sys.G_drives,
             Symmetric(drive_anticoms),
             drift_anticoms,
@@ -332,59 +152,328 @@ struct FourthOrderPadeHessian
     end
 end
 
-
-# Hessian of the 4th order Pade integrator w.r.t. aᵏₜ and aʲₜ
-
-@views function (H::FourthOrderPadeHessian)(
+function (integrator::FourthOrderPade)(
     ψ̃ₜ₊₁::AbstractVector,
     ψ̃ₜ::AbstractVector,
-    μₜ::AbstractVector,
-    Δt::Real,
-    k::Int,
-    j::Int
-)
-    Hᵏʲₜ = 0.0
-
-    Ĝᵏʲ = Δt^2 / 9 * H.G_drive_anticoms[k, j]
-
-    for i = 1:H.nqstates
-
-        ψ̃ⁱ_slice = slice(i, H.isodim)
-
-        μⁱₜ = μₜ[ψ̃ⁱ_slice]
-
-        ψ̃ⁱₜ = ψ̃ₜ[ψ̃ⁱ_slice]
-
-        ψ̃ⁱₜ₊₁ = ψ̃ₜ₊₁[ψ̃ⁱ_slice]
-
-        Hᵏʲₜ += dot(μⁱₜ, Ĝᵏʲ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ))
-    end
-
-    return Hᵏʲₜ
-end
-
-
-# Hessian of 4th order Pade integrator w.r.t. ψ̃ⁱₜ₍₊₁₎  and aʲₜ
-
-@views function (H::FourthOrderPadeHessian)(
     aₜ::AbstractVector,
-    μₜ::AbstractVector,
-    Δt::Real,
-    i::Int,
-    j::Int,
-    ψ̃ⁱₜ₊₁::Bool
+    Δt::Real
 )
-    Ĝʲ = G(aₜ, H.G_drift_anticoms[j], H.G_drive_anticoms[:, j])
-    Gʲ = H.G_drives[j]
-    μⁱₜ = μₜ[slice(i, H.isodim)]
-    if ψ̃ⁱₜ₊₁
-        return (μⁱₜ)' * (-Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)
-    else
-        return -(Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)' * μⁱₜ
+    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
+    Id = I(size(Gₜ, 1))
+    # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
+    #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
+    return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
+        Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
+end
+
+function fourth_order_pade(Gₜ::Matrix, Δt::Real)
+    Id = I(size(Gₜ, 1))
+    return inv(Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) *
+        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2)
+end
+
+
+#
+# Jacobians
+#
+
+
+function ∂ψ̃ⁱₜ(
+    P::SecondOrderPade,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Id = I(size(Gₜ, 1))
+    return -(Id + Δt / 2 * Gₜ)
+end
+
+function ∂ψ̃ⁱₜ(
+    P::FourthOrderPade,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Id = I(size(Gₜ, 1))
+    return -(Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2)
+end
+
+
+function ∂ψ̃ⁱₜ₊₁(
+    P::SecondOrderPade,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Id = I(size(Gₜ, 1))
+    return Id - Δt / 2 * Gₜ
+end
+
+function ∂ψ̃ⁱₜ₊₁(
+    P::FourthOrderPade,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Id = I(size(Gₜ, 1))
+    return Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2
+end
+
+
+function ∂aₜ(
+    P::SecondOrderPade,
+    ψ̃ⁱₜ₊₁::AbstractVector,
+    ψ̃ⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    ∂aₜPⁱₜ = zeros(length(ψ̃ⁱₜ), length(aₜ))
+    for j = 1:length(aₜ)
+        Gʲ = P.G_drives[j]
+        ∂aₜPⁱₜ[:, j] = -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ)
     end
+    return ∂aₜPⁱₜ
+end
+
+function ∂aₜ(
+    P::FourthOrderPade,
+    ψ̃ⁱₜ₊₁::AbstractVector,
+    ψ̃ⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    ∂aₜPⁱₜ = zeros(length(ψ̃ⁱₜ), length(aₜ))
+    for j = 1:length(aₜ)
+        Gʲ = P.G_drives[j]
+        Gʲ_anticom_Gₜ =
+            G(aₜ, J.G_drift_anticoms[j], J.G_drive_anticoms[:, j])
+        ∂aₜPⁱₜ[:, j] =
+            -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
+            Δt^2 / 9 * Gʲ_anticom_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+    end
+    return ∂aₜPⁱₜ
+end
+
+
+function ∂Δtₜ(
+    P::SecondOrderPade,
+    ψ̃ⁱₜ₊₁::AbstractVector,
+    ψ̃ⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real # not used, but kept to match 4th order method signature
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    return - 1 / 2 * Gₜ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ)
+end
+
+function ∂Δtₜ(
+    P::FourthOrderPade,
+    ψ̃ⁱₜ₊₁::AbstractVector,
+    ψ̃ⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    return - 1 / 2 * Gₜ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
+        2 / 9 * Δtₜ * Gₜ^2 * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+end
+
+
+#
+# Hessians of the Lagrangian
+#
+
+
+
+# for dispatching purposes
+function μₜ∂²aₜ(P::SecondOrderPade, args...)
+    ncontrols = length(P.G_drives)
+    return zeros(ncontrols, ncontrols)
+end
+
+# TODO: test and add multithreading
+
+function μₜ∂²aₜ(
+    P::FourthOrderPade,
+    μₜ::AbstractVector,
+    Ψ̃ₜ₊₁::AbstractVector,
+    Ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    ncontrols = length(P.G_drives)
+    μₜ∂²aₜPₜ = zeros(ncontrols, ncontrols)
+    for i = 1:P.nqstates
+        ψ̃ⁱ_slice = slice(i, P.isodim)
+        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
+        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
+        μⁱₜ = μₜ[ψ̃ⁱ_slice]
+        for k = 1:ncontrols
+            for j = k:ncontrols
+                ∂aᵏₜ∂aʲₜPⁱₜ = Δt^2 / 9 * P.G_drive_anticoms[k, j] * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+                μₜ∂²aₜPₜ[k, j] += dot(μⁱₜ, ∂aᵏₜ∂aʲₜPⁱₜ)
+            end
+        end
+    end
+    return Symmetric(μₜ∂²aₜPₜ)
+end
+
+
+function μⁱₜ∂aₜ∂ψ̃ⁱₜ(
+    P::SecondOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+)
+    μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ = zeros(length(μⁱₜ), length(aₜ))
+    for j = 1:length(aₜ)
+        Gʲ = P.G_drives[j]
+        ∂aₜ∂ψ̃ⁱₜPⁱₜ = -Δt / 2 * Gʲ
+        μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ[:, j] = (∂aₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
+    end
+    return μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ
+end
+
+function μⁱₜ∂aₜ∂ψ̃ⁱₜ(
+    P::FourthOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+)
+    μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ = zeros(length(μⁱₜ), length(aₜ))
+    for j = 1:length(aₜ)
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, H.G_drift_anticoms[j], H.G_drive_anticoms[:, j])
+        ∂aₜ∂ψ̃ⁱₜPⁱₜ = -Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ
+        μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ[:, j] = (∂aₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
+    end
+    return μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ
+end
+
+
+function μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁(
+    P::SecondOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+)
+    μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = zeros(length(μⁱₜ), length(aₜ))
+    for j = 1:length(aₜ)
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, H.G_drift_anticoms[j], H.G_drive_anticoms[:, j])
+        ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = -Δt / 2 * Gʲ
+        μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ[:, j] = (μⁱₜ)' * ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
+    end
+    return μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
+end
+
+function μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁(
+    P::FourthOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+)
+    μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = zeros(length(μⁱₜ), length(aₜ))
+    for j = 1:length(aₜ)
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, H.G_drift_anticoms[j], H.G_drive_anticoms[:, j])
+        ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = -Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ
+        μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ[:, j] = (μⁱₜ)' * ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
+    end
+    return μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
 end
 
 
 
+#
+# min time problem hessians of the lagrangian
+#
+
+
+# for dispatching purposes
+μₜ∂²Δtₜ(P::SecondOrderPade, args...) = 0.0
+
+@views function μₜ∂²Δtₜ(
+    P::FourthOrderPade,
+    μₜ::AbstractVector,
+    Ψ̃ₜ₊₁::AbstractVector,
+    Ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    μₜ∂²ΔtₜPₜ = 0.0
+    for i = 1:P.nqstates
+        ψ̃ⁱ_slice = slice(i, P.isodim)
+        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
+        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
+        μⁱₜ = μₜ[ψ̃ⁱ_slice]
+        ∂²ΔtₜPⁱₜ = 2 / 9 * Gₜ^2 * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+        μₜ∂²ΔtₜPₜ += dot(μⁱₜ, ∂²ΔtₜPⁱₜ)
+    end
+    return μₜ∂²ΔtₜPₜ
+end
+
+
+function μⁱₜ∂Δtₜ∂ψ̃ⁱₜ(
+    P::SecondOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real # kept for dispatching purposes
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    ∂Δtₜ∂ψ̃ⁱₜPⁱₜ = -1 / 2 * Gₜ
+    return (∂Δtₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
+end
+
+function μⁱₜ∂Δtₜ∂ψ̃ⁱₜ(
+    P::FourthOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    ∂Δtₜ∂ψ̃ⁱₜPⁱₜ = -1 / 2 * Gₜ + 2 / 9 * Δtₜ * Gₜ^2
+    return (∂Δtₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
+end
+
+
+μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁(P::SecondOrderPade, args...) = μⁱₜ∂Δtₜ∂ψ̃ⁱₜ(P, args...)
+
+function μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁(
+    P::FourthOrderPade,
+    μⁱₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real
+)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    ∂Δtₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = -(1 / 2 * Gₜ + 2 / 9 * Δtₜ * Gₜ^2)
+    return (∂Δtₜ∂ψ̃ⁱₜ₊₁Pⁱₜ)' * μⁱₜ
+end
+
+@views function μₜ∂Δtₜ∂aₜ(
+    H::FourthOrderPadeHessian,
+    μₜ::AbstractVector,
+    Ψ̃ₜ₊₁::AbstractVector,
+    Ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real
+)
+    μₜ∂Δtₜ∂aₜPₜ = zeros(length(aₜ))
+    for i = 1:H.nqstates
+        ψ̃ⁱ_slice = slice(i, H.isodim)
+        μⁱₜ = μₜ[ψ̃ⁱ_slice]
+        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
+        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
+        for j = 1:length(aₜ)
+            Gʲ = H.G_drives[j]
+            Ĝʲ = G(aₜ, H.G_drift_anticoms[j], H.G_drive_anticoms[:, j])
+            ∂Δtₜ∂aʲₜPⁱₜ =
+                - 1 / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
+                2 / 9 * Δtₜ * Ĝʲ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+            μₜ∂Δtₜ∂aₜPₜ[j] += dot(μⁱₜ, ∂Δtₜ∂aʲₜPⁱₜ)
+        end
+    end
+    return μₜ∂Δtₜ∂aₜPₜ
+end
 
 end
