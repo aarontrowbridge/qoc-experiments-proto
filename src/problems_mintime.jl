@@ -24,7 +24,7 @@ const MOI = MathOptInterface
 #
 #
 
-abstract type MinTimeProblem <: AbstractProblem end
+abstract type MinTimeProblem end
 
 struct MinTimeQuantumControlProblem <: MinTimeProblem
     subprob::AbstractProblem

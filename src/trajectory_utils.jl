@@ -167,6 +167,7 @@ function save_controls(traj::Trajectory, sys::QuantumSystem, path::String)
     controls = transpose(controls) |> Array
     result = Dict(
         "total_time" => traj.times[end],
+        "times" => traj.times,
         "T" => traj.T,
         "delta_t" => traj.Δt,
         "controls" => controls,
@@ -179,6 +180,8 @@ function save_controls(traj::Trajectory, sys::QuantumSystem, path::String)
         end
     end
 end
+
+# function load_trajectory_from_controls()
 
 
 end

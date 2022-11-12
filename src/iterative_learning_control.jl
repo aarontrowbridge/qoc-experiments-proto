@@ -63,15 +63,15 @@ function measure(
 end
 
 function measure(
-    Ψ̃::Vector{Vector{Float64}},
+    ψ̃::Vector{Vector{Float64}},
     g::Function,
     τs::AbstractVector{Int},
     ydim::Int,
 )
-    @assert size(g(Ψ̃[1]), 1) == ydim
+    @assert size(g(ψ̃[1]), 1) == ydim
     ys = Vector{Vector{Float64}}(undef, length(τs))
     for (i, τ) in enumerate(τs)
-        ys[i] = g(Ψ̃[τ])
+        ys[i] = g(ψ̃[τ])
     end
     return MeasurementData(ys, τs, ydim)
 end
@@ -125,9 +125,9 @@ function (experiment::QuantumExperiment)(
             U[t - 1],
             experiment.sys.G_drift,
             experiment.sys.G_drives
-        ) + 1e-2 * QuantumSystems.G(GATES[:CX])
-        Ψ̃[t] = experiment.integrator(Gₜ * experiment.Δt) *
-            Ψ̃[t - 1]
+        )# + 1e-2 * QuantumSystems.G(GATES[:CX])
+
+        Ψ̃[t] = experiment.integrator(Gₜ * experiment.Δt) * Ψ̃[t - 1]
     end
 
     Ȳ = measure(
@@ -148,9 +148,9 @@ end
 # - OSQP error handling
 
 struct QuadraticProblem
-    ∇f::Function
-    ∇g::Function
-    ∇²g::Function
+    ∂f::Function
+    ∂g::Function
+    ∂²g::Function
     Q::Float64
     R::Float64
     Σinv::Union{Matrix{Float64}, Nothing}
@@ -174,19 +174,19 @@ function QuadraticProblem(
 )
     @assert size(Σ, 1) == size(Σ, 2) == dims.y
 
-    ∇f(zz) = ForwardDiff.jacobian(f, zz)
+    ∂f(zz) = ForwardDiff.jacobian(f, zz)
 
-    ∇g(x) = ForwardDiff.jacobian(g, x)
+    ∂g(x) = ForwardDiff.jacobian(g, x)
 
-    function ∇²g(x)
-        H = ForwardDiff.jacobian(u -> vec(∇g(u)), x)
+    function ∂²g(x)
+        H = ForwardDiff.jacobian(u -> vec(∂g(u)), x)
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
     return QuadraticProblem(
-        ∇f,
-        ∇g,
-        ∇²g,
+        ∂f,
+        ∂g,
+        ∂²g,
         Q,
         R,
         inv(Σ),
@@ -268,22 +268,22 @@ end
 
         τᵢ = ΔY.times[i]
 
-        ∇gᵢ = QP.∇g(Ẑ.states[τᵢ])
+        ∂gᵢ = QP.∂g(Ẑ.states[τᵢ])
 
         if QP.correction_term
-            ∇²gᵢ = QP.∇²g(Ẑ.states[τᵢ])
-            ϵ̂ᵢ = pinv(∇gᵢ) * ΔY.ys[i]
-            @einsum ∇gᵢ[j, k] += ∇²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+            ∂²gᵢ = QP.∂²g(Ẑ.states[τᵢ])
+            ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
         end
 
-        Hᵢmle = ∇gᵢ' * QP.Σinv * ∇gᵢ
+        Hᵢmle = ∂gᵢ' * QP.Σinv * ∂gᵢ
 
         Hmle[
             slice(τᵢ, QP.dims.x, QP.dims.z),
             slice(τᵢ, QP.dims.x, QP.dims.z)
         ] = sparse(Hᵢmle)
 
-        ∇ᵢmle = ΔY.ys[i]' * QP.Σinv * ∇gᵢ
+        ∇ᵢmle = ΔY.ys[i]' * QP.Σinv * ∂gᵢ
 
         ∇[slice(τᵢ, QP.dims.x, QP.dims.z)] = ∇ᵢmle
     end
@@ -318,12 +318,12 @@ end
         lb = vcat(f_cons, zeros(QP.dims.u), u_lb, zeros(QP.dims.u))
         ub = vcat(f_cons, zeros(QP.dims.u), u_ub, zeros(QP.dims.u))
     else
-        ∇G = build_measurement_constraint_jacobian(
+        ∂G = build_measurement_constraint_jacobian(
             QP,
             Ẑ,
             ΔY
         )
-        A = sparse_vcat(∂F, ∇G, C)
+        A = sparse_vcat(∂F, ∂G, C)
         g_cons = -vcat(ΔY.ys...)
         lb = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_lb, zeros(QP.dims.u))
         ub = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_ub, zeros(QP.dims.u))
@@ -363,27 +363,27 @@ end
     Ẑ::Trajectory,
     ΔY::MeasurementData
 )
-    ∇G = spzeros(QP.dims.y * QP.dims.M, QP.dims.z * QP.dims.T)
+    ∂G = spzeros(QP.dims.y * QP.dims.M, QP.dims.z * QP.dims.T)
 
     for i = 1:QP.dims.M
 
         τᵢ = ΔY.times[i]
 
-        ∇gᵢ = QP.∇g(Ẑ.states[τᵢ])
+        ∂gᵢ = QP.∂g(Ẑ.states[τᵢ])
 
         if QP.correction_term
-            ∇²gᵢ = QP.∇²g(Ẑ.states[τᵢ])
-            ϵ̂ᵢ = pinv(∇gᵢ) * ΔY.ys[i]
-            @einsum ∇gᵢ[j, k] += ∇²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+            ∂²gᵢ = QP.∂²g(Ẑ.states[τᵢ])
+            ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
         end
 
-        ∇G[
+        ∂G[
             slice(i, QP.dims.y),
             slice(τᵢ, QP.dims.x, QP.dims.z)
-        ] = sparse(∇gᵢ)
+        ] = sparse(∂gᵢ)
     end
 
-    return ∇G
+    return ∂G
 end
 
 # TODO: add feat to just store jacobian of goal traj
@@ -408,7 +408,7 @@ end
         ∂F[
             slice(t, QP.dims.x),
             slice(t, QP.dims.z; stretch=QP.dims.z)
-        ] = sparse(QP.∇f(zₜ))
+        ] = sparse(QP.∂f(zₜ))
     end
 
     return ∂F
@@ -516,6 +516,8 @@ mutable struct ILCProblem
     end
 end
 
+fidelity(ψ̃, ψ̃goal) = abs2(ψ̃' * ψ̃goal)
+
 function ProblemSolvers.solve!(prob::ILCProblem)
     U = prob.Ẑ.actions
     Ȳ = prob.experiment(U)
@@ -530,7 +532,8 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         if prob.settings[:verbose]
             println("iteration = ", k)
-            println("|ΔY| = ", norm(ΔY, prob.settings[:norm_p]))
+            println("|ΔY| =      ", norm(ΔY, prob.settings[:norm_p]))
+            println("fidelity =  ", fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end]))
             println()
         end
         ΔZ = prob.QP(prob.Ẑ, ΔY)

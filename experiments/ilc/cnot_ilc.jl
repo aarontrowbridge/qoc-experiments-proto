@@ -4,7 +4,7 @@ data_name = "cnot_iter_500_00002"
 data_dir = "data/twoqubit/cnot"
 data_path = joinpath(data_dir, data_name * ".jld2")
 
-prob = load_problem(data_path)
+prob = load_data(data_path)
 
 xs = [
     prob.trajectory.states[t][1:prob.system.isodim]
@@ -27,7 +27,7 @@ Ẑ = Trajectory(
     prob.trajectory.Δt
 )
 
-g(x) = abs2.(iso_to_ket(x))
+g(ψ̃) = abs2.(iso_to_ket(ψ̃))
 
 experiment = QuantumExperiment(
     prob.system,
@@ -56,7 +56,7 @@ prob = ILCProblem(
 
 solve!(prob)
 
-plot_dir = "plots/ILC/twoqubit"
-plot_path = generate_file_path("gif", data_name, plot_dir)
+# plot_dir = "plots/ILC/twoqubit"
+# plot_path = generate_file_path("gif", data_name, plot_dir)
 
-animate_ILC_two_qubit(prob, plot_path; fps=fps)
+# animate_ILC_two_qubit(prob, plot_path; fps=fps)

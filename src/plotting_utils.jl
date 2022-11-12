@@ -346,7 +346,7 @@ function plot_multimode(
 end
 
 function plot_multimode_split(
-    prob::AbstractProblem,
+    prob::QuantumControlProblem,
     path::String;
     show_highest_modes=false,
     show_augs=false

@@ -48,8 +48,8 @@ include("constraints.jl")
 include("problems.jl")
 @reexport using .Problems
 
-include("problems_mintime.jl")
-@reexport using .MinTimeProblems
+# include("problems_mintime.jl")
+# @reexport using .MinTimeProblems
 
 include("problem_utils.jl")
 @reexport using .ProblemUtils

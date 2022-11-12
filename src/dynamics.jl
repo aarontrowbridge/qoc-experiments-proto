@@ -786,7 +786,7 @@ function QuantumDynamics(
     )
 end
 
-function MinTimeQuantumDynamics(
+function QuantumDynamics(
     sys::AbstractSystem,
     integrator::Symbol,
     Z_indices::UnitRange{Int},
