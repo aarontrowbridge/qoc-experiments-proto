@@ -1,7 +1,7 @@
 using Pico
 using LinearAlgebra
 
-iter = 5000
+iter = 200
 
 experiment = "cnot_iter_$(iter)"
 plot_dir = "plots/twoqubit/cnot"

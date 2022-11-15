@@ -77,32 +77,37 @@ function measure(
 end
 
 struct QuantumExperiment
-    sys::QuantumSystem
     ψ̃₁::Vector{Float64}
-    Δt::Float64
+    ts::Vector{Float64}
     g::Function
     ydim::Int
     τs::AbstractVector{Int}
     integrator::Function
+    G_drift::AbstractMatrix{Float64}
+    G_drives::Vector{AbstractMatrix{Float64}}
+    G_error_term::AbstractMatrix{Float64}
 end
 
 function QuantumExperiment(
     sys::QuantumSystem,
     ψ̃₁::Vector{Float64},
-    Δt::Float64,
+    ts::Vector{Float64},
     g::Function,
     ydim::Int,
     τs::AbstractVector{Int};
+    G_error_term=zeros(size(sys.G_drift)),
     integrator=exp
 )
     return QuantumExperiment(
-        sys,
         ψ̃₁,
-        Δt,
+        ts,
         g,
         ydim,
         τs,
-        integrator
+        integrator,
+        sys.G_drift,
+        sys.G_drives,
+        G_error_term
     )
 end
 
@@ -123,11 +128,13 @@ function (experiment::QuantumExperiment)(
     for t = 2:T
         Gₜ = Integrators.G(
             U[t - 1],
-            experiment.sys.G_drift,
-            experiment.sys.G_drives
-        )# + 1e-2 * QuantumSystems.G(GATES[:CX])
+            experiment.G_drift,
+            experiment.G_drives
+        ) + experiment.G_error_term
 
-        Ψ̃[t] = experiment.integrator(Gₜ * experiment.Δt) * Ψ̃[t - 1]
+        Δt = experiment.ts[t] - experiment.ts[t - 1]
+
+        Ψ̃[t] = experiment.integrator(Gₜ * Δt) * Ψ̃[t - 1]
     end
 
     Ȳ = measure(
@@ -166,7 +173,7 @@ function QuadraticProblem(
     g::Function,
     Q::Float64,
     R::Float64,
-    Σ::Matrix{Float64},
+    Σ::AbstractMatrix{Float64},
     u_bounds::Vector{Float64},
     correction_term::Bool,
     settings::Dict,
@@ -248,7 +255,7 @@ end
     QP::QuadraticProblem
 )
     Hₜ = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
-    H = kron(sparse(I(QP.dims.T)), Hₜ)
+    H = kron(sparse(I(QP.dims.T)), sparse(Hₜ))
     return H
 end
 
@@ -257,7 +264,6 @@ end
     Ẑ::Trajectory,
     ΔY::MeasurementData
 )
-    Hₜreg = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
     Hreg = build_regularization_hessian(QP)
 
     Hmle = spzeros(QP.dims.z * QP.dims.T, QP.dims.z * QP.dims.T)
@@ -442,8 +448,9 @@ mutable struct ILCProblem
         integrator=:FourthOrderPade,
         Q=1.0,
         R=1.0,
-        Σ=random_cov_matrix(experiment.ydim),
-        u_bounds=[2π * 0.5 for j = 1:sys.ncontrols],
+        # identity matrix of Float64
+        Σ=Diagonal(fill(1.0, experiment.ydim)),
+        u_bounds=sys.a_bounds,
         correction_term=true,
         verbose=true,
         max_iter=100,
@@ -516,7 +523,8 @@ mutable struct ILCProblem
     end
 end
 
-fidelity(ψ̃, ψ̃goal) = abs2(ψ̃' * ψ̃goal)
+fidelity(ψ̃, ψ̃goal) = abs2(iso_to_ket(ψ̃)' * iso_to_ket(ψ̃goal))
+
 
 function ProblemSolvers.solve!(prob::ILCProblem)
     U = prob.Ẑ.actions
@@ -533,19 +541,44 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         if prob.settings[:verbose]
             println("iteration = ", k)
             println("|ΔY| =      ", norm(ΔY, prob.settings[:norm_p]))
-            println("fidelity =  ", fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end]))
+            println(
+                "fidelity =  ",
+                fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
+            )
             println()
         end
         ΔZ = prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
         U = prob.Ẑ.actions
         Ȳ = prob.experiment(U)
+        ΔYnext = Ȳ - prob.Ygoal
+        if norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
+            println("   backtracking")
+            i = 1
+        end
+        while norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
+            if i > 10
+                println("   max backtracking iterations reached")
+                ΔY = ΔYnext
+                return
+            end
+            prob.Ẑ = prob.Ẑ - ΔZ
+            ΔZ = 0.5 * ΔZ
+            prob.Ẑ = prob.Ẑ + ΔZ
+            U = prob.Ẑ.actions
+            Ȳ = prob.experiment(U)
+            ΔYnext = Ȳ - prob.Ygoal
+            println("       iter = $i")
+            println("       |ΔY| = ", norm(ΔYnext, prob.settings[:norm_p]))
+            println()
+            i += 1
+        end
+        ΔY = ΔYnext
         push!(prob.Ȳs, Ȳ)
         push!(prob.Us, hcat(U...))
-        ΔY = Ȳ - prob.Ygoal
         k += 1
     end
-    @info "ILC converged!" Symbol("|ΔY|") = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
+    @info "ILC converged!" "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
 end
 
 

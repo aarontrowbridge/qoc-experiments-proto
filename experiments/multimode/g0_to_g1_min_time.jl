@@ -10,13 +10,11 @@ data_name = "g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5"
 
 data_path = joinpath(data_dir, data_name * ".jld2")
 
-pin_first_qstate = true
-
 u_bound = 1e-4
 u_bounds = fill(u_bound, 4)
 
 options = Options(
-    max_iter = 10_000,
+    max_iter = 300,
     max_cpu_time = 100_000_000.0,
 )
 
@@ -27,7 +25,6 @@ prob = load_problem(
     data_path;
     mode=mode,
     equal_Δts=equal_Δts,
-    pin_first_qstate=pin_first_qstate,
     options=options,
     u_bounds=u_bounds,
 )

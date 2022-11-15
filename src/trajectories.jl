@@ -39,7 +39,7 @@ function rollout(
             Ψ̃[t - 1][slice(i, sys.isodim)]
                 for i = 1:sys.nqstates
         ]
-        Uₜ = integrator(Gₜ, Δt[t - 1])
+        Uₜ = integrator(Gₜ * Δt[t - 1])
         Ψ̃[t] = vcat([Uₜ * ψ̃ⁱₜ₋₁ for ψ̃ⁱₜ₋₁ in ψ̃ⁱₜ₋₁s]...)
     end
     return Ψ̃
@@ -66,7 +66,7 @@ function integral(xs::Vector, ts::Vector)
     return ∫xs
 end
 
-struct Trajectory
+mutable struct Trajectory
     states::Vector{Vector{Float64}}
     actions::Vector{Vector{Float64}}
     times::Vector{Float64}
@@ -83,6 +83,30 @@ function Base.:+(traj1::Trajectory, traj2::Trajectory)
         traj1.times,
         traj1.T,
         traj1.Δt
+    )
+end
+
+function Base.:-(traj1::Trajectory, traj2::Trajectory)
+    states = traj1.states .- traj2.states
+    actions = traj1.actions .- traj2.actions
+    return Trajectory(
+        states,
+        actions,
+        traj1.times,
+        traj1.T,
+        traj1.Δt
+    )
+end
+
+function Base.:*(c::Number, traj::Trajectory)
+    states = c .* traj.states
+    actions = c .* traj.actions
+    return Trajectory(
+        states,
+        actions,
+        traj.times,
+        traj.T,
+        traj.Δt
     )
 end
 

@@ -467,6 +467,7 @@ end
     prob.trajectory.states .= xs
     prob.trajectory.actions .= us
     prob.trajectory.times .= times
+    prob.trajectory.Δt = Z̄[prob.params[:Δt_indices]][end]
 end
 
 end

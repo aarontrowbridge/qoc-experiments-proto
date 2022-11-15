@@ -1,23 +1,28 @@
 using Pico
 
-experiment = "cnot_iter_5000_00000"
+experiment = "cnot_iter_200_00000"
 
 data_dir  = "data/twoqubit/cnot_update"
-save_dir = "data/twoqubit/cnot_update/min_time"
-plot_dir = "plots/twoqubit/cnot_update/min_time"
-
 data_path = joinpath(data_dir, experiment * ".jld2")
-save_path = generate_file_path("jld2", experiment, save_dir)
-plot_path = generate_file_path("png", experiment, plot_dir)
 
 mode = :min_time
 R = 1e-7
 max_iter = 300
+u_bound = 1e1
+
+experiment = experiment * "_mintime_R_$(R)_u_bound_$(u_bound)_iter_$(max_iter)"
+
+save_dir = "data/twoqubit/cnot_update/min_time"
+save_path = generate_file_path("jld2", experiment, save_dir)
+
+plot_dir = "plots/twoqubit/cnot_update/min_time"
+plot_path = generate_file_path("png", experiment, plot_dir)
 
 prob = load_problem(
     data_path;
     mode=mode,
     R=R,
+    u_bounds=fill(u_bound, 4),
     options=Options(
         max_iter=max_iter,
     )

@@ -1,10 +1,13 @@
 using Pico
 
-data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
+# data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
+
+data_dir = "data/multimode/good_solutions"
 save_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
 plot_dir = "plots/multimode/fixed_time_update/guess/pinned"
 
-data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000_00001_00000"
+# data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000_00001_00000"
+data_name = "g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5"
 
 data_path = joinpath(data_dir, data_name * ".jld2")
 
@@ -14,8 +17,8 @@ u_bound = 1e-4
 u_bounds = fill(u_bound, 4)
 
 options = Options(
-    max_iter = 10_000,
-    max_cpu_time = 100_000_000.0,
+    max_iter = 500,
+    max_cpu_time = 100_000.0,
 )
 
 
@@ -24,6 +27,7 @@ prob = load_problem(
     pin_first_qstate=pin_first_qstate,
     options=options,
     u_bounds=u_bounds,
+    Δt_max=4.0
 )
 
 experiment =

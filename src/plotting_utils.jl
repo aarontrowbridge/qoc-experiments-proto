@@ -9,7 +9,8 @@ export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
 export plot_twoqubit
-export animate_ILC_two_qubit
+export animate_ILC
+export animate_ILC_multimode
 
 using ..Utils
 using ..Trajectories
@@ -736,7 +737,7 @@ function plot_twoqubit(
 
 end
 
-function animate_ILC_two_qubit(
+function animate_ILC(
     prob::ILCProblem,
     path::String;
     fps=5
@@ -752,12 +753,6 @@ function animate_ILC_two_qubit(
 
     series!(Ygoalax, τs, Ygoal;
         color=:seaborn_muted,
-        # labels=[
-        #     "|00⟩",
-        #     "|01⟩",
-        #     "|10⟩",
-        #     "|11⟩",
-        # ]
     )
 
     # axislegend(Ygoalax; position=:lb)
@@ -766,12 +761,6 @@ function animate_ILC_two_qubit(
 
     Ȳsp = series!(Ȳax, τs, Ȳ₁;
         color=:seaborn_muted,
-        # labels=[
-        #     "|00⟩",
-        #     "|01⟩",
-        #     "|10⟩",
-        #     "|11⟩",
-        # ]
     )
 
     # axislegend(Ȳax; position=:lb)
@@ -782,12 +771,6 @@ function animate_ILC_two_qubit(
 
     ΔYsp = series!(ΔYax, τs, ΔY₁;
         color=:seaborn_muted,
-        # labels=[
-        #     "|00⟩",
-        #     "|01⟩",
-        #     "|10⟩",
-        #     "|11⟩",
-        # ]
     )
 
     autolimits!(ΔYax)
@@ -803,7 +786,65 @@ function animate_ILC_two_qubit(
         labels=["a_$j" for j = 1:prob.QP.dims.u]
     )
 
-    println(path)
+    record(fig, path, 1:length(prob.Ȳs); framerate=fps) do i
+        Ȳ = hcat(prob.Ȳs[i].ys...)
+        ΔY = Ȳ - Ygoal
+        U = prob.Us[i]
+
+        Ȳsp[2] = Ȳ
+        ΔYsp[2] = ΔY
+        Usp[2] = U
+    end
+end
+
+function animate_ILC_multimode(
+    prob::ILCProblem,
+    path::String;
+    fps=5
+)
+    fig = Figure(resolution=(1200, 1200))
+
+    Ygoalax = Axis(fig[1, :]; title="Y goal", xlabel=L"t")
+
+    Ȳax = Axis(fig[2, :]; title="Ȳ", xlabel=L"t")
+
+    Ygoal = hcat(prob.Ygoal.ys...)
+    τs = prob.Ygoal.times
+
+    series!(Ygoalax, τs, Ygoal;
+        color=:phase,
+    )
+
+    # axislegend(Ygoalax; position=:lb)
+
+    Ȳ₁ = hcat(prob.Ȳs[1].ys...)
+
+    Ȳsp = series!(Ȳax, τs, Ȳ₁;
+        color=:phase,
+    )
+
+    # axislegend(Ȳax; position=:lb)
+
+    ΔYax = Axis(fig[3, :]; title="ΔY", xlabel=L"t")
+
+    ΔY₁ = Ȳ₁ - Ygoal
+
+    ΔYsp = series!(ΔYax, τs, ΔY₁;
+        color=:phase,
+    )
+
+    autolimits!(ΔYax)
+
+    # axislegend(ΔYax; position=:lb)
+
+    uax = Axis(fig[4, :]; title="a(t)", xlabel=L"t")
+
+    U₁ = prob.Us[1]
+    ts = prob.Ẑ.times
+
+    Usp = series!(uax, ts, U₁;
+        labels=["a_$j" for j = 1:prob.QP.dims.u]
+    )
 
     record(fig, path, 1:length(prob.Ȳs); framerate=fps) do i
         Ȳ = hcat(prob.Ȳs[i].ys...)

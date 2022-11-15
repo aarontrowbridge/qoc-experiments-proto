@@ -1,8 +1,10 @@
 using Pico
 
-data_dir = "data/multimode/fixed_time_update/guess/problems"
+data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
 
-data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000"
+# data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000"
+
+data_name = "g0_to_g1_T_102_dt_4.0_Q_200.0_R_0.1_u_bound_0.0001_iter_10000_00000"
 
 data_path = joinpath(data_dir, data_name * ".jld2")
 
@@ -33,8 +35,7 @@ transmon_levels = 3
 cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
-χ = 1.0 * 2π * -0.5459e-3
-
+χ = 1.05 * data.system.params[:χ]
 
 experimental_system = MultiModeSystem(
     transmon_levels,
@@ -49,14 +50,16 @@ g(ψ̃) = abs2.(iso_to_ket(ψ̃))
 experiment = QuantumExperiment(
     experimental_system,
     Ẑ.states[1],
-    Ẑ.Δt,
-    x -> x,
-    data.system.isodim,
-    1:Ẑ.T
+    Ẑ.times,
+    x -> g(x),
+    data.system.isodim ÷ 2,
+    1:Ẑ.T;
+    integrator=exp
 )
 
-max_iter = 20
-fps = 5
+max_iter = 10
+fps = 2
+R = 2.0
 
 prob = ILCProblem(
     data.system,
@@ -66,9 +69,14 @@ prob = ILCProblem(
     QP_verbose=false,
     QP_max_iter=100000,
     correction_term=true,
-    norm_p=Inf,
-    R=0.01,
+    norm_p=2,
+    R=R,
     Q=0.0
 )
 
 solve!(prob)
+
+plot_dir = "plots/multimode/ILC"
+plot_path = generate_file_path("gif", data_name, plot_dir)
+
+animate_ILC_multimode(prob, plot_path; fps=fps)
