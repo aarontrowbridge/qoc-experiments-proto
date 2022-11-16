@@ -319,20 +319,52 @@ end
     u_ub = foldr(vcat, fill(QP.u_bounds, Ẑ.T - 2)) -
         vcat(Ẑ.actions[2:Ẑ.T - 1]...)
 
+    # constrain state matrix for state at time 1
+    C_x₁ = sparse_hcat(
+        I(QP.dims.x),
+        spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
+    )
+
     if QP.mle
-        A = sparse_vcat(∂F, C)
-        lb = vcat(f_cons, zeros(QP.dims.u), u_lb, zeros(QP.dims.u))
-        ub = vcat(f_cons, zeros(QP.dims.u), u_ub, zeros(QP.dims.u))
+        A = sparse_vcat(∂F, C, C_x₁)
+        lb = vcat(
+            f_cons,
+            zeros(QP.dims.u),
+            u_lb,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
+        ub = vcat(
+            f_cons,
+            zeros(QP.dims.u),
+            u_ub,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
     else
         ∂G = build_measurement_constraint_jacobian(
             QP,
             Ẑ,
             ΔY
         )
-        A = sparse_vcat(∂F, ∂G, C)
+        A = sparse_vcat(∂F, ∂G, C, C_x₁)
         g_cons = -vcat(ΔY.ys...)
-        lb = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_lb, zeros(QP.dims.u))
-        ub = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_ub, zeros(QP.dims.u))
+        lb = vcat(
+            f_cons,
+            g_cons,
+            zeroes(QP.dims.u),
+            u_lb,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
+        ub = vcat(
+            f_cons,
+            g_cons,
+            zeroes(QP.dims.u),
+            u_ub,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
     end
 
     return A, lb, ub
@@ -523,7 +555,13 @@ mutable struct ILCProblem
     end
 end
 
-fidelity(ψ̃, ψ̃goal) = abs2(iso_to_ket(ψ̃)' * iso_to_ket(ψ̃goal))
+function fidelity(ψ̃, ψ̃goal)
+    ψ = iso_to_ket(ψ̃)
+    ψgoal = iso_to_ket(ψ̃goal)
+    # println("norm(ψ)     = $(norm(ψ))")
+    # println("norm(ψgoal) = $(norm(ψgoal))")
+    return abs2(ψ' * ψgoal)
+end
 
 
 function ProblemSolvers.solve!(prob::ILCProblem)
@@ -538,8 +576,9 @@ function ProblemSolvers.solve!(prob::ILCProblem)
             @info "max iterations reached" max_iter = prob.settings[:max_iter] "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol]
             return
         end
+        # TODO: make jacobians constant about nominal trajectory
         if prob.settings[:verbose]
-            println("iteration = ", k)
+            println("iter = ", k)
             println("|ΔY| =      ", norm(ΔY, prob.settings[:norm_p]))
             println(
                 "fidelity =  ",
@@ -549,11 +588,13 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         ΔZ = prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
+        println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
         U = prob.Ẑ.actions
         Ȳ = prob.experiment(U)
         ΔYnext = Ȳ - prob.Ygoal
         if norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
             println("   backtracking")
+            println()
             i = 1
         end
         while norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
