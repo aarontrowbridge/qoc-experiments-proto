@@ -102,10 +102,10 @@ function (integrator::SecondOrderPade)(
     return ψ̃ₜ₊₁ - ψ̃ₜ - Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
 end
 
-function second_order_pade(Gₜ::Matrix, Δt::Real)
+function second_order_pade(Gₜ::Matrix)
     Id = I(size(Gₜ, 1))
-    return inv(Id - Δt / 2 * Gₜ) *
-        (Id + Δt / 2 * Gₜ)
+    return inv(Id - 1 / 2 * Gₜ) *
+        (Id + 1 / 2 * Gₜ)
 end
 
 
@@ -170,10 +170,10 @@ function (integrator::FourthOrderPade)(
         Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
 end
 
-function fourth_order_pade(Gₜ::Matrix, Δt::Real)
+function fourth_order_pade(Gₜ::Matrix)
     Id = I(size(Gₜ, 1))
-    return inv(Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) *
-        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2)
+    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ^2) *
+        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ^2)
 end
 
 

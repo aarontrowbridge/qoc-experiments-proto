@@ -1,7 +1,6 @@
 using Pico
-using JLD2
 
-subprob_data_dir = "data/multimode/fixed_time/no_guess/problems"
+data_dir = "data/multimode/fixed_time_update/no_guess/problems"
 
 # experiment =
     # "g0_to_g1_T_500_dt_0.8_R_1.0_iter_1000_resolve_10_00000"

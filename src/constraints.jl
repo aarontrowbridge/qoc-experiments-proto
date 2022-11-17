@@ -5,10 +5,12 @@ export constrain!
 
 export AbstractConstraint
 
-export L1SlackConstraint
 export EqualityConstraint
 export BoundsConstraint
 export TimeStepBoundsConstraint
+export TimeStepEqualityConstraint
+export TimeStepsAllEqualConstraint
+export L1SlackConstraint
 
 using ..Utils
 using ..QuantumSystems
@@ -191,15 +193,17 @@ end
 
 struct TimeStepBoundsConstraint <: AbstractConstraint
     bounds::Tuple{R, R} where R <: Real
-    T::Int
+    Δt_indices::AbstractVector{Int}
     name::String
+
     function TimeStepBoundsConstraint(
         bounds::Tuple{R, R} where R <: Real,
+        Δt_indices::AbstractVector{Int},
         T::Int;
         name="unnamed time step bounds constraint"
     )
         @assert bounds[1] < bounds[2] "lower bound must be less than upper bound"
-        return new(bounds, T, name)
+        return new(bounds, Δt_indices, name)
     end
 end
 
@@ -207,16 +211,71 @@ function (con::TimeStepBoundsConstraint)(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex}
 )
-    for t = 1:(con.T - 1)
+    for i ∈ con.Δt_indices
         MOI.add_constraints(
             opt,
-            vars[end - (con.T - 1) + t],
+            vars[i],
             MOI.GreaterThan(con.bounds[1])
         )
         MOI.add_constraints(
             opt,
-            vars[end - (con.T - 1) + t],
+            vars[i],
             MOI.LessThan(con.bounds[2])
+        )
+    end
+end
+
+struct TimeStepEqualityConstraint <: AbstractConstraint
+    val::R where R <: Real
+    Δt_indices::AbstractVector{Int}
+    name::String
+
+    function TimeStepEqualityConstraint(
+        val::R where R <: Real,
+        Δt_indices::AbstractVector{Int};
+        name="unnamed time step equality constraint"
+    )
+        return new(val, Δt_indices, name)
+    end
+end
+
+function (con::TimeStepEqualityConstraint)(
+    opt::Ipopt.Optimizer,
+    vars::Vector{MOI.VariableIndex}
+)
+    for i ∈ con.Δt_indices
+        MOI.add_constraints(
+            opt,
+            vars[i],
+            MOI.EqualTo(con.val)
+        )
+    end
+end
+
+struct TimeStepsAllEqualConstraint <: AbstractConstraint
+    Δt_indices::AbstractVector{Int}
+    name::String
+
+    function TimeStepsAllEqualConstraint(
+        Δt_indices::AbstractVector{Int};
+        name="unnamed time step all equal constraint"
+    )
+        return new(Δt_indices, name)
+    end
+end
+
+function (con::TimeStepsAllEqualConstraint)(
+    opt::Ipopt.Optimizer,
+    vars::Vector{MOI.VariableIndex}
+)
+    N = length(con.Δt_indices)
+    for i = 1:N-1
+        Δtᵢ = MOI.ScalarAffineTerm(1.0, vars[con.Δt_indices[i]])
+        minusΔt̄ = MOI.ScalarAffineTerm(-1.0, vars[con.Δt_indices[end]])
+        MOI.add_constraints(
+            opt,
+            MOI.ScalarAffineFunction([Δtᵢ, minusΔt̄], 0.0),
+            MOI.EqualTo(0.0)
         )
     end
 end
@@ -267,67 +326,5 @@ function (con::L1SlackConstraint)(
         )
     end
 end
-
-
-function problem_constraints(
-    system::AbstractSystem,
-    T::Int;
-    pin_first_qstate=false
-)
-    cons = AbstractConstraint[]
-
-    # initial quantum state constraints: ψ̃(t=1) = ψ̃1
-    ψ1_con = EqualityConstraint(
-        1,
-        1:system.n_wfn_states,
-        system.ψ̃init,
-        system.vardim;
-        name="initial quantum state constraints"
-    )
-    push!(cons, ψ1_con)
-
-    # initial a(t = 1) constraints: ∫a, a, da = 0
-    aug_cons = EqualityConstraint(
-        [1, T],
-        system.n_wfn_states .+ (1:system.n_aug_states),
-        0.0,
-        system.vardim;
-        name="initial and final augmented state constraints"
-    )
-    push!(cons, aug_cons)
-
-    # bound |a(t)| < a_bound
-    @assert length(system.control_bounds) ==
-        length(system.G_drives)
-
-    for cntrl_index in 1:system.ncontrols
-        cntrl_bound = BoundsConstraint(
-            2:T-1,
-            system.n_wfn_states +
-            system.∫a * system.ncontrols +
-            cntrl_index,
-            system.control_bounds[cntrl_index],
-            system.vardim;
-            name="constraint on control $(cntrl_index)"
-        )
-        push!(cons, cntrl_bound)
-    end
-
-    # pin first qstate to be equal to analytic solution
-    if pin_first_qstate
-        ψ̃¹goal = system.ψ̃goal[1:system.isodim]
-        pin_con = EqualityConstraint(
-            T,
-            1:system.isodim,
-            ψ̃¹goal,
-            system.vardim;
-            name="pinned first qstate at T"
-        )
-        push!(cons, pin_con)
-    end
-
-    return cons
-end
-
 
 end

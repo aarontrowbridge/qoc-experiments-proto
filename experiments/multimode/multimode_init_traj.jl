@@ -6,9 +6,9 @@ experiment = "g0_to_g1_with_transmon_f_state_smooth_pulse_1_downsampled_5_T_101_
 
 data_path = joinpath(data_dir, experiment*".jld2")
 
-prob = load_prob(data_path)
+# prob = load_prob(data_path)
 
-# @load data_path data
+@load data_path data
 
 # R        = 1.0
 # iter     = 500

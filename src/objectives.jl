@@ -353,21 +353,26 @@ function L1SlackRegularizer(;
 end
 
 
-function MinTimeObjective(;T::Int=nothing, eval_hessian=true)
-
+function MinTimeObjective(;
+    Δt_indices::UnitRange{Int}=nothing,
+    T::Int=nothing,
+    eval_hessian::Bool=true
+)
+    @assert !isnothing(Δt_indices) "Δt_indices must be specified"
     @assert !isnothing(T) "T must be specified"
 
     params = Dict(
         :type => :MinTimeObjective,
+        :Δt_indices => Δt_indices,
         :T => T,
         :eval_hessian => eval_hessian
     )
 
-	L(Z::AbstractVector) = sum(Z[(end - (T - 1) + 1):end])
+	L(Z::AbstractVector) = sum(Z[Δt_indices])
 
 	∇L = (Z::AbstractVector) -> begin
 		∇ = zeros(typeof(Z[1]), length(Z))
-		∇[end - (T - 1) + 1:end] .= 1.0
+		∇[Δt_indices] .= 1.0
 		return ∇
 	end
 

@@ -70,46 +70,51 @@ function measure(
 end
 
 function measure(
-    Ψ̃::Vector{Vector{Float64}},
+    ψ̃::Vector{Vector{Float64}},
     g::Function,
     τs::AbstractVector{Int},
     ydim::Int,
 )
-    @assert size(g(Ψ̃[1]), 1) == ydim
+    @assert size(g(ψ̃[1]), 1) == ydim
     ys = Vector{Vector{Float64}}(undef, length(τs))
     for (i, τ) in enumerate(τs)
-        ys[i] = g(Ψ̃[τ])
+        ys[i] = g(ψ̃[τ])
     end
     return MeasurementData(ys, τs, ydim)
 end
 
 struct QuantumExperiment
-    sys::QuantumSystem
     ψ̃₁::Vector{Float64}
-    Δt::Float64
+    ts::Vector{Float64}
     g::Function
     ydim::Int
     τs::AbstractVector{Int}
     integrator::Function
+    G_drift::AbstractMatrix{Float64}
+    G_drives::Vector{AbstractMatrix{Float64}}
+    G_error_term::AbstractMatrix{Float64}
 end
 
 function QuantumExperiment(
     sys::QuantumSystem,
     ψ̃₁::Vector{Float64},
-    Δt::Float64,
+    ts::Vector{Float64},
     g::Function,
     ydim::Int,
     τs::AbstractVector{Int};
+    G_error_term=zeros(size(sys.G_drift)),
     integrator=exp
 )
     return QuantumExperiment(
-        sys,
         ψ̃₁,
-        Δt,
+        ts,
         g,
         ydim,
         τs,
-        integrator
+        integrator,
+        sys.G_drift,
+        sys.G_drives,
+        G_error_term
     )
 end
 
@@ -132,11 +137,13 @@ function (experiment::QuantumExperiment)(
     for t = 2:T
         Gₜ = Integrators.G(
             U[t - 1],
-            experiment.sys.G_drift,
-            experiment.sys.G_drives
-        ) + get_mat_iso(-1im*2 * CHI*0.05 * kron(TRANSMON_E*TRANSMON_E', number(cavity_levels)))
-        Ψ̃[t] = experiment.integrator(Gₜ * experiment.Δt) *
-            Ψ̃[t - 1]
+            experiment.G_drift,
+            experiment.G_drives
+        ) + experiment.G_error_term
+
+        Δt = experiment.ts[t] - experiment.ts[t - 1]
+
+        Ψ̃[t] = experiment.integrator(Gₜ * Δt) * Ψ̃[t - 1]
     end
 
     Ȳ = measure(
@@ -157,9 +164,9 @@ end
 # - OSQP error handling
 
 struct QuadraticProblem
-    ∇f::Function
-    ∇g::Function
-    ∇²g::Function
+    ∂f::Function
+    ∂g::Function
+    ∂²g::Function
     Q::Float64
     R::Float64
     Σinv::Union{Matrix{Float64}, Nothing}
@@ -175,7 +182,7 @@ function QuadraticProblem(
     g::Function,
     Q::Float64,
     R::Float64,
-    Σ::Matrix{Float64},
+    Σ::AbstractMatrix{Float64},
     u_bounds::Vector{Float64},
     correction_term::Bool,
     settings::Dict,
@@ -183,19 +190,19 @@ function QuadraticProblem(
 )
     @assert size(Σ, 1) == size(Σ, 2) == dims.y
 
-    ∇f(zz) = ForwardDiff.jacobian(f, zz)
+    ∂f(zz) = ForwardDiff.jacobian(f, zz)
 
-    ∇g(x) = ForwardDiff.jacobian(g, x)
+    ∂g(x) = ForwardDiff.jacobian(g, x)
 
-    function ∇²g(x)
-        H = ForwardDiff.jacobian(u -> vec(∇g(u)), x)
+    function ∂²g(x)
+        H = ForwardDiff.jacobian(u -> vec(∂g(u)), x)
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
     return QuadraticProblem(
-        ∇f,
-        ∇g,
-        ∇²g,
+        ∂f,
+        ∂g,
+        ∂²g,
         Q,
         R,
         inv(Σ),
@@ -257,7 +264,7 @@ end
     QP::QuadraticProblem
 )
     Hₜ = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
-    H = kron(sparse(I(QP.dims.T)), Hₜ)
+    H = kron(sparse(I(QP.dims.T)), sparse(Hₜ))
     return H
 end
 
@@ -266,7 +273,6 @@ end
     Ẑ::Trajectory,
     ΔY::MeasurementData
 )
-    Hₜreg = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
     Hreg = build_regularization_hessian(QP)
 
     Hmle = spzeros(QP.dims.z * QP.dims.T, QP.dims.z * QP.dims.T)
@@ -277,21 +283,22 @@ end
 
         τᵢ = ΔY.times[i]
 
-        ∇gᵢ = QP.∇g(Ẑ.states[τᵢ])
+        ∂gᵢ = QP.∂g(Ẑ.states[τᵢ])
+
         if QP.correction_term
-            ∇²gᵢ = QP.∇²g(Ẑ.states[τᵢ])
-            ϵ̂ᵢ = pinv(∇gᵢ) * ΔY.ys[i]
-            @einsum ∇gᵢ[j, k] += ∇²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+            ∂²gᵢ = QP.∂²g(Ẑ.states[τᵢ])
+            ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
         end
 
-        Hᵢmle = ∇gᵢ' * QP.Σinv * ∇gᵢ
+        Hᵢmle = ∂gᵢ' * QP.Σinv * ∂gᵢ
 
         Hmle[
             slice(τᵢ, QP.dims.x, QP.dims.z),
             slice(τᵢ, QP.dims.x, QP.dims.z)
         ] = sparse(Hᵢmle)
 
-        ∇ᵢmle = ΔY.ys[i]' * QP.Σinv * ∇gᵢ
+        ∇ᵢmle = ΔY.ys[i]' * QP.Σinv * ∂gᵢ
 
         ∇[slice(τᵢ, QP.dims.x, QP.dims.z)] = ∇ᵢmle
     end
@@ -321,20 +328,52 @@ end
     u_ub = foldr(vcat, fill(QP.u_bounds, Ẑ.T - 2)) -
         vcat(Ẑ.actions[2:Ẑ.T - 1]...)
 
+    # constrain state matrix for state at time 1
+    C_x₁ = sparse_hcat(
+        I(QP.dims.x),
+        spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
+    )
+
     if QP.mle
-        A = sparse_vcat(∂F, C)
-        lb = vcat(f_cons, zeros(QP.dims.u), u_lb, zeros(QP.dims.u))
-        ub = vcat(f_cons, zeros(QP.dims.u), u_ub, zeros(QP.dims.u))
+        A = sparse_vcat(∂F, C, C_x₁)
+        lb = vcat(
+            f_cons,
+            zeros(QP.dims.u),
+            u_lb,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
+        ub = vcat(
+            f_cons,
+            zeros(QP.dims.u),
+            u_ub,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
     else
-        ∇G = build_measurement_constraint_jacobian(
+        ∂G = build_measurement_constraint_jacobian(
             QP,
             Ẑ,
             ΔY
         )
-        A = sparse_vcat(∂F, ∇G, C)
+        A = sparse_vcat(∂F, ∂G, C, C_x₁)
         g_cons = -vcat(ΔY.ys...)
-        lb = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_lb, zeros(QP.dims.u))
-        ub = vcat(f_cons, g_cons, zeroes(QP.dims.u), u_ub, zeros(QP.dims.u))
+        lb = vcat(
+            f_cons,
+            g_cons,
+            zeroes(QP.dims.u),
+            u_lb,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
+        ub = vcat(
+            f_cons,
+            g_cons,
+            zeroes(QP.dims.u),
+            u_ub,
+            zeros(QP.dims.u),
+            zeros(QP.dims.x)
+        )
     end
 
     return A, lb, ub
@@ -371,27 +410,27 @@ end
     Ẑ::Trajectory,
     ΔY::MeasurementData
 )
-    ∇G = spzeros(QP.dims.y * QP.dims.M, QP.dims.z * QP.dims.T)
+    ∂G = spzeros(QP.dims.y * QP.dims.M, QP.dims.z * QP.dims.T)
 
     for i = 1:QP.dims.M
 
         τᵢ = ΔY.times[i]
 
-        ∇gᵢ = QP.∇g(Ẑ.states[τᵢ])
+        ∂gᵢ = QP.∂g(Ẑ.states[τᵢ])
 
         if QP.correction_term
-            ∇²gᵢ = QP.∇²g(Ẑ.states[τᵢ])
-            ϵ̂ᵢ = pinv(∇gᵢ) * ΔY.ys[i]
-            @einsum ∇gᵢ[j, k] += ∇²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+            ∂²gᵢ = QP.∂²g(Ẑ.states[τᵢ])
+            ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
         end
 
-        ∇G[
+        ∂G[
             slice(i, QP.dims.y),
             slice(τᵢ, QP.dims.x, QP.dims.z)
-        ] = sparse(∇gᵢ)
+        ] = sparse(∂gᵢ)
     end
 
-    return ∇G
+    return ∂G
 end
 
 # TODO: add feat to just store jacobian of goal traj
@@ -416,7 +455,7 @@ end
         ∂F[
             slice(t, QP.dims.x),
             slice(t, QP.dims.z; stretch=QP.dims.z)
-        ] = sparse(QP.∇f(zₜ))
+        ] = sparse(QP.∂f(zₜ))
     end
 
     return ∂F
@@ -450,8 +489,9 @@ mutable struct ILCProblem
         integrator=:FourthOrderPade,
         Q=1.0,
         R=1.0,
-        Σ=random_cov_matrix(experiment.ydim),
-        u_bounds=[2π * 0.5 for j = 1:sys.ncontrols],
+        # identity matrix of Float64
+        Σ=Diagonal(fill(1.0, experiment.ydim)),
+        u_bounds=sys.a_bounds,
         correction_term=true,
         verbose=true,
         max_iter=100,
@@ -524,6 +564,15 @@ mutable struct ILCProblem
     end
 end
 
+function fidelity(ψ̃, ψ̃goal)
+    ψ = iso_to_ket(ψ̃)
+    ψgoal = iso_to_ket(ψ̃goal)
+    # println("norm(ψ)     = $(norm(ψ))")
+    # println("norm(ψgoal) = $(norm(ψgoal))")
+    return abs2(ψ' * ψgoal)
+end
+
+
 function ProblemSolvers.solve!(prob::ILCProblem)
     U = prob.Ẑ.actions
     Ȳ = prob.experiment(U)
@@ -536,21 +585,50 @@ function ProblemSolvers.solve!(prob::ILCProblem)
             @info "max iterations reached" max_iter = prob.settings[:max_iter] "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol]
             return
         end
+        # TODO: make jacobians constant about nominal trajectory
         if prob.settings[:verbose]
-            println("iteration = ", k)
-            println("|ΔY| = ", norm(ΔY, prob.settings[:norm_p]))
+            println("iter = ", k)
+            println("|ΔY| =      ", norm(ΔY, prob.settings[:norm_p]))
+            println(
+                "fidelity =  ",
+                fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
+            )
             println()
         end
         ΔZ = prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
+        println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
         U = prob.Ẑ.actions
         Ȳ = prob.experiment(U)
+        ΔYnext = Ȳ - prob.Ygoal
+        if norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
+            println("   backtracking")
+            println()
+            i = 1
+        end
+        while norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
+            if i > 10
+                println("   max backtracking iterations reached")
+                ΔY = ΔYnext
+                return
+            end
+            prob.Ẑ = prob.Ẑ - ΔZ
+            ΔZ = 0.5 * ΔZ
+            prob.Ẑ = prob.Ẑ + ΔZ
+            U = prob.Ẑ.actions
+            Ȳ = prob.experiment(U)
+            ΔYnext = Ȳ - prob.Ygoal
+            println("       iter = $i")
+            println("       |ΔY| = ", norm(ΔYnext, prob.settings[:norm_p]))
+            println()
+            i += 1
+        end
+        ΔY = ΔYnext
         push!(prob.Ȳs, Ȳ)
         push!(prob.Us, hcat(U...))
-        ΔY = Ȳ - prob.Ygoal
         k += 1
     end
-    @info "ILC converged!" Symbol("|ΔY|") = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
+    @info "ILC converged!" "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
 end
 
 

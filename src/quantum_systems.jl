@@ -17,7 +17,7 @@ Im2 = [
     1  0
 ]
 
-G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
+iso(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
 abstract type AbstractSystem end
 
@@ -29,16 +29,18 @@ struct QuantumSystem <: AbstractSystem
     nstates::Int
     nqstates::Int
     isodim::Int
+    ketdim::Int
     augdim::Int
     vardim::Int
     ncontrols::Int
     control_order::Int
     G_drift::Matrix{Float64}
     G_drives::Vector{Matrix{Float64}}
-    control_bounds::Vector{Float64}
+    a_bounds::Vector{Float64}
     ψ̃init::Vector{Float64}
     ψ̃goal::Vector{Float64}
     ∫a::Bool
+    params::Dict{Symbol, Any}
 end
 
 
@@ -46,18 +48,22 @@ end
 
 function QuantumSystem(
     H_drift::Matrix,
-    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
+    H_drives::Vector{Matrix{T}},
     ψinit::Union{Vector{C1}, Vector{Vector{C1}}},
-    ψgoal::Union{Vector{C2}, Vector{Vector{C2}}},
-    control_bounds::Vector{Float64};
+    ψgoal::Union{Vector{C2}, Vector{Vector{C2}}};
+    a_bounds::Vector{Float64}=fill(Inf, length(H_drives)),
     ∫a=false,
     control_order=2,
-    goal_phase=0.0
+    goal_phase=0.0,
+    params=Dict()
 ) where {C1 <: Number, C2 <: Number, T <: Number}
+
+    params[:goal_phase] = goal_phase
 
     if isa(ψinit, Vector{C1})
         nqstates = 1
-        isodim = 2 * length(ψinit)
+        ketdim = length(ψinit)
+        isodim = 2 * ketdim
         ψ̃init = ket_to_iso(ψinit)
         ψgoal *= exp(im * goal_phase)
         ψ̃goal = ket_to_iso(ψgoal)
@@ -65,23 +71,19 @@ function QuantumSystem(
         @assert isa(ψgoal, Vector{Vector{C2}})
         nqstates = length(ψinit)
         @assert length(ψgoal) == nqstates
-        isodim = 2 * length(ψinit[1])
+        ketdim = length(ψinit[1])
+        isodim = 2 * ketdim
         ψ̃init = vcat(ket_to_iso.(ψinit)...)
         ψgoal[1] *= exp(im * goal_phase)
         ψ̃goal = vcat(ket_to_iso.(ψgoal)...)
     end
 
-    G_drift = G(H_drift)
+    G_drift = iso(H_drift)
 
-    if isa(H_drive, Matrix{T})
-        ncontrols = 1
-        G_drive = [G(H_drive)]
-    else
-        ncontrols = length(H_drive)
-        G_drive = G.(H_drive)
-    end
+    ncontrols = length(H_drives)
+    G_drives = iso.(H_drives)
 
-    @assert length(control_bounds) == length(G_drive)
+    @assert length(a_bounds) == ncontrols
 
     augdim = control_order + ∫a
 
@@ -98,16 +100,18 @@ function QuantumSystem(
         nstates,
         nqstates,
         isodim,
+        ketdim,
         augdim,
         vardim,
         ncontrols,
         control_order,
         G_drift,
-        G_drive,
-        control_bounds,
+        G_drives,
+        a_bounds,
         ψ̃init,
         ψ̃goal,
-        ∫a
+        ∫a,
+        params
     )
 end
 
@@ -130,6 +134,16 @@ function MultiModeSystem(
     @assert ψ1[1] in ['g', 'e'] && ψf[1] in ['g', 'e']
     @assert parse(Int, ψ1[2]) ∈ 0:cavity_levels-2
     @assert parse(Int, ψf[2]) ∈ 0:cavity_levels-2
+
+    params = Dict(
+        :χ => χ,
+        :κ => κ,
+        :χGF => χGF,
+        :α => α,
+        :transmon_control_bound => transmon_control_bound,
+        :cavity_control_bound => cavity_control_bound,
+        :n_cavities => n_cavities,
+    )
 
     if transmon_levels == 2
 
@@ -224,7 +238,7 @@ function MultiModeSystem(
         H_drive_cavity_I
     ]
 
-    control_bounds = [
+    a_bounds = [
         fill(transmon_control_bound, 2);
         fill(cavity_control_bound, 2 * n_cavities)
     ]
@@ -233,8 +247,9 @@ function MultiModeSystem(
         H_drift,
         H_drives,
         ψinit,
-        ψgoal,
-        control_bounds;
+        ψgoal;
+        a_bounds=a_bounds,
+        params=params,
         kwargs...
     )
 end

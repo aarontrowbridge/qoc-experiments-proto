@@ -4,11 +4,18 @@ using Pico
 
 # experiment = "g0_to_g1_with_transmon_f_state_smooth_pulse_1_downsampled_5_T_101_dt_4.0_Q_500.0_R_1.0_alpha_transmon_20.0_alpha_cavity_20.0_iter_2000_resolve_10_00000"
 
-experiment = "g0_to_g1_T_200_dt_5.0_R_1.0_iter_2000_u_bound_1.0e-6_alpha_transmon_20.0_alpha_cavity_20.0_resolve_10_00000"
+# experiment = "g0_to_g1_T_102_dt_4.0_Q_200.0_R_0.1_u_bound_0.0001_iter_10000_00000"
 
-data_dir = "data/multimode/fixed_time/no_guess/problems"
+# experiment = "g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5"
 
-save_dir = "data/multimode/fixed_time/no_guess/controls"
+experiment = "g0_to_g1_T_102_dt_4.0_Q_200.0_R_0.1_u_bound_0.0001_iter_10000_00005"
+
+data_dir = "data/multimode/min_time_update/guess/pinned/problems"
+# data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
+
+# save_dir = "data/multimode/good_solutions"
+save_dir = "data/multimode/min_time_update/guess/pinned/controls"
+# save_dir = "data/multimode/fixed_time_update/guess/pinned/controls"
 
 data_path = joinpath(data_dir, experiment * ".jld2")
 

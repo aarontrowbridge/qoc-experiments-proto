@@ -27,19 +27,19 @@ end
 function rollout(
     sys::AbstractSystem,
     A::Vector{<:AbstractVector},
-    Δt::Real;
+    Δt::Vector{Float64};
     integrator=fourth_order_pade
 )
     T = length(A) + 1
-    Ψ̃ = Vector{typeof(sys.ψ̃goal)}(undef, T)
-    Ψ̃[1] = sys.ψ̃goal
+    Ψ̃ = Vector{typeof(sys.ψ̃init)}(undef, T)
+    Ψ̃[1] = sys.ψ̃init
     for t = 2:T
         Gₜ = Integrators.G(A[t - 1], sys.G_drift, sys.G_drives)
         ψ̃ⁱₜ₋₁s = @views [
             Ψ̃[t - 1][slice(i, sys.isodim)]
                 for i = 1:sys.nqstates
         ]
-        Uₜ = integrator(Gₜ, Δt)
+        Uₜ = integrator(Gₜ * Δt[t - 1])
         Ψ̃[t] = vcat([Uₜ * ψ̃ⁱₜ₋₁ for ψ̃ⁱₜ₋₁ in ψ̃ⁱₜ₋₁s]...)
     end
     return Ψ̃
@@ -66,7 +66,7 @@ function integral(xs::Vector, ts::Vector)
     return ∫xs
 end
 
-struct Trajectory
+mutable struct Trajectory
     states::Vector{Vector{Float64}}
     actions::Vector{Vector{Float64}}
     times::Vector{Float64}
@@ -86,18 +86,55 @@ function Base.:+(traj1::Trajectory, traj2::Trajectory)
     )
 end
 
+function Base.:-(traj1::Trajectory, traj2::Trajectory)
+    states = traj1.states .- traj2.states
+    actions = traj1.actions .- traj2.actions
+    return Trajectory(
+        states,
+        actions,
+        traj1.times,
+        traj1.T,
+        traj1.Δt
+    )
+end
+
+function Base.:*(c::Number, traj::Trajectory)
+    states = c .* traj.states
+    actions = c .* traj.actions
+    return Trajectory(
+        states,
+        actions,
+        traj.times,
+        traj.T,
+        traj.Δt
+    )
+end
+
 # constructor for case of given controls
 
 function Trajectory(
     sys::AbstractSystem,
-    controls::Matrix,
+    controls::AbstractMatrix,
     Δt::Real
 )
-    T = size(controls, 2) + 1
+    return Trajectory(sys, controls, fill(Δt, size(controls, 2)))
+end
 
-    times = [Δt * t for t = 1:T]
+function Trajectory(
+    sys::AbstractSystem,
+    controls::AbstractMatrix,
+    Δt::Vector{Float64};
+    T_controls=true # this is true if the length of the controls is T
+)
+    if T_controls
+        T = size(controls, 2)
+    else
+        T = size(controls, 2) + 1
+        controls = hcat(controls, controls[:, end])
+    end
 
-    controls = hcat(controls, controls[:, end])
+    times = [0.0; cumsum(Δt[1:T-1])]
+
 
     if sys.∫a
         ∫controls = similar(controls)
@@ -158,7 +195,7 @@ function Trajectory(
 
     actions = [actions_matrix[:, t] for t = 1:T]
 
-    return Trajectory(states, actions, times, T, Δt)
+    return Trajectory(states, actions, times, T, Δt[end])
 end
 
 function Trajectory(
@@ -193,7 +230,7 @@ function Trajectory(
         zeros(sys.ncontrols)
     ]
 
-    times = [Δt * t for t = 1:T]
+    times = [Δt * t for t = 0:T-1]
 
     return Trajectory(states, actions, times, T, Δt)
 end

@@ -6,44 +6,32 @@ cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
 
+T             = 200
+Δt            = 3.0
+Q             = 500.0
+R             = 1.0e-1
+iter          = 2000
+resolves      = 5
+α_transmon    = 20.0
+α_cavity      = 20.0
+u_bound       = 1e-5
+Δt_max_factor = 1.5
+
 system = MultiModeSystem(
     transmon_levels,
     cavity_levels,
     ψ1,
-    ψf,
+    ψf;
+    u_bounds=fill(u_bound, 4)
 )
-
-T                = 200
-Δt               = 3.0
-Q                = 500.0
-R                = 1.0e-1
-iter             = 2000
-resolves         = 10
-pin_first_qstate = false
-α_transmon       = 20.0
-α_cavity         = 20.0
-u_bound          = 0.5e-4
 
 options = Options(
     max_iter = iter,
     max_cpu_time = 100000.0,
 )
 
-u_bounds = BoundsConstraint(
-    1:T,
-    system.n_wfn_states .+ slice(
-        system.∫a + 1 + system.control_order,
-        system.ncontrols
-    ),
-    u_bound,
-    system.vardim
-)
-
-cons = AbstractConstraint[u_bounds]
-
 experiment =
-    "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_Q_$(Q)_R_$(R)_iter_$(iter)" *
-    (pin_first_qstate ? "_pinned" : "") *
+    "$(ψ1)_to_$(ψf)_T_$(T)_dt_$(Δt)_Δt_max_factor_$(Δt_max_factor)_Q_$(Q)_R_$(R)_iter_$(iter)" *
     "_u_bound_$(u_bound)" *
     "_alpha_transmon_$(α_transmon)_alpha_cavity_$(α_cavity)"
 
@@ -68,10 +56,9 @@ prob = QuantumControlProblem(
     system;
     T=T,
     Δt=Δt,
+    Δt_max=Δt_max_factor * Δt,
     R=R,
-    pin_first_qstate=pin_first_qstate,
     options=options,
-    constraints=cons,
     L1_regularized_states=reg_states,
     α=[
         fill(α_transmon, length(transmon_f_states));
