@@ -31,6 +31,13 @@ struct MeasurementData
     ydim::Int
 end
 
+function get_mat_iso(mat)
+    mat_r = real(mat)
+    mat_i = imag(mat)
+    return vcat(hcat(mat_r, -mat_i),
+                hcat(mat_i,  mat_r))
+end
+
 function Base.:-(
     data1::MeasurementData,
     data2::MeasurementData
@@ -119,13 +126,15 @@ function (experiment::QuantumExperiment)(
 
     Ψ̃ = Vector{typeof(experiment.ψ̃₁)}(undef, T)
     Ψ̃[1] = experiment.ψ̃₁
-
+    CHI = 2π * -0.5469e-3
+    cavity_levels = 15
+    TRANSMON_E = [zeros(1); 1; zeros(2 - 2)]
     for t = 2:T
         Gₜ = Integrators.G(
             U[t - 1],
             experiment.sys.G_drift,
             experiment.sys.G_drives
-        ) + 1e-2 * QuantumSystems.G(GATES[:CX])
+        ) + get_mat_iso(-1im*2 * CHI*0.05 * kron(TRANSMON_E*TRANSMON_E', number(cavity_levels)))
         Ψ̃[t] = experiment.integrator(Gₜ * experiment.Δt) *
             Ψ̃[t - 1]
     end
@@ -136,7 +145,7 @@ function (experiment::QuantumExperiment)(
         experiment.τs,
         experiment.ydim
     )
-
+    println(abs2.(iso_to_ket(Ȳ.ys[end])))
     return Ȳ
 end
 
@@ -269,7 +278,6 @@ end
         τᵢ = ΔY.times[i]
 
         ∇gᵢ = QP.∇g(Ẑ.states[τᵢ])
-
         if QP.correction_term
             ∇²gᵢ = QP.∇²g(Ẑ.states[τᵢ])
             ϵ̂ᵢ = pinv(∇gᵢ) * ΔY.ys[i]
