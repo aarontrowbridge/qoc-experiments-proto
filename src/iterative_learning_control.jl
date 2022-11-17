@@ -154,7 +154,62 @@ end
 # - add functionality to store non updating jacobians
 # - OSQP error handling
 
-struct QuadraticProblem
+abstract type QuadraticProblem end
+
+struct StaticQuadraticProblem <: QuadraticProblem
+    H::Matrix
+    ∇::Vector
+    ∂F::Matrix
+    ∂G::Matrix
+    C::Matrix
+    settings::Dict{Symbol, Any}
+end
+
+function StaticQuadraticProblem(
+    Ẑgoal::Trajectory,
+    f::Function,
+    g::Function,
+    Q::Float64,
+    R::Float64,
+    Σ::AbstractMatrix{Float64},
+    u_bounds::Vector{Float64},
+    correction_term::Bool,
+    settings::Dict,
+    dims::NamedTuple;
+    mle=true
+)
+    @assert size(Σ, 1) == size(Σ, 2) == dims.y
+
+    ∂f(zz) = ForwardDiff.jacobian(f, zz)
+
+    ∂g(x) = ForwardDiff.jacobian(g, x)
+
+    function ∂²g(x)
+        H = ForwardDiff.jacobian(u -> vec(∂g(u)), x)
+        return reshape(H, dims.y, dims.x, dims.x)
+    end
+
+    if mle
+
+
+    return QuadraticProblem(
+        ∂f,
+        ∂g,
+        ∂²g,
+        Q,
+        R,
+        inv(Σ),
+        u_bounds,
+        correction_term,
+        settings,
+        dims,
+        !isnothing(Σ)
+    )
+end
+
+
+
+struct DynamicQuadraticProblem <: QuadraticProblem
     ∂f::Function
     ∂g::Function
     ∂²g::Function
@@ -168,7 +223,7 @@ struct QuadraticProblem
     mle::Bool
 end
 
-function QuadraticProblem(
+function DynamicQuadraticProblem(
     f::Function,
     g::Function,
     Q::Float64,
@@ -190,7 +245,7 @@ function QuadraticProblem(
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
-    return QuadraticProblem(
+    return DynamicQuadraticProblem(
         ∂f,
         ∂g,
         ∂²g,
@@ -205,17 +260,21 @@ function QuadraticProblem(
     )
 end
 
-function (QP::QuadraticProblem)(
+function (QP::DynamicQuadraticProblem)(
     Ẑ::Trajectory,
     ΔY::MeasurementData,
 )
     model = OSQP.Model()
 
     if QP.mle
-        H, ∇ = build_mle_hessian_and_gradient(QP, Ẑ, ΔY)
+        Hmle, ∇ = build_mle_hessian_and_gradient(Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims)
+        Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
+        H = Hmle + Hreg
+        ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
+
         A, lb, ub = build_constraint_matrix(QP, Ẑ, ΔY)
     else
-        H = build_regularization_hessian(QP)
+        H = build_regularization_hessian(QP.Q, QP.R, QP.dims)
         A, lb, ub = build_constraint_matrix(QP, Ẑ, ΔY)
     end
 
@@ -252,51 +311,52 @@ end
 
 
 @inline function build_regularization_hessian(
-    QP::QuadraticProblem
+    Q::Float64,
+    R::Float64,
+    dims::NamedTuple
 )
-    Hₜ = spdiagm([QP.Q * ones(QP.dims.x); QP.R * ones(QP.dims.u)])
-    H = kron(sparse(I(QP.dims.T)), sparse(Hₜ))
+    Hₜ = spdiagm([Q * ones(dims.x); R * ones(dims.u)])
+    H = kron(sparse(I(dims.T)), sparse(Hₜ))
     return H
 end
 
 @inline function build_mle_hessian_and_gradient(
-    QP::QuadraticProblem,
     Ẑ::Trajectory,
-    ΔY::MeasurementData
+    ΔY::MeasurementData,
+    ∂g::Function,
+    ∂²g::Function,
+    Σinv::Matrix,
+    dims::NamedTuple
 )
-    Hreg = build_regularization_hessian(QP)
+    Hmle = spzeros(dims.z * dims.T, dims.z * dims.T)
 
-    Hmle = spzeros(QP.dims.z * QP.dims.T, QP.dims.z * QP.dims.T)
+    ∇ = zeros(dims.z * dims.T)
 
-    ∇ = zeros(QP.dims.z * QP.dims.T)
-
-    for i = 1:QP.dims.M
+    for i = 1:dims.M
 
         τᵢ = ΔY.times[i]
 
-        ∂gᵢ = QP.∂g(Ẑ.states[τᵢ])
+        ∂gᵢ = ∂g(Ẑ.states[τᵢ])
 
-        if QP.correction_term
-            ∂²gᵢ = QP.∂²g(Ẑ.states[τᵢ])
+        if correction_term
+            ∂²gᵢ = ∂²g(Ẑ.states[τᵢ])
             ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
             @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
         end
 
-        Hᵢmle = ∂gᵢ' * QP.Σinv * ∂gᵢ
+        Hᵢmle = ∂gᵢ' * Σinv * ∂gᵢ
 
         Hmle[
-            slice(τᵢ, QP.dims.x, QP.dims.z),
-            slice(τᵢ, QP.dims.x, QP.dims.z)
+            slice(τᵢ, dims.x, dims.z),
+            slice(τᵢ, dims.x, dims.z)
         ] = sparse(Hᵢmle)
 
-        ∇ᵢmle = ΔY.ys[i]' * QP.Σinv * ∂gᵢ
+        ∇ᵢmle = ΔY.ys[i]' * Σinv * ∂gᵢ
 
-        ∇[slice(τᵢ, QP.dims.x, QP.dims.z)] = ∇ᵢmle
+        ∇[slice(τᵢ, dims.x, dims.z)] = ∇ᵢmle
     end
 
-    H = Hreg + Hmle
-
-    return H, ∇
+    return Hmle, ∇
 end
 
 
@@ -307,17 +367,9 @@ end
     Ẑ::Trajectory,
     ΔY::MeasurementData,
 )
-    ∂F = build_dynamics_constraint_jacobian(QP, Ẑ)
+    ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, ∂f, dims)
 
-    f_cons = zeros(QP.dims.x * (QP.dims.T - 1))
-
-    C = build_constrols_constraint_matrix(QP)
-
-    u_lb = -foldr(vcat, fill(QP.u_bounds, Ẑ.T - 2)) -
-        vcat(Ẑ.actions[2:Ẑ.T - 1]...)
-
-    u_ub = foldr(vcat, fill(QP.u_bounds, Ẑ.T - 2)) -
-        vcat(Ẑ.actions[2:Ẑ.T - 1]...)
+    C_u, u_lb, u_ub = build_constrols_constraint_matrix(dims, u_bounds)
 
     # constrain state matrix for state at time 1
     C_x₁ = sparse_hcat(
@@ -326,43 +378,35 @@ end
     )
 
     if QP.mle
-        A = sparse_vcat(∂F, C, C_x₁)
+        A = sparse_vcat(∂F, C_u, C_x₁)
         lb = vcat(
             f_cons,
-            zeros(QP.dims.u),
             u_lb,
-            zeros(QP.dims.u),
             zeros(QP.dims.x)
         )
         ub = vcat(
             f_cons,
-            zeros(QP.dims.u),
             u_ub,
-            zeros(QP.dims.u),
             zeros(QP.dims.x)
         )
     else
-        ∂G = build_measurement_constraint_jacobian(
+        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
             QP,
             Ẑ,
             ΔY
         )
-        A = sparse_vcat(∂F, ∂G, C, C_x₁)
+        A = sparse_vcat(∂G, ∂F, C_u, C_x₁)
         g_cons = -vcat(ΔY.ys...)
         lb = vcat(
-            f_cons,
-            g_cons,
-            zeroes(QP.dims.u),
+            ∂G_cons,
+            ∂F_cons,
             u_lb,
-            zeros(QP.dims.u),
             zeros(QP.dims.x)
         )
         ub = vcat(
-            f_cons,
-            g_cons,
-            zeroes(QP.dims.u),
+            ∂G_cons,
+            ∂F_cons,
             u_ub,
-            zeros(QP.dims.u),
             zeros(QP.dims.x)
         )
     end
@@ -371,72 +415,89 @@ end
 end
 
 @inline function build_constrols_constraint_matrix(
-    QP::QuadraticProblem
+    dims::NamedTuple,
+    u_bounds::Vector,
 )
     C = spzeros(
-        QP.dims.u * QP.dims.T,
-        QP.dims.z * QP.dims.T
+        dims.u * dims.T,
+        dims.z * dims.T
     )
 
-    for t = 1:QP.dims.T
+    for t = 1:dims.T
         C[
             slice(
                 t,
-                QP.dims.u
+                dims.u
             ),
             slice(
                 t,
-                QP.dims.x + 1,
-                QP.dims.z,
-                QP.dims.z
+                dims.x + 1,
+                dims.z,
+                dims.z
             )
-        ] = sparse(I(QP.dims.u))
+        ] = sparse(I(dims.u))
     end
 
-    return C
+    u_lb = -foldr(vcat, fill(u_bounds, dims.T - 2)) -
+        vcat(Ẑ.actions[2:dims.T - 1]...)
+
+    u_ub = foldr(vcat, fill(u_bounds, dims.T - 2)) -
+        vcat(Ẑ.actions[2:dims.T - 1]...)
+
+    u_lb = [zeros(dims.u); u_lb; zeros(dims.u)]
+
+    u_ub = [zeros(dims.u); u_ub; zeros(dims.u)]
+
+    return C_u, u_lb, u_ub
 end
 
 @inline function build_measurement_constraint_jacobian(
-    QP::QuadraticProblem,
     Ẑ::Trajectory,
-    ΔY::MeasurementData
+    ΔY::MeasurementData,
+    ∂g::Function,
+    ∂²g::Function,
+    dims::NamedTuple,
+    correction_term::Bool
 )
-    ∂G = spzeros(QP.dims.y * QP.dims.M, QP.dims.z * QP.dims.T)
+    ∂G = spzeros(dims.y * dims.M, dims.z * dims.T)
 
-    for i = 1:QP.dims.M
+    for i = 1:dims.M
 
         τᵢ = ΔY.times[i]
 
-        ∂gᵢ = QP.∂g(Ẑ.states[τᵢ])
+        ∂gᵢ = ∂g(Ẑ.states[τᵢ])
 
-        if QP.correction_term
-            ∂²gᵢ = QP.∂²g(Ẑ.states[τᵢ])
+        if correction_term
+            ∂²gᵢ = ∂²g(Ẑ.states[τᵢ])
             ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
             @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
         end
 
         ∂G[
-            slice(i, QP.dims.y),
-            slice(τᵢ, QP.dims.x, QP.dims.z)
+            slice(i, dims.y),
+            slice(τᵢ, dims.x, dims.z)
         ] = sparse(∂gᵢ)
     end
 
-    return ∂G
+    ∂G_cons = -vcat(ΔY.ys...)
+
+    return ∂G, ∂G_cons
 end
 
 # TODO: add feat to just store jacobian of goal traj
 @inline function build_dynamics_constraint_jacobian(
-    QP::QuadraticProblem,
-    Ẑ::Trajectory
+    Ẑ::Trajectory,
+    ∂f::Function,
+    dims::NamedTuple
 )
     ∂F = spzeros(
-        QP.dims.x * (QP.dims.T - 1),
-        QP.dims.z * QP.dims.T
+        dims.x * (dims.T - 1),
+        dims.z * dims.T
     )
 
-    for t = 1:QP.dims.T - 1
+    for t = 1:dims.T - 1
 
-        zₜ = [
+        zₜzₜ₊₁ = [
             Ẑ.states[t];
             Ẑ.actions[t];
             Ẑ.states[t + 1];
@@ -444,12 +505,14 @@ end
         ]
 
         ∂F[
-            slice(t, QP.dims.x),
-            slice(t, QP.dims.z; stretch=QP.dims.z)
-        ] = sparse(QP.∂f(zₜ))
+            slice(t, dims.x),
+            slice(t, dims.z; stretch=dims.z)
+        ] = sparse(∂f(zₜzₜ₊₁))
     end
 
-    return ∂F
+    ∂F_cons = zeros(dims.x * (dims.T - 1))
+
+    return ∂F, ∂F_cons
 end
 
 
