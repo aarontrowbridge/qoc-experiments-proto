@@ -189,8 +189,6 @@ function StaticQuadraticProblem(
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
-    if mle
-
 
     return QuadraticProblem(
         ∂f,
@@ -266,16 +264,30 @@ function (QP::DynamicQuadraticProblem)(
 )
     model = OSQP.Model()
 
+    Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
+
+    ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
+
+    C_u, C_u_lb, C_u_ub = build_control_constraint_matrices(QP.u_bounds, QP.dims)
+
+    C_x₁, C_x₁_cons = build_initial_state_constraint_matrix(QP.dims)
+
+    A = sparse_vcat(∂F, C_u, C_x₁)
+
+    lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
+    ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
+
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims)
-        Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
         H = Hmle + Hreg
-        ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
-
-        A, lb, ub = build_constraint_matrix(QP, Ẑ, ΔY)
     else
-        H = build_regularization_hessian(QP.Q, QP.R, QP.dims)
-        A, lb, ub = build_constraint_matrix(QP, Ẑ, ΔY)
+        H = Hreg
+        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.dims, QP.correction_term
+        )
+        A = sparse_vcat(∂G, A)
+        lb = vcat(∂G_cons, lb)
+        ub = vcat(∂G_cons, ub)
     end
 
     OSQP.setup!(
@@ -359,6 +371,18 @@ end
     return Hmle, ∇
 end
 
+@inline function build_initial_state_constraint_matrix(
+    dims::NamedTuple
+)
+    C_x₁ = sparse_hcat(
+        I(QP.dims.x),
+        spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
+    )
+    C_x₁_cons = zeros(QP.dims.x)
+    return C_x₁, C_x₁_cons
+end
+
+
 
 
 
@@ -369,7 +393,7 @@ end
 )
     ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, ∂f, dims)
 
-    C_u, u_lb, u_ub = build_constrols_constraint_matrix(dims, u_bounds)
+    C_u, u_lb, u_ub = build_constrols_constraint_matrix(u_bounds, dims)
 
     # constrain state matrix for state at time 1
     C_x₁ = sparse_hcat(
@@ -415,8 +439,8 @@ end
 end
 
 @inline function build_constrols_constraint_matrix(
-    dims::NamedTuple,
     u_bounds::Vector,
+    dims::NamedTuple
 )
     C = spzeros(
         dims.u * dims.T,
@@ -551,6 +575,7 @@ mutable struct ILCProblem
         max_iter=100,
         tol=1e-6,
         norm_p=Inf,
+        static_QP=false,
         QP_max_iter=1000,
         QP_verbose=false,
         QP_settings=Dict(),
@@ -589,14 +614,26 @@ mutable struct ILCProblem
             return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
         end
 
-        QP = QuadraticProblem(
-            f, experiment.g,
-            Q, R, Σ,
-            u_bounds,
-            correction_term,
-            QP_settings,
-            dims
-        )
+        if static_QP
+            QP = StaticQuadraticProblem(
+                Ẑgoal,
+                f, experiment.g,
+                Q, R, Σ,
+                u_bounds,
+                correction_term,
+                QP_settings,
+                dims
+            )
+        else
+            QP = DynamicQuadraticProblem(
+                f, experiment.g,
+                Q, R, Σ,
+                u_bounds,
+                correction_term,
+                QP_settings,
+                dims
+            )
+        end
 
         Ygoal = measure(
             Ẑgoal,
