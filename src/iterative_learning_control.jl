@@ -811,6 +811,10 @@ mutable struct ILCProblem
             experiment.ydim
         )
 
+        display(Ygoal.ys[end])
+        println()
+        display(Ẑgoal.states[end])
+
         return new(
             Ẑgoal,
             Ẑgoal,

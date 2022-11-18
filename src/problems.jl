@@ -23,8 +23,9 @@ using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
 
+abstract type AbstractProblem end
 
-struct QuantumControlProblem
+struct QuantumControlProblem <: AbstractProblem
     system::AbstractSystem
     variables::Vector{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer

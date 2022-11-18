@@ -52,15 +52,16 @@ experiment = QuantumExperiment(
     experimental_system,
     Ẑ.states[1],
     Ẑ.times,
-    x -> x,
-    data.system.isodim,
+    x -> g(x),
+    data.system.isodim ÷ 2,
     [5:5:50; Ẑ.T];
+    # 1:Ẑ.T;
     integrator=exp
 )
 
-max_iter = 10
+max_iter = 20
 fps = 2
-R = 20.0
+R = 200.0
 p = 1
 
 prob = ILCProblem(
