@@ -93,11 +93,11 @@ function QuantumExperiment(
     ψ̃₁::Vector{Float64},
     ts::Vector{Float64},
     g::Function,
-    ydim::Int,
     τs::AbstractVector{Int};
     G_error_term=zeros(size(sys.G_drift)),
     integrator=exp
 )
+    ydim = size(g(ψ̃₁), 1)
     return QuantumExperiment(
         ψ̃₁,
         ts,
@@ -811,9 +811,9 @@ mutable struct ILCProblem
             experiment.ydim
         )
 
-        display(Ygoal.ys[end])
-        println()
-        display(Ẑgoal.states[end])
+        # display(Ygoal.ys[end])
+        # println()
+        # display(Ẑgoal.states[end])
 
         return new(
             Ẑgoal,
