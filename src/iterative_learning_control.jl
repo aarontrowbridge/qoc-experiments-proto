@@ -157,12 +157,15 @@ end
 abstract type QuadraticProblem end
 
 struct StaticQuadraticProblem <: QuadraticProblem
-    H::Matrix
-    ∇::Vector
-    ∂F::Vector{Matrix}
-    ∂gs::Vector{Matrix}
-    ∂²gs::Vector{Array}
-    C::Matrix
+    Hreg::SparseMatrixCSC
+    A::SparseMatrixCSC
+    ∂gs::Vector{Matrix{Float64}}
+    ∂²gs::Vector{Array{Float64}}
+    Σinv::AbstractMatrix{Float64}
+    u_bounds::Vector{Float64}
+    correction_term::Bool
+    mle::Bool
+    dims::NamedTuple
     settings::Dict{Symbol, Any}
 end
 
@@ -175,7 +178,7 @@ function StaticQuadraticProblem(
     Σ::AbstractMatrix{Float64},
     u_bounds::Vector{Float64},
     correction_term::Bool,
-    settings::Dict,
+    settings::Dict{Symbol, Any},
     dims::NamedTuple;
     mle=true
 )
@@ -190,7 +193,7 @@ function StaticQuadraticProblem(
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
-    ∂F,  = build_dynamics_constraint_jacobian(
+    ∂F = build_dynamics_constraint_jacobian(
         Ẑgoal,
         ∂f,
         dims
@@ -208,12 +211,25 @@ function StaticQuadraticProblem(
         push!(∂²gs, ∂²g(Ẑgoal.states[t]))
     end
 
-    C_u = build_control_constraint_matrix(dims)
+    C_u = build_controls_constraint_matrix(dims)
     C_x₁ = build_initial_state_constraint_matrix(dims)
 
+    A = sparse_vcat(∂F, C_u, C_x₁)
 
+    Hreg = build_regularization_hessian(Q, R, dims)
 
-
+    return StaticQuadraticProblem(
+        Hreg,
+        A,
+        ∂gs,
+        ∂²gs,
+        inv(Σ),
+        u_bounds,
+        correction_term,
+        mle,
+        dims,
+        settings
+    )
 end
 
 function (QP::StaticQuadraticProblem)(
@@ -222,33 +238,29 @@ function (QP::StaticQuadraticProblem)(
 )
     model = OSQP.Model()
 
-    Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
-
-    ∂F, ∂F_cons = build_dynamics_constraint_jacobian(QP.∂fs, QP.dims)
-
-    C_u,  = build_controls_constraint_matrix(QP.dims)
     C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims)
 
-    C_x₁, C_x₁_cons = build_initial_state_constraint_matrix(QP.dims)
+    ∂F_cons = zeros(QP.dims.x * (QP.dims.T - 1))
 
-    A = sparse_vcat(∂F, C_u, C_x₁)
+    C_x₁_cons = zeros(QP.dims.x)
 
     lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
     ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
-            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims, QP.correction_term
+            ΔY, QP.∂gs, QP.∂²gs, QP.Σinv, QP.dims, QP.correction_term
         )
-        H = Hmle + Hreg
+        H = Hmle + QP.Hreg
+        A = QP.A
     else
-        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
-            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.dims, QP.correction_term
-        )
-        A = sparse_vcat(∂G, A)
-        lb = vcat(∂G_cons, lb)
-        ub = vcat(∂G_cons, ub)
         H = Hreg
+        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
+            ΔY, QP.∂gs, QP.∂²gs, QP.dims, QP.correction_term
+        )
+        A = sparse_vcat(∂G, QP.A)
+        ub = vcat(∂G_cons, ub)
+        lb = vcat(∂G_cons, lb)
     end
 
     OSQP.setup!(
@@ -293,7 +305,7 @@ struct DynamicQuadraticProblem <: QuadraticProblem
     Σinv::Union{Matrix{Float64}, Nothing}
     u_bounds::Vector{Float64}
     correction_term::Bool
-    settings::Dict
+    settings::Dict{Symbol, Any}
     dims::NamedTuple
     mle::Bool
 end
@@ -306,7 +318,7 @@ function DynamicQuadraticProblem(
     Σ::AbstractMatrix{Float64},
     u_bounds::Vector{Float64},
     correction_term::Bool,
-    settings::Dict,
+    settings::Dict{Symbol, Any},
     dims::NamedTuple
 )
     @assert size(Σ, 1) == size(Σ, 2) == dims.y
@@ -419,7 +431,7 @@ end
     ΔY::MeasurementData,
     ∂g::Function,
     ∂²g::Function,
-    Σinv::Matrix,
+    Σinv::AbstractMatrix,
     dims::NamedTuple,
     correction_term::Bool
 )
@@ -454,6 +466,45 @@ end
     return Hmle, ∇
 end
 
+@inline function build_mle_hessian_and_gradient(
+    ΔY::MeasurementData,
+    ∂gs::Vector{Matrix{Float64}},
+    ∂²gs::Vector{Array{Float64}},
+    Σinv::AbstractMatrix,
+    dims::NamedTuple,
+    correction_term::Bool
+)
+    Hmle = spzeros(dims.z * dims.T, dims.z * dims.T)
+
+    ∇ = zeros(dims.z * dims.T)
+
+    for i = 1:dims.M
+
+        τᵢ = ΔY.times[i]
+
+        ∂gᵢ = ∂gs[i]
+
+        if correction_term
+            ∂²gᵢ = ∂²gs[i]
+            ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+        end
+
+        Hᵢmle = ∂gᵢ' * Σinv * ∂gᵢ
+
+        Hmle[
+            slice(τᵢ, dims.x, dims.z),
+            slice(τᵢ, dims.x, dims.z)
+        ] = sparse(Hᵢmle)
+
+        ∇ᵢmle = ΔY.ys[i]' * Σinv * ∂gᵢ
+
+        ∇[slice(τᵢ, dims.x, dims.z)] = ∇ᵢmle
+    end
+
+    return Hmle, ∇
+end
+
 @inline function build_initial_state_constraint_matrix(
     dims::NamedTuple
 )
@@ -461,7 +512,7 @@ end
         I(dims.x),
         spzeros(dims.x, dims.u + dims.z * (dims.T - 1))
     )
-    return C_x₁, C_x₁_cons
+    return C_x₁
 end
 
 
@@ -596,6 +647,37 @@ end
     return ∂G, ∂G_cons
 end
 
+@inline function build_measurement_constraint_jacobian(
+    ΔY::MeasurementData,
+    ∂gs::Vector{Matrix},
+    ∂²gs::Vector{Array},
+    dims::NamedTuple,
+    correction_term::Bool
+)
+    ∂G = spzeros(dims.y * dims.M, dims.z * dims.T)
+
+    for i = 1:dims.M
+
+        τᵢ = ΔY.times[i]
+
+        ∂gᵢ = ∂gs[i]
+
+        if correction_term
+            ∂²gᵢ = ∂²gs[i]
+            ϵ̂ᵢ = pinv(∂gᵢ) * ΔY.ys[i]
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+        end
+
+        ∂G[
+            slice(i, dims.y),
+            slice(τᵢ, dims.x, dims.z)
+        ] = sparse(∂gᵢ)
+    end
+
+    ∂G_cons = -vcat(ΔY.ys...)
+
+    return ∂G, ∂G_cons
+end
 # TODO: add feat to just store jacobian of goal traj
 @inline function build_dynamics_constraint_jacobian(
     Ẑ::Trajectory,
@@ -644,7 +726,7 @@ mutable struct ILCProblem
     Ȳs::Vector{MeasurementData}
     Us::Vector{Matrix{Float64}}
     experiment::QuantumExperiment
-    settings::Dict
+    settings::Dict{Symbol, Any}
 
     function ILCProblem(
         sys::QuantumSystem,
@@ -668,19 +750,20 @@ mutable struct ILCProblem
     )
         @assert length(u_bounds) == sys.ncontrols
 
-        ILC_settings = Dict(
+        ILC_settings::Dict{Symbol, Any} = Dict(
             :max_iter => max_iter,
             :tol => tol,
             :norm_p => norm_p,
             :verbose => verbose,
         )
 
-        QP_kw_settings = Dict(
+        QP_kw_settings::Dict{Symbol, Any} = Dict(
             :max_iter => QP_max_iter,
             :verbose => QP_verbose,
         )
 
-        QP_settings = merge(QP_kw_settings, QP_settings)
+        QP_settings::Dict{Symbol, Any} =
+            merge(QP_kw_settings, QP_settings)
 
         dynamics = eval(integrator)(sys)
 
@@ -694,9 +777,9 @@ mutable struct ILCProblem
         )
 
         f = zz -> begin
-            xₜ₊₁ = zz[dims.z .+ (1:dims.x)]
             xₜ = zz[1:dims.x]
             uₜ = zz[dims.x .+ (1:dims.u)]
+            xₜ₊₁ = zz[dims.z .+ (1:dims.x)]
             return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
         end
 

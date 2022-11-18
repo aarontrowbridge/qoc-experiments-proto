@@ -60,7 +60,7 @@ experiment = QuantumExperiment(
 
 max_iter = 10
 fps = 2
-R = 200.0
+R = 20.0
 p = 1
 
 prob = ILCProblem(
@@ -73,6 +73,7 @@ prob = ILCProblem(
     correction_term=true,
     norm_p=p,
     R=R,
+    static_QP=true,
     Q=0.0
 )
 
