@@ -159,8 +159,9 @@ abstract type QuadraticProblem end
 struct StaticQuadraticProblem <: QuadraticProblem
     H::Matrix
     ∇::Vector
-    ∂F::Matrix
-    ∂G::Matrix
+    ∂F::Vector{Matrix}
+    ∂gs::Vector{Matrix}
+    ∂²gs::Vector{Array}
     C::Matrix
     settings::Dict{Symbol, Any}
 end
@@ -189,20 +190,96 @@ function StaticQuadraticProblem(
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
-
-    return QuadraticProblem(
+    ∂F,  = build_dynamics_constraint_jacobian(
+        Ẑgoal,
         ∂f,
-        ∂g,
-        ∂²g,
-        Q,
-        R,
-        inv(Σ),
-        u_bounds,
-        correction_term,
-        settings,
-        dims,
-        !isnothing(Σ)
+        dims
     )
+
+    ∂gs = Matrix[]
+
+    for t = 1:Ẑgoal.T
+        push!(∂gs, ∂g(Ẑgoal.states[t]))
+    end
+
+    ∂²gs = Array[]
+
+    for t = 1:Ẑgoal.T
+        push!(∂²gs, ∂²g(Ẑgoal.states[t]))
+    end
+
+    C_u = build_control_constraint_matrix(dims)
+    C_x₁ = build_initial_state_constraint_matrix(dims)
+
+
+
+
+end
+
+function (QP::StaticQuadraticProblem)(
+    Ẑ::Trajectory,
+    ΔY::MeasurementData
+)
+    model = OSQP.Model()
+
+    Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
+
+    ∂F, ∂F_cons = build_dynamics_constraint_jacobian(QP.∂fs, QP.dims)
+
+    C_u,  = build_controls_constraint_matrix(QP.dims)
+    C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims)
+
+    C_x₁, C_x₁_cons = build_initial_state_constraint_matrix(QP.dims)
+
+    A = sparse_vcat(∂F, C_u, C_x₁)
+
+    lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
+    ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
+
+    if QP.mle
+        Hmle, ∇ = build_mle_hessian_and_gradient(
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims, QP.correction_term
+        )
+        H = Hmle + Hreg
+    else
+        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.dims, QP.correction_term
+        )
+        A = sparse_vcat(∂G, A)
+        lb = vcat(∂G_cons, lb)
+        ub = vcat(∂G_cons, ub)
+        H = Hreg
+    end
+
+    OSQP.setup!(
+        model;
+        P=H,
+        A=A,
+        q=QP.mle ? ∇ : nothing,
+        l=lb,
+        u=ub,
+        QP.settings...
+    )
+
+    results = OSQP.solve!(model)
+
+    if results.info.status != :Solved
+        @warn "OSQP did not solve the problem"
+    end
+
+    Δxs = [
+        results.x[slice(t, QP.dims.x, QP.dims.z)]
+            for t = 1:QP.dims.T
+    ]
+
+    Δus = [
+        results.x[slice(t, QP.dims.x + 1, QP.dims.z, QP.dims.z)]
+            for t = 1:QP.dims.T
+    ]
+
+    ΔZ = Trajectory(Δxs, Δus, Ẑ.times, Ẑ.T, Ẑ.Δt)
+
+    return ΔZ
 end
 
 
@@ -260,17 +337,20 @@ end
 
 function (QP::DynamicQuadraticProblem)(
     Ẑ::Trajectory,
-    ΔY::MeasurementData,
+    ΔY::MeasurementData
 )
     model = OSQP.Model()
 
     Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
 
-    ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
+    ∂F = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
+    ∂F_cons = zeros(size(∂F_cons, 1))
 
-    C_u, C_u_lb, C_u_ub = build_control_constraint_matrices(QP.u_bounds, QP.dims)
+    C_u = build_controls_constraint_matrix(QP.dims)
+    C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims)
 
-    C_x₁, C_x₁_cons = build_initial_state_constraint_matrix(QP.dims)
+    C_x₁ = build_initial_state_constraint_matrix(QP.dims)
+    C_x₁_cons = zeros(size(C_x₁, 1))
 
     A = sparse_vcat(∂F, C_u, C_x₁)
 
@@ -278,16 +358,18 @@ function (QP::DynamicQuadraticProblem)(
     ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
 
     if QP.mle
-        Hmle, ∇ = build_mle_hessian_and_gradient(Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims)
+        Hmle, ∇ = build_mle_hessian_and_gradient(
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims, QP.correction_term
+        )
         H = Hmle + Hreg
     else
-        H = Hreg
         ∂G, ∂G_cons = build_measurement_constraint_jacobian(
             Ẑ, ΔY, QP.∂g, QP.∂²g, QP.dims, QP.correction_term
         )
         A = sparse_vcat(∂G, A)
         lb = vcat(∂G_cons, lb)
         ub = vcat(∂G_cons, ub)
+        H = Hreg
     end
 
     OSQP.setup!(
@@ -338,7 +420,8 @@ end
     ∂g::Function,
     ∂²g::Function,
     Σinv::Matrix,
-    dims::NamedTuple
+    dims::NamedTuple,
+    correction_term::Bool
 )
     Hmle = spzeros(dims.z * dims.T, dims.z * dims.T)
 
@@ -375,10 +458,9 @@ end
     dims::NamedTuple
 )
     C_x₁ = sparse_hcat(
-        I(QP.dims.x),
-        spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
+        I(dims.x),
+        spzeros(dims.x, dims.u + dims.z * (dims.T - 1))
     )
-    C_x₁_cons = zeros(QP.dims.x)
     return C_x₁, C_x₁_cons
 end
 
@@ -386,69 +468,68 @@ end
 
 
 
-@inline function build_constraint_matrix(
-    QP::QuadraticProblem,
-    Ẑ::Trajectory,
-    ΔY::MeasurementData,
-)
-    ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, ∂f, dims)
+# @inline function build_constraint_matrix(
+#     QP::QuadraticProblem,
+#     Ẑ::Trajectory,
+#     ΔY::MeasurementData,
+# )
+#     ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, ∂f, dims)
 
-    C_u, u_lb, u_ub = build_constrols_constraint_matrix(u_bounds, dims)
+#     C_u, u_lb, u_ub = build_constrols_constraint_matrix(u_bounds, dims)
 
-    # constrain state matrix for state at time 1
-    C_x₁ = sparse_hcat(
-        I(QP.dims.x),
-        spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
-    )
+#     # constrain state matrix for state at time 1
+#     C_x₁ = sparse_hcat(
+#         I(QP.dims.x),
+#         spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
+#     )
 
-    if QP.mle
-        A = sparse_vcat(∂F, C_u, C_x₁)
-        lb = vcat(
-            f_cons,
-            u_lb,
-            zeros(QP.dims.x)
-        )
-        ub = vcat(
-            f_cons,
-            u_ub,
-            zeros(QP.dims.x)
-        )
-    else
-        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
-            QP,
-            Ẑ,
-            ΔY
-        )
-        A = sparse_vcat(∂G, ∂F, C_u, C_x₁)
-        g_cons = -vcat(ΔY.ys...)
-        lb = vcat(
-            ∂G_cons,
-            ∂F_cons,
-            u_lb,
-            zeros(QP.dims.x)
-        )
-        ub = vcat(
-            ∂G_cons,
-            ∂F_cons,
-            u_ub,
-            zeros(QP.dims.x)
-        )
-    end
+#     if QP.mle
+#         A = sparse_vcat(∂F, C_u, C_x₁)
+#         lb = vcat(
+#             f_cons,
+#             u_lb,
+#             zeros(QP.dims.x)
+#         )
+#         ub = vcat(
+#             f_cons,
+#             u_ub,
+#             zeros(QP.dims.x)
+#         )
+#     else
+#         ∂G, ∂G_cons = build_measurement_constraint_jacobian(
+#             QP,
+#             Ẑ,
+#             ΔY
+#         )
+#         A = sparse_vcat(∂G, ∂F, C_u, C_x₁)
+#         g_cons = -vcat(ΔY.ys...)
+#         lb = vcat(
+#             ∂G_cons,
+#             ∂F_cons,
+#             u_lb,
+#             zeros(QP.dims.x)
+#         )
+#         ub = vcat(
+#             ∂G_cons,
+#             ∂F_cons,
+#             u_ub,
+#             zeros(QP.dims.x)
+#         )
+#     end
 
-    return A, lb, ub
-end
+#     return A, lb, ub
+# end
 
-@inline function build_constrols_constraint_matrix(
-    u_bounds::Vector,
+@inline function build_controls_constraint_matrix(
     dims::NamedTuple
 )
-    C = spzeros(
+    C_u = spzeros(
         dims.u * dims.T,
         dims.z * dims.T
     )
 
     for t = 1:dims.T
-        C[
+        C_u[
             slice(
                 t,
                 dims.u
@@ -461,18 +542,25 @@ end
             )
         ] = sparse(I(dims.u))
     end
+    return C_u
+end
 
-    u_lb = -foldr(vcat, fill(u_bounds, dims.T - 2)) -
+@inline function build_controls_constraint_bounds(
+    Ẑ::Trajectory,
+    u_bounds::Vector,
+    dims::NamedTuple
+)
+    C_u_lb = -foldr(vcat, fill(u_bounds, dims.T - 2)) -
         vcat(Ẑ.actions[2:dims.T - 1]...)
 
-    u_ub = foldr(vcat, fill(u_bounds, dims.T - 2)) -
+    C_u_ub = foldr(vcat, fill(u_bounds, dims.T - 2)) -
         vcat(Ẑ.actions[2:dims.T - 1]...)
 
-    u_lb = [zeros(dims.u); u_lb; zeros(dims.u)]
+    C_u_lb = [zeros(dims.u); C_u_lb; zeros(dims.u)]
 
-    u_ub = [zeros(dims.u); u_ub; zeros(dims.u)]
+    C_u_ub = [zeros(dims.u); C_u_ub; zeros(dims.u)]
 
-    return C_u, u_lb, u_ub
+    return C_u_lb, C_u_ub
 end
 
 @inline function build_measurement_constraint_jacobian(
@@ -534,9 +622,7 @@ end
         ] = sparse(∂f(zₜzₜ₊₁))
     end
 
-    ∂F_cons = zeros(dims.x * (dims.T - 1))
-
-    return ∂F, ∂F_cons
+    return ∂F
 end
 
 
@@ -678,17 +764,19 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         # TODO: make jacobians constant about nominal trajectory
         if prob.settings[:verbose]
-            println("iter = ", k)
-            println("|ΔY| =      ", norm(ΔY, prob.settings[:norm_p]))
-            println(
-                "fidelity =  ",
-                fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
-            )
+            println("iter =  ", k)
+            println("|ΔY| =  ", norm(ΔY, prob.settings[:norm_p]))
+            # println(
+            #     "fidelity =  ",
+            #     fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
+            # )
+            println("|ΔY_T| = ", norm(ΔY.ys[end], prob.settings[:norm_p]))
             println()
         end
         ΔZ = prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
-        println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
+        # println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
+        # println()
         U = prob.Ẑ.actions
         Ȳ = prob.experiment(U)
         ΔYnext = Ȳ - prob.Ygoal
