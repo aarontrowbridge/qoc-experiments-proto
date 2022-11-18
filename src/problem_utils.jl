@@ -23,7 +23,7 @@ using HDF5
 using JLD2
 using Ipopt
 
-struct ProblemData
+struct ProblemData <: AbstractProblem
     system::AbstractSystem
     # objective_terms::Vector{Dict}
     # constraints::Vector{AbstractConstraint}

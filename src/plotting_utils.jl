@@ -347,7 +347,7 @@ function plot_multimode(
 end
 
 function plot_multimode_split(
-    prob::QuantumControlProblem,
+    prob::AbstractProblem,
     path::String;
     show_highest_modes=false,
     show_augs=false
@@ -362,6 +362,8 @@ function plot_multimode_split(
     fig = Figure(resolution=(1200, 1500))
 
     ketdim = prob.system.isodim ÷ 2
+
+    color = :glasbey_bw_minc_20_n256
 
     if !show_highest_modes
         ψs1 = pop_matrix(
@@ -392,7 +394,7 @@ function plot_multimode_split(
             ψax1,
             prob.trajectory.times,
             ψs1;
-            color=:tab20,
+            color=color,
             labels=["|g$(i)⟩" for i = 0:ketdim÷2 - 1]
         )
 
@@ -402,7 +404,7 @@ function plot_multimode_split(
             ψax2,
             prob.trajectory.times,
             ψs2;
-            color=:tab20,
+            color=color,
             labels=["|e$(i)⟩" for i = 0:ketdim÷2 - 1]
         )
 
@@ -423,12 +425,6 @@ function plot_multimode_split(
             components=[ketdim÷3, ketdim ÷ 3 * 2]
         )
 
-        ψfstates = pop_matrix(
-            prob.trajectory,
-            prob.system;
-            components=[ketdim ÷ 3 * 2 + 1:ketdim...]
-        )
-
         ψg0g1_ax = Axis(
             fig[1, :];
             title="multimode system components 1:2",
@@ -438,12 +434,6 @@ function plot_multimode_split(
         ψgNeN_ax = Axis(
             fig[2, :];
             title="multimode system components 14 & 28",
-            xlabel=L"t [ns]"
-        )
-
-        ψfstates_ax = Axis(
-            fig[3, :];
-            title="multimode system components 29:$(ketdim)",
             xlabel=L"t [ns]"
         )
 
@@ -466,18 +456,29 @@ function plot_multimode_split(
         )
 
         axislegend(ψgNeN_ax; position=:lc)
-
-        series!(
-            ψfstates_ax,
-            prob.trajectory.times,
-            ψfstates;
-            color=:tab20,
-            labels=["|f$(i)⟩" for i = 0:ketdim ÷ 3 - 1]
-        )
-
-        axislegend(ψfstates_ax; position=:lc)
-
     end
+
+    ψfstates = pop_matrix(
+        prob.trajectory,
+        prob.system;
+        components=[ketdim ÷ 3 * 2 + 1:ketdim...]
+    )
+
+    ψfstates_ax = Axis(
+        fig[3, :];
+        title="multimode system components 29:$(ketdim)",
+        xlabel=L"t [ns]"
+    )
+
+    series!(
+        ψfstates_ax,
+        prob.trajectory.times,
+        ψfstates;
+        color=color,
+        labels=["|f$(i)⟩" for i = 0:ketdim ÷ 3 - 1]
+    )
+
+    axislegend(ψfstates_ax; position=:lc)
 
     if show_augs
         for j = 0:system.control_order
