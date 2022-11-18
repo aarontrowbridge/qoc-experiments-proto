@@ -152,7 +152,7 @@ function (experiment::QuantumExperiment)(
         experiment.τs,
         experiment.ydim
     )
-    println(abs2.(iso_to_ket(Ȳ.ys[end])))
+    println(Ȳ.ys[end])
     return Ȳ
 end
 
