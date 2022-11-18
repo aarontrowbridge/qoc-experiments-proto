@@ -71,8 +71,8 @@ experiment = QuantumExperiment(
     Ẑ.times,
     # x -> x,
     g_pop,
-    # [5:5:50; Ẑ.T];
-    [2:2:Ẑ.T - 10; Ẑ.T];
+    [5:5:50; Ẑ.T];
+    # [2:2:Ẑ.T - 10; Ẑ.T];
     # [1:Ẑ.T ÷ 2; Ẑ.T];
     # 1:Ẑ.T;
     integrator=exp
@@ -94,7 +94,7 @@ prob = ILCProblem(
     correction_term=true,
     norm_p=p,
     R=R,
-    static_QP=true,
+    static_QP=false,
     Q=0.0,
     Qf=Qf
 )

@@ -362,7 +362,7 @@ function (QP::DynamicQuadraticProblem)(
     Hreg = build_regularization_hessian(QP.Q, QP.R, QP.dims)
 
     ∂F = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
-    ∂F_cons = zeros(size(∂F_cons, 1))
+    ∂F_cons = zeros(size(∂F, 1))
 
     C_u = build_controls_constraint_matrix(QP.dims)
     C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims)
@@ -851,8 +851,8 @@ function ProblemSolvers.solve!(prob::ILCProblem)
             U = prob.Ẑ.actions
             Ȳ = prob.experiment(U)
             ΔYnext = Ȳ - prob.Ygoal
-            println("       iter = $i")
-            println("       |ΔY| = ", norm(ΔYnext, prob.settings[:norm_p]))
+            println("       iter =   $i")
+            println("       |ΔY_t| = ", norm(ΔYnext.ys[end], prob.settings[:norm_p]))
             println()
             i += 1
         end
