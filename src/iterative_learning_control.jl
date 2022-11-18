@@ -162,6 +162,7 @@ struct StaticQuadraticProblem <: QuadraticProblem
     ∂gs::Vector{Matrix{Float64}}
     ∂²gs::Vector{Array{Float64}}
     Σinv::AbstractMatrix{Float64}
+    Qf::Float64
     u_bounds::Vector{Float64}
     correction_term::Bool
     mle::Bool
@@ -174,6 +175,7 @@ function StaticQuadraticProblem(
     f::Function,
     g::Function,
     Q::Float64,
+    Qf::Float64,
     R::Float64,
     Σ::AbstractMatrix{Float64},
     u_bounds::Vector{Float64},
@@ -224,6 +226,7 @@ function StaticQuadraticProblem(
         ∂gs,
         ∂²gs,
         inv(Σ),
+        Qf,
         u_bounds,
         correction_term,
         mle,
@@ -249,7 +252,7 @@ function (QP::StaticQuadraticProblem)(
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
-            ΔY, QP.∂gs, QP.∂²gs, QP.Σinv, QP.dims, QP.correction_term
+            ΔY, QP.∂gs, QP.∂²gs, QP.Qf, QP.Σinv, QP.dims, QP.correction_term
         )
         H = Hmle + QP.Hreg
         A = QP.A
@@ -301,6 +304,7 @@ struct DynamicQuadraticProblem <: QuadraticProblem
     ∂g::Function
     ∂²g::Function
     Q::Float64
+    Qf::Float64
     R::Float64
     Σinv::Union{Matrix{Float64}, Nothing}
     u_bounds::Vector{Float64}
@@ -314,6 +318,7 @@ function DynamicQuadraticProblem(
     f::Function,
     g::Function,
     Q::Float64,
+    Qf::Float64,
     R::Float64,
     Σ::AbstractMatrix{Float64},
     u_bounds::Vector{Float64},
@@ -337,6 +342,7 @@ function DynamicQuadraticProblem(
         ∂g,
         ∂²g,
         Q,
+        Qf,
         R,
         inv(Σ),
         u_bounds,
@@ -371,7 +377,7 @@ function (QP::DynamicQuadraticProblem)(
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
-            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Σinv, QP.dims, QP.correction_term
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Qf, QP.Σinv, QP.dims, QP.correction_term
         )
         H = Hmle + Hreg
     else
@@ -431,6 +437,7 @@ end
     ΔY::MeasurementData,
     ∂g::Function,
     ∂²g::Function,
+    Qf::Float64,
     Σinv::AbstractMatrix,
     dims::NamedTuple,
     correction_term::Bool
@@ -460,6 +467,11 @@ end
 
         ∇ᵢmle = ΔY.ys[i]' * Σinv * ∂gᵢ
 
+        if i == dims.M
+            Hᵢmle *= Qf
+            ∇ᵢmle *= Qf
+        end
+
         ∇[slice(τᵢ, dims.x, dims.z)] = ∇ᵢmle
     end
 
@@ -470,6 +482,7 @@ end
     ΔY::MeasurementData,
     ∂gs::Vector{Matrix{Float64}},
     ∂²gs::Vector{Array{Float64}},
+    Qf::Float64,
     Σinv::AbstractMatrix,
     dims::NamedTuple,
     correction_term::Bool
@@ -499,6 +512,11 @@ end
 
         ∇ᵢmle = ΔY.ys[i]' * Σinv * ∂gᵢ
 
+        if i == dims.M
+            Hᵢmle *= Qf
+            ∇ᵢmle *= Qf
+        end
+
         ∇[slice(τᵢ, dims.x, dims.z)] = ∇ᵢmle
     end
 
@@ -515,61 +533,6 @@ end
     return C_x₁
 end
 
-
-
-
-
-# @inline function build_constraint_matrix(
-#     QP::QuadraticProblem,
-#     Ẑ::Trajectory,
-#     ΔY::MeasurementData,
-# )
-#     ∂F, ∂F_cons = build_dynamics_constraint_jacobian(Ẑ, ∂f, dims)
-
-#     C_u, u_lb, u_ub = build_constrols_constraint_matrix(u_bounds, dims)
-
-#     # constrain state matrix for state at time 1
-#     C_x₁ = sparse_hcat(
-#         I(QP.dims.x),
-#         spzeros(QP.dims.x, QP.dims.u + QP.dims.z * (QP.dims.T - 1))
-#     )
-
-#     if QP.mle
-#         A = sparse_vcat(∂F, C_u, C_x₁)
-#         lb = vcat(
-#             f_cons,
-#             u_lb,
-#             zeros(QP.dims.x)
-#         )
-#         ub = vcat(
-#             f_cons,
-#             u_ub,
-#             zeros(QP.dims.x)
-#         )
-#     else
-#         ∂G, ∂G_cons = build_measurement_constraint_jacobian(
-#             QP,
-#             Ẑ,
-#             ΔY
-#         )
-#         A = sparse_vcat(∂G, ∂F, C_u, C_x₁)
-#         g_cons = -vcat(ΔY.ys...)
-#         lb = vcat(
-#             ∂G_cons,
-#             ∂F_cons,
-#             u_lb,
-#             zeros(QP.dims.x)
-#         )
-#         ub = vcat(
-#             ∂G_cons,
-#             ∂F_cons,
-#             u_ub,
-#             zeros(QP.dims.x)
-#         )
-#     end
-
-#     return A, lb, ub
-# end
 
 @inline function build_controls_constraint_matrix(
     dims::NamedTuple
@@ -734,6 +697,7 @@ mutable struct ILCProblem
         experiment::QuantumExperiment;
         integrator=:FourthOrderPade,
         Q=1.0,
+        Qf=100.0,
         R=1.0,
         # identity matrix of Float64
         Σ=Diagonal(fill(1.0, experiment.ydim)),
@@ -787,7 +751,7 @@ mutable struct ILCProblem
             QP = StaticQuadraticProblem(
                 Ẑgoal,
                 f, experiment.g,
-                Q, R, Σ,
+                Q, Qf, R, Σ,
                 u_bounds,
                 correction_term,
                 QP_settings,
@@ -796,7 +760,7 @@ mutable struct ILCProblem
         else
             QP = DynamicQuadraticProblem(
                 f, experiment.g,
-                Q, R, Σ,
+                Q, Qf, R, Σ,
                 u_bounds,
                 correction_term,
                 QP_settings,
@@ -867,12 +831,15 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         U = prob.Ẑ.actions
         Ȳ = prob.experiment(U)
         ΔYnext = Ȳ - prob.Ygoal
-        if norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
+        if norm(ΔYnext.ys[end], prob.settings[:norm_p]) >
+            norm(ΔY.ys[end], prob.settings[:norm_p])
+
             println("   backtracking")
             println()
             i = 1
         end
-        while norm(ΔYnext, prob.settings[:norm_p]) > norm(ΔY, prob.settings[:norm_p])
+        while norm(ΔYnext.ys[end], prob.settings[:norm_p]) >
+            norm(ΔY.ys[end], prob.settings[:norm_p])
             if i > 10
                 println("   max backtracking iterations reached")
                 ΔY = ΔYnext

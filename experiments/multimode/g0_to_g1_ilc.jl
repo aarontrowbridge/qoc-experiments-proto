@@ -36,7 +36,7 @@ transmon_levels = 3
 cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
-χ = 1.3 * data.system.params[:χ]
+χ = 1.2 * data.system.params[:χ]
 
 experimental_system = MultiModeSystem(
     transmon_levels,
@@ -72,7 +72,8 @@ experiment = QuantumExperiment(
     # x -> x,
     g_pop,
     # [5:5:50; Ẑ.T];
-    [2:2:Ẑ.T; Ẑ.T];
+    [2:2:Ẑ.T - 10; Ẑ.T];
+    # [1:Ẑ.T ÷ 2; Ẑ.T];
     # 1:Ẑ.T;
     integrator=exp
 )
@@ -81,6 +82,7 @@ max_iter = 20
 fps = 2
 R = 200.0
 p = 1
+Qf = 1e1
 
 prob = ILCProblem(
     data.system,
@@ -93,7 +95,8 @@ prob = ILCProblem(
     norm_p=p,
     R=R,
     static_QP=true,
-    Q=0.0
+    Q=0.0,
+    Qf=Qf
 )
 
 solve!(prob)
