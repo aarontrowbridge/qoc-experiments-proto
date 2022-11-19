@@ -841,8 +841,8 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         # TODO: make jacobians constant about nominal trajectory
         if prob.settings[:verbose]
-            println("iter =   ", k)
-            println("|ΔY| =   ", norm(ΔY, prob.settings[:norm_p]))
+            println("iter =    ", k)
+            println("⟨|ΔY|⟩ =  ", (norm(ΔY, prob.settings[:norm_p])) / length(ΔY.ys))
             # println(
             #     "fidelity =  ",
             #     fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
@@ -868,6 +868,7 @@ function ProblemSolvers.solve!(prob::ILCProblem)
             norm(ΔY.ys[end], prob.settings[:norm_p])
             if i > prob.settings[:max_backtrack_iter]
                 println("   max backtracking iterations reached")
+                println()
                 ΔY = ΔYnext
                 return
             end

@@ -36,7 +36,7 @@ transmon_levels = 3
 cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
-χ = 1.3 * data.system.params[:χ]
+χ = 1.2 * data.system.params[:χ]
 
 experimental_system = MultiModeSystem(
     transmon_levels,
@@ -92,11 +92,10 @@ max_iter = 20
 max_backtrack_iter = 15
 fps = 2
 α = 0.5
-β = 0.5
-R = 20.0
-p = 1
-Qy = 1.0e1
-Qf = 2e2
+β = 1.0
+R = 1.0e1
+Qy = 1.0e2
+Qf = 1.0e2
 
 
 prob = ILCProblem(
@@ -106,7 +105,7 @@ prob = ILCProblem(
     max_iter=max_iter,
     QP_verbose=false,
     correction_term=true,
-    norm_p=p,
+    norm_p=1,
     R=R,
     static_QP=false,
     Qy=Qy,
