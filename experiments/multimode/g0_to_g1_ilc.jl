@@ -36,7 +36,7 @@ transmon_levels = 3
 cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
-χ = 1.2 * data.system.params[:χ]
+χ = 1.3 * data.system.params[:χ]
 
 experimental_system = MultiModeSystem(
     transmon_levels,
@@ -59,7 +59,14 @@ function g_pop(x)
         )
     )
     for i = 1:10
-        append!(y, x[i]^2 + x[i+3*cavity_levels]^2 + x[i + cavity_levels]^2 + x[i+4*cavity_levels]^2 + x[i + 2*cavity_levels]^2 + x[i + 5*cavity_levels]^2)
+        append!(y,
+            x[i]^2 +
+            x[i + 3 * cavity_levels]^2 +
+            x[i + cavity_levels]^2 +
+            x[i + 4 * cavity_levels]^2 +
+            x[i + 2 * cavity_levels]^2 +
+            x[i + 5 * cavity_levels]^2
+        )
         #append!(y, x[i + cavity_levels]^2 + x[i+3*cavity_levels]^2)
     end
     return convert(typeof(x), y)
@@ -71,7 +78,10 @@ experiment = QuantumExperiment(
     Ẑ.times,
     # x -> x,
     g_pop,
-    [5:5:50; Ẑ.T];
+    # [5:5:50; Ẑ.T];
+    # [10:10:100; Ẑ.T];
+    [25, 50, 75, Ẑ.T];
+    # [50, Ẑ.T];
     # [2:2:Ẑ.T - 10; Ẑ.T];
     # [1:Ẑ.T ÷ 2; Ẑ.T];
     # 1:Ẑ.T;
@@ -79,10 +89,15 @@ experiment = QuantumExperiment(
 )
 
 max_iter = 20
+max_backtrack_iter = 15
 fps = 2
-R = 200.0
+α = 0.5
+β = 0.5
+R = 20.0
 p = 1
-Qf = 1e1
+Qy = 1.0e1
+Qf = 2e2
+
 
 prob = ILCProblem(
     data.system,
@@ -90,13 +105,16 @@ prob = ILCProblem(
     experiment;
     max_iter=max_iter,
     QP_verbose=false,
-    QP_max_iter=100000,
     correction_term=true,
     norm_p=p,
     R=R,
     static_QP=false,
-    Q=0.0,
-    Qf=Qf
+    Qy=Qy,
+    Qf=Qf,
+    use_system_goal=true,
+    α=α,
+    β=β,
+    max_backtrack_iter=max_backtrack_iter,
 )
 
 solve!(prob)

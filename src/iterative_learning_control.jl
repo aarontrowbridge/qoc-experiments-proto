@@ -162,6 +162,7 @@ struct StaticQuadraticProblem <: QuadraticProblem
     ∂gs::Vector{Matrix{Float64}}
     ∂²gs::Vector{Array{Float64}}
     Σinv::AbstractMatrix{Float64}
+    Qy::Float64
     Qf::Float64
     u_bounds::Vector{Float64}
     correction_term::Bool
@@ -175,6 +176,7 @@ function StaticQuadraticProblem(
     f::Function,
     g::Function,
     Q::Float64,
+    Qy::Float64,
     Qf::Float64,
     R::Float64,
     Σ::AbstractMatrix{Float64},
@@ -226,6 +228,7 @@ function StaticQuadraticProblem(
         ∂gs,
         ∂²gs,
         inv(Σ),
+        Qy,
         Qf,
         u_bounds,
         correction_term,
@@ -252,7 +255,7 @@ function (QP::StaticQuadraticProblem)(
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
-            ΔY, QP.∂gs, QP.∂²gs, QP.Qf, QP.Σinv, QP.dims, QP.correction_term
+            ΔY, QP.∂gs, QP.∂²gs, QP.Qy, QP.Qf, QP.Σinv, QP.dims, QP.correction_term
         )
         H = Hmle + QP.Hreg
         A = QP.A
@@ -304,6 +307,7 @@ struct DynamicQuadraticProblem <: QuadraticProblem
     ∂g::Function
     ∂²g::Function
     Q::Float64
+    Qy::Float64
     Qf::Float64
     R::Float64
     Σinv::Union{Matrix{Float64}, Nothing}
@@ -318,6 +322,7 @@ function DynamicQuadraticProblem(
     f::Function,
     g::Function,
     Q::Float64,
+    Qy::Float64,
     Qf::Float64,
     R::Float64,
     Σ::AbstractMatrix{Float64},
@@ -342,6 +347,7 @@ function DynamicQuadraticProblem(
         ∂g,
         ∂²g,
         Q,
+        Qy,
         Qf,
         R,
         inv(Σ),
@@ -377,7 +383,7 @@ function (QP::DynamicQuadraticProblem)(
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
-            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Qf, QP.Σinv, QP.dims, QP.correction_term
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.Qy, QP.Qf, QP.Σinv, QP.dims, QP.correction_term
         )
         H = Hmle + Hreg
     else
@@ -437,6 +443,7 @@ end
     ΔY::MeasurementData,
     ∂g::Function,
     ∂²g::Function,
+    Q::Float64,
     Qf::Float64,
     Σinv::AbstractMatrix,
     dims::NamedTuple,
@@ -470,6 +477,9 @@ end
         if i == dims.M
             Hᵢmle *= Qf
             ∇ᵢmle *= Qf
+        else
+            Hᵢmle *= Q
+            ∇ᵢmle *= Q
         end
 
         ∇[slice(τᵢ, dims.x, dims.z)] = ∇ᵢmle
@@ -482,6 +492,7 @@ end
     ΔY::MeasurementData,
     ∂gs::Vector{Matrix{Float64}},
     ∂²gs::Vector{Array{Float64}},
+    Qy::Float64,
     Qf::Float64,
     Σinv::AbstractMatrix,
     dims::NamedTuple,
@@ -515,6 +526,9 @@ end
         if i == dims.M
             Hᵢmle *= Qf
             ∇ᵢmle *= Qf
+        else
+            Hᵢmle *= Qy
+            ∇ᵢmle *= Qy
         end
 
         ∇[slice(τᵢ, dims.x, dims.z)] = ∇ᵢmle
@@ -696,7 +710,8 @@ mutable struct ILCProblem
         Ẑgoal::Trajectory,
         experiment::QuantumExperiment;
         integrator=:FourthOrderPade,
-        Q=1.0,
+        Q=0.0,
+        Qy=1.0,
         Qf=100.0,
         R=1.0,
         # identity matrix of Float64
@@ -705,17 +720,24 @@ mutable struct ILCProblem
         correction_term=true,
         verbose=true,
         max_iter=100,
+        max_backtrack_iter=10,
         tol=1e-6,
+        α=0.5,
+        β=0.5,
         norm_p=Inf,
         static_QP=false,
-        QP_max_iter=1000,
+        QP_max_iter=100_000,
         QP_verbose=false,
         QP_settings=Dict(),
+        use_system_goal=false,
     )
         @assert length(u_bounds) == sys.ncontrols
 
         ILC_settings::Dict{Symbol, Any} = Dict(
             :max_iter => max_iter,
+            :max_backtrack_iter => max_backtrack_iter,
+            :α => α,
+            :β => β,
             :tol => tol,
             :norm_p => norm_p,
             :verbose => verbose,
@@ -740,10 +762,10 @@ mutable struct ILCProblem
             M=length(experiment.τs)
         )
 
-        f = zz -> begin
-            xₜ = zz[1:dims.x]
-            uₜ = zz[dims.x .+ (1:dims.u)]
-            xₜ₊₁ = zz[dims.z .+ (1:dims.x)]
+        f = zₜzₜ₊₁ -> begin
+            xₜ = zₜzₜ₊₁[1:dims.x]
+            uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+            xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
             return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
         end
 
@@ -751,7 +773,7 @@ mutable struct ILCProblem
             QP = StaticQuadraticProblem(
                 Ẑgoal,
                 f, experiment.g,
-                Q, Qf, R, Σ,
+                Q, Qy, Qf, R, Σ,
                 u_bounds,
                 correction_term,
                 QP_settings,
@@ -760,7 +782,7 @@ mutable struct ILCProblem
         else
             QP = DynamicQuadraticProblem(
                 f, experiment.g,
-                Q, Qf, R, Σ,
+                Q, Qy, Qf, R, Σ,
                 u_bounds,
                 correction_term,
                 QP_settings,
@@ -774,6 +796,10 @@ mutable struct ILCProblem
             experiment.τs,
             experiment.ydim
         )
+
+        if use_system_goal
+            Ygoal.ys[end] = experiment.g(sys.ψ̃goal[slice(1, sys.isodim)])
+        end
 
         # display(Ygoal.ys[end])
         # println()
@@ -815,16 +841,16 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         # TODO: make jacobians constant about nominal trajectory
         if prob.settings[:verbose]
-            println("iter =  ", k)
-            println("|ΔY| =  ", norm(ΔY, prob.settings[:norm_p]))
+            println("iter =   ", k)
+            println("|ΔY| =   ", norm(ΔY, prob.settings[:norm_p]))
             # println(
             #     "fidelity =  ",
             #     fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
             # )
-            println("|ΔY_T| = ", norm(ΔY.ys[end], prob.settings[:norm_p]))
+            println("|ΔY(T)| = ", norm(ΔY.ys[end], prob.settings[:norm_p]))
             println()
         end
-        ΔZ = prob.QP(prob.Ẑ, ΔY)
+        ΔZ = prob.settings[:β] * prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
         # println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
         # println()
@@ -840,19 +866,19 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         while norm(ΔYnext.ys[end], prob.settings[:norm_p]) >
             norm(ΔY.ys[end], prob.settings[:norm_p])
-            if i > 10
+            if i > prob.settings[:max_backtrack_iter]
                 println("   max backtracking iterations reached")
                 ΔY = ΔYnext
                 return
             end
             prob.Ẑ = prob.Ẑ - ΔZ
-            ΔZ = 0.5 * ΔZ
+            ΔZ = prob.settings[:α] * ΔZ
             prob.Ẑ = prob.Ẑ + ΔZ
             U = prob.Ẑ.actions
             Ȳ = prob.experiment(U)
             ΔYnext = Ȳ - prob.Ygoal
             println("       iter =   $i")
-            println("       |ΔY_t| = ", norm(ΔYnext.ys[end], prob.settings[:norm_p]))
+            println("       |ΔY(T)| = ", norm(ΔYnext.ys[end], prob.settings[:norm_p]))
             println()
             i += 1
         end

@@ -816,6 +816,7 @@ function animate_ILC_multimode(
 
     series!(Ygoalax, τs, Ygoal;
         color=color,
+        markersize=5
     )
 
     # axislegend(Ygoalax; position=:lb)
@@ -824,6 +825,7 @@ function animate_ILC_multimode(
 
     Ȳsp = series!(Ȳax, τs, Ȳ₁;
         color=color,
+        markersize=5
     )
 
     # axislegend(Ȳax; position=:lb)
@@ -834,6 +836,7 @@ function animate_ILC_multimode(
 
     ΔYsp = series!(ΔYax, τs, ΔY₁;
         color=color,
+        markersize=5
     )
 
     autolimits!(ΔYax)
