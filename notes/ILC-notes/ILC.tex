@@ -9,7 +9,7 @@
 
 \newcommand{\isopsi}{\tilde \psi}
 
-\title{Iterative Learning Control with Measurements}
+\title{Iterative Learning Control with \\ Nonlinear Measurements}
 \author{Aaron Trowbridge}
 \date{}
 
@@ -58,7 +58,7 @@ $$
 For example, if $g(x) = x$ is the identity function, i.e. we are trying to track the trajectory:
 
 $$
-\Delta x = - 
+\Delta x = -e 
 $$
 
 The real problem involves finding the corresponding correction to the controls: $\Delta u(t)$. This involves setting up a quadratic optimization problem.
@@ -79,23 +79,23 @@ With $\Delta y \equiv \bar y - \hat y$, we have
 \begin{align*}
   \bar y &= g(\bar x) \\
   &= g(\hat x + e) \\ 
-  &\approx g(\hat x) + \nabla g(\hat x) \cdot e \\
-  &= \hat y + \nabla g(\hat x) \cdot e  
+  &\approx g(\hat x) + \pdv{g}{\hat x} \cdot e \\
+  &= \hat y + \pdv{g}{\hat x} \cdot e  
 \end{align*}
 
  
-which, with writing $\nabla \hat g = \nabla g(\hat x)$ yields
+which, with writing $\hat M = \pdv*{g}{\hat x} $ yields
 
 $$
-\Delta y \approx \nabla \hat g \cdot e 
+\Delta y \approx \hat M \cdot e 
 $$
 
 
-and since $g: \mathbb{R}^n \to \mathbb{R}^m$ where $m \leq n$, $\nabla g$ is not necessarily invertible, but we can use the Moore-Penrose pseudoinverse here to get a guess for $e$:
+and since $g: \mathbb{R}^n \to \mathbb{R}^m$ where $m \leq n$, $\hat M \in \mathbb{R}^{m \times n}$ is not necessarily invertible, but we can use the Moore-Penrose pseudoinverse here to get a guess for $e$:
 
 $$
 \boxed{
-e \approx \qty(\nabla \hat g)^+ \cdot \Delta y \equiv \hat e 
+e \approx \hat M^+ \cdot \Delta y \equiv \hat e 
 }
 $$
 
@@ -105,7 +105,8 @@ To tie the experimental measurements to the model measurements we require
 
 \begin{align*}
 \hat y &= g(\bar x + \Delta x) \\ 
-&\approx \bar y + \nabla g(\bar x) \cdot \Delta x \\
+&\approx \bar y + \pdv{g}{\bar x} \cdot \Delta x \\
+&= \bar y + \bar M \cdot \Delta x
 \end{align*}
 
 
@@ -113,7 +114,7 @@ which yields the condition
 
 \begin{equation}
   \boxed{
-  \nabla g(\bar x) \cdot \Delta x = - \Delta y
+  \bar M \cdot \Delta x = - \Delta y
   }
 \end{equation}
 
@@ -122,13 +123,17 @@ which yields the condition
 where
 
 \begin{align*}
-  \nabla g(\bar x)_i^j &= \nabla g(\hat x + e)_i^j \\
-  & \approx  \nabla g(\hat x + \hat e)_i^j \\
-  &= \nabla g(\hat x)_i^j + \sum_k \qty(\nabla^2 g(\hat x))_i^{jk} \ \hat e_k \\
-  &= \nabla \hat g_i^j + \sum_{kl} \qty(\nabla^2 \hat g)_i^{jk} \ \qty(\qty(\nabla \hat g)^+)_k^l \Delta y_l 
+  \bar M_i^j &= \partial g(\hat x + e)_i^j \\
+  & \approx  \partial g(\hat x + \hat e)_i^j \\
+  & \approx \partial g(\hat x)_i^j + \sum_k \qty(\partial^2 g(\hat x))_i^{jk} \ \hat e_k \\
+  &= \hat M_i^j + \sum_{kl} \qty(\partial^2 g(\hat x))_i^{jk} \ \qty(\hat M^+)_k^l \Delta y_l 
 \end{align*}
 
-\newpage
+where 
+$$
+\partial g(\cdot) = \eval{\pdv{g}{x}}_{x = \cdot} 
+$$
+
 \subsubsection*{State Correction to Control Correction}
 
 To propagate the state correction to the control correction, we utilize the dynamics constraint, $f(z_t, z_{t+1}) = 0$, where we define the \textit{knot point} 
@@ -142,15 +147,15 @@ Let's write $\vb{z}_t = \mqty(z_t \\ z_{t+1})$. Then we have
 
 \begin{align*}
 0 &= f( \hat{\vb{z}}_t + \Delta {\vb{z}}_t) \\
-&\approx f(\hat{\vb{z}}_t) + \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t \\
+&\approx f(\hat{\vb{z}}_t) + \partial f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t \\
 \end{align*}
 
 
-which yields
+which yields, with $\hat D = \partial f(\hat{\vb{z}}_t)$
 
 \begin{equation}
   \boxed{
-  \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0
+  \hat D \cdot \Delta {\vb{z}}_t = 0
   }
 \end{equation}
 
@@ -161,8 +166,9 @@ We seek to find the solution to
 
 \begin{align*}
   \underset{\Delta x_{1:T},\ \Delta u_{1:T}}{\text{minimize}} & \quad \frac{1}{2} \sum_t \Delta x^\top_t Q \Delta x_t + \Delta u^\top_t R \Delta u_t \\
-  \text{subject to} \ & \quad \nabla g(\bar x_\tau) \cdot \Delta x_\tau = - \Delta y_\tau \quad \forall \tau \\
-  & \quad \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0 \quad \forall t
+  \text{subject to} \ & 
+  \quad \bar M \cdot \Delta x_\tau = - \Delta y_\tau \quad \forall \tau \\
+  & \quad \hat D \cdot \Delta {\vb{z}}_t = 0 \quad \forall t
 \end{align*}
 
 
@@ -183,7 +189,6 @@ $$
 }
 $$
 
-\newpage
 \subsubsection*{KKT Matrix (for just single quantum state and controls)}
 
 Below we use:
@@ -219,27 +224,27 @@ and $A$ is the constraint Jacobian:
 
 $$
 A = \mqty(
-  \nabla F \\
-  \nabla G
+  \partial F \\
+  \partial G
 )
 $$
 
 with 
 
 $$
-\nabla F = \mqty(
-  \nabla f(\hat{\vb{z}}_1) \\
+\partial F = \mqty(
+  \partial f(\hat{\vb{z}}_1) \\
   & \ddots \\
-  & & \nabla f(\hat{\vb{z}}_{T-1})
+  & & \partial f(\hat{\vb{z}}_{T-1})
 ) \in \mathbb{R}^{d (T - 1) \times n T}
 $$
 
 and
 
 $$
-\nabla G = \mqty(
+\partial G = \mqty(
   \ddots \\
-  & \nabla g(\bar x_{\tau}) \ \vb{0}^{m \times (a + c)} \\
+  & \partial g(\bar x_{\tau}) \ \vb{0}^{m \times (a + c)} \\
   & & \ddots
 ) \in \mathbb{R}^{m M \times n T}
 $$
@@ -251,9 +256,9 @@ where $\tau = t_1, \dots, t_M$ are the measurement times.
 For the constraints we then have
 
 $$
-\nabla F \cdot \Delta Z = 0
+\partial F \cdot \Delta Z = 0
 \quad \text{and} \quad
-\nabla G \cdot \Delta Z = - \Delta Y
+\partial G \cdot \Delta Z = - \Delta Y
 $$
 
 where again
@@ -262,37 +267,35 @@ $$
 \Delta Y = \bar Y - \hat Y
 $$
 
-\newpage
-
 \section*{An Alternative Quadratic Problem}
 
-In the regime of noisy measurements, satisfying both the dynamics constraints and the measurement constraints becomes infeasible. To overcome this we we can relax the measurement into a maximum likelihood problem.  To see this let's write
+In the regime of noisy measurements, satisfying both the dynamics constraints and the measurement constraints becomes infeasible. To overcome this we we can relax the measurement into a maximum likelihood problem by assuming additive gaussian noise $w \sim \mathcal{N}(0, \Sigma)$.  To see this let's write
 
 \begin{align*}
-\bar y = \hat y - \nabla g \cdot \Delta x &\implies \bar y \sim \mathcal{N}(\hat y - \nabla g \cdot \Delta x, \Sigma) \\ 
-&\implies \Delta y \sim \mathcal{N}(-\nabla g \cdot \Delta x, \Sigma) \\
+\bar y = \hat y - M \cdot \Delta x + w &\implies \bar y \sim \mathcal{N}(\hat y - M \cdot \Delta x, \Sigma) \\ 
+&\implies \Delta y \sim \mathcal{N}(-M \cdot \Delta x, \Sigma) \\
 \end{align*}
 
-where $\Sigma$ is the covariance matrix of the measurement noise, which we can get from the experiment.  To make the following clearer, let's define the parameterized distribution over $\Delta y$ as
+where $\Sigma$ is the covariance matrix of the measurement noise, which we can get from the experiment.  To make the following clearer, let's define the parameterized distribution over $\Delta y$ s.t. 
 
 $$
-p(\Delta x) = \mathcal{N}(-\nabla g \cdot \Delta x, \Sigma)
+\Delta y \sim p(\Delta x) = \mathcal{N}(-M \cdot \Delta x, \Sigma)
 $$
 
 then, given an observation $\bar y$, we can find the MLE for the parameter $\Delta x$ as the solution to the following optimization problem:
 
 \begin{align*}
-\max_{\Delta x} \ \log p(\Delta x) \ &\implies \ \min_{\Delta x} \ \frac{1}{2} \qty(\Delta y + \nabla g \cdot \Delta x)^\top \Sigma^{-1} \qty(\Delta y + \nabla g \cdot \Delta x) \\
-&\implies \ \min_{\Delta x} \ \frac{1}{2} \Delta x^\top \nabla g^\top \Sigma^{-1} \nabla g \Delta x + \Delta y^\top \Sigma^{-1} \nabla g \Delta x 
+\max_{\Delta x} \ \log p(\Delta x) \ &\implies \ \min_{\Delta x} \ \frac{1}{2} \qty(\Delta y + M \cdot \Delta x)^\top \Sigma^{-1} \qty(\Delta y + M \cdot \Delta x) \\
+&\implies \ \min_{\Delta x} \ \frac{1}{2} \Delta x^\top \qty(M^\top \Sigma^{-1} M) \Delta x + \qty(\Delta y^\top \Sigma^{-1} M) \Delta x 
 \end{align*}
 
 We can then augment our initial problem with this objective term and remove the measurement constraint.  This yields the following problem:
 
 \begin{align*}
   \underset{\Delta x_{1:T},\ \Delta u_{1:T}}{\text{minimize}} & \quad \frac{1}{2} \sum_t \Delta x^\top_t Q \Delta x_t + \Delta u^\top_t R \Delta u_t \\
-  & \quad + \sum_\tau \frac{1}{2} \Delta x_\tau^\top \qty(\nabla g^\top \Sigma^{-1} \nabla g) \Delta x_\tau + \qty(\Delta y_\tau^\top \Sigma^{-1} \nabla g) \Delta x_\tau \\
+  & \quad + \sum_\tau \frac{1}{2} \Delta x_\tau^\top \qty(M_\tau^\top \Sigma^{-1} M_\tau) \Delta x_\tau + \qty(\Delta y_\tau^\top \Sigma^{-1} M_\tau) \Delta x_\tau \\
   \text{subject to} \ 
-  & \quad \nabla f(\hat{\vb{z}}_t) \cdot \Delta {\vb{z}}_t = 0 \quad \forall t \\
+  & \quad \hat D \cdot \Delta {\vb{z}}_t = 0 \quad \forall t \\
   & \quad -u_\text{max} - \hat u_t < \Delta u_t < u_\text{max} - \hat u_t \\
   & \quad \Delta u_1 = \Delta u_T = 0
 \end{align*}
@@ -301,12 +304,15 @@ We can then augment our initial problem with this objective term and remove the 
 
 \section*{ILC Algorithm}
 
+Tying everything together, \textit{iterative learning control} (ILC) solves the aforementioned quadratic problem and updates the trajectory iteratively until convergence.  The following algorithm codifies this: 
+
 \begin{algorithm}
   \caption{Iterative Control Learning}
   \KwData{
     $\hat Z^\text{goal}$,
     $\textsf{tol} > 0$,
-    $\textsf{max\_iter} \gg 0$
+    $\alpha = 0.5$,
+    $\beta = 0.1$,
 }
   \KwResult{$U$}
   $Y^\text{goal} \gets \textsf{measure}(\hat Z^\text{goal}) = \text{vec}(y_{\tau_1:\tau_M})$\\
@@ -316,11 +322,18 @@ We can then augment our initial problem with this objective term and remove the 
   $\Delta Y \gets \bar Y - Y^\text{goal}$ \\
   $k \gets 1$\\
   \While{$\qty|\Delta Y| > \textsf{tol}$}{
-    \If{$k > \textsf{max\_iter}$}{
-      \textbf{break} 
-    }
-    $\Delta Z \gets \textsf{QuadraticProblem}(\hat Z, \Delta Y)$\\
-    $\hat Z \gets \hat Z + \Delta Z $\\
+    $\Delta Z \gets \beta \cdot \textsf{QuadraticProblem}(\hat Z, \Delta Y)$\\
+    $\hat Z_{\text{next}} \gets \hat Z + \Delta Z $\\
+    $\bar y_{T, \text{next}} \gets \textsf{measure\_final\_state}(\hat Z_{\text{next}})$\\
+    $\Delta y_{T,\text{next}} \gets \bar y_{T, \text{next}} - \bar y_{T, \text{goal}}$\\
+    
+    \While{$\norm{\Delta y_{T,\text{next}}}_p > \norm{\Delta y_{T}}$\tcp*{Backtracking line search}}{
+      $\Delta Z \gets \alpha \cdot \Delta Z$\\
+      $\hat Z_{\text{next}} \gets \hat Z + \Delta Z $\\
+      $\bar y_{T, \text{next}} \gets \textsf{measure\_final\_state}(\hat Z_{\text{next}})$\\
+      $\Delta y_{T,\text{next}} \gets \bar y_{T, \text{next}} - \bar y_{T, \text{goal}}$\\
+    } 
+    $\hat Z \gets \hat Z_{\text{next}}$\\
     $U \gets \textsf{controls}(\hat Z)$\\
     $\bar Y \gets \textsf{experiment}(U)$\\
     $\Delta Y \gets \bar Y - Y^\text{goal}$\\
