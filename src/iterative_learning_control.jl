@@ -76,7 +76,20 @@ function measure(
     return MeasurementData(ys, τs, ydim)
 end
 
-struct QuantumExperiment
+abstract type AbstractExperiment end
+
+struct HardwareExperiment <: AbstractExperiment
+    g_hardware::Function
+    g_analytic::Function
+    τs::AbstractVector{Int}
+    ydim::Int
+end
+
+function (experiment::HardwareExperiment)(us::Vector{Vector{Float64}})
+    return experiment.g_hardware(us)
+end
+
+struct QuantumExperiment <: AbstractExperiment
     ψ̃₁::Vector{Float64}
     ts::Vector{Float64}
     g::Function
@@ -702,8 +715,121 @@ mutable struct ILCProblem
     Ygoal::MeasurementData
     Ȳs::Vector{MeasurementData}
     Us::Vector{Matrix{Float64}}
-    experiment::QuantumExperiment
+    experiment::AbstractExperiment
     settings::Dict{Symbol, Any}
+
+    function ILCProblem(
+        sys::QuantumSystem,
+        Ẑgoal::Trajectory,
+        experiment::HardwareExperiment,
+        end_state_goal::Vector{Float64};
+        integrator=:FourthOrderPade,
+        Q=0.0,
+        Qy=1.0,
+        Qf=100.0,
+        R=1.0,
+        # identity matrix of Float64
+        Σ=Diagonal(fill(1.0, experiment.ydim)),
+        u_bounds=sys.a_bounds,
+        correction_term=true,
+        verbose=true,
+        max_iter=100,
+        max_backtrack_iter=10,
+        tol=1e-6,
+        α=0.5,
+        β=0.5,
+        norm_p=Inf,
+        static_QP=false,
+        QP_max_iter=100_000,
+        QP_verbose=false,
+        QP_settings=Dict(),
+        use_system_goal=false,
+    )
+        @assert length(u_bounds) == sys.ncontrols
+
+        ILC_settings::Dict{Symbol, Any} = Dict(
+            :max_iter => max_iter,
+            :max_backtrack_iter => max_backtrack_iter,
+            :α => α,
+            :β => β,
+            :tol => tol,
+            :norm_p => norm_p,
+            :verbose => verbose,
+        )
+
+        QP_kw_settings::Dict{Symbol, Any} = Dict(
+            :max_iter => QP_max_iter,
+            :verbose => QP_verbose,
+        )
+
+        QP_settings::Dict{Symbol, Any} =
+            merge(QP_kw_settings, QP_settings)
+
+        dynamics = eval(integrator)(sys)
+
+        dims = (
+            x=size(Ẑgoal.states[1], 1),
+            u=size(Ẑgoal.actions[1], 1),
+            z=size(Ẑgoal.states[1], 1) + size(Ẑgoal.actions[1], 1),
+            y=experiment.ydim,
+            T=Ẑgoal.T,
+            M=length(experiment.τs)
+        )
+
+        f = zₜzₜ₊₁ -> begin
+            xₜ = zₜzₜ₊₁[1:dims.x]
+            uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+            xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
+            return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
+        end
+
+        if static_QP
+            QP = StaticQuadraticProblem(
+                Ẑgoal,
+                f, experiment.g_analytic,
+                Q, Qy, Qf, R, Σ,
+                u_bounds,
+                correction_term,
+                QP_settings,
+                dims
+            )
+        else
+            QP = DynamicQuadraticProblem(
+                f, experiment.g_analytic,
+                Q, Qy, Qf, R, Σ,
+                u_bounds,
+                correction_term,
+                QP_settings,
+                dims
+            )
+        end
+
+        Ygoal = measure(
+            Ẑgoal,
+            experiment.g_analytic,
+            experiment.τs,
+            experiment.ydim
+        )
+
+        if use_system_goal
+            Ygoal.ys[end] = experiment.g_analytic(sys.ψ̃goal[slice(1, sys.isodim)])
+        end
+
+        # display(Ygoal.ys[end])
+        # println()
+        # display(Ẑgoal.states[end])
+
+        return new(
+            Ẑgoal,
+            Ẑgoal,
+            QP,
+            Ygoal,
+            MeasurementData[],
+            Matrix{Float64}[],
+            experiment,
+            ILC_settings
+        )
+    end
 
     function ILCProblem(
         sys::QuantumSystem,
