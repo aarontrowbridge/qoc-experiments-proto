@@ -39,6 +39,31 @@ using SparseArrays
     return [δψ̃s; δaugs]
 end
 
+@views function dynamics_sep(
+    xₜ₊₁::AbstractVector{R},
+    xₜ::AbstractVector{R},
+    uₜ::AbstractVector{R},
+    Δt::Real,
+    P::QuantumIntegrator,
+    sys::QuantumSystem
+)::Vector{R} where R <: Real
+    augsₜ = xₜ[(sys.n_wfn_states + 1):end]
+    augsₜ₊₁ = xₜ₊₁[(sys.n_wfn_states + 1):end]
+    da_augs_tt1 =  augsₜ[(sys.ncontrols + 1):end] + Δt * uₜ
+    a_augs_tt1 = augsₜ[1:sys.ncontrols] +  Δt * da_augs_tt1
+    δaugs = augsₜ₊₁ - [a_augs_tt1; da_augs_tt1]
+    δψ̃s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
+    aₜ = augsₜ[slice(1 + sys.∫a, sys.ncontrols)]
+    for i = 1:sys.nqstates
+        ψ̃ⁱ_slice = slice(i, sys.isodim)
+        ψ̃ⁱₜ = xₜ[ψ̃ⁱ_slice]
+        ψ̃ⁱₜ₊₁ = xₜ₊₁[ψ̃ⁱ_slice]
+        δψ̃s[ψ̃ⁱ_slice] = P(ψ̃ⁱₜ₊₁, ψ̃ⁱₜ, aₜ, Δt)
+    end
+    return [δψ̃s; δaugs]
+end
+
+
 @views function fₜ(
     zₜ::AbstractVector{R},
     zₜ₊₁::AbstractVector{R},

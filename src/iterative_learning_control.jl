@@ -17,6 +17,7 @@ using ..Integrators
 using ..Utils
 using ..ProblemSolvers
 using ..QuantumLogic
+using ..Dynamics
 
 using LinearAlgebra
 using SparseArrays
@@ -86,6 +87,7 @@ struct QuantumExperiment
     G_drift::AbstractMatrix{Float64}
     G_drives::Vector{AbstractMatrix{Float64}}
     G_error_term::AbstractMatrix{Float64}
+    d2u::Bool
 end
 
 function QuantumExperiment(
@@ -95,7 +97,8 @@ function QuantumExperiment(
     g::Function,
     τs::AbstractVector{Int};
     G_error_term=zeros(size(sys.G_drift)),
-    integrator=exp
+    integrator=exp,
+    d2u=false
 )
     ydim = size(g(ψ̃₁), 1)
     return QuantumExperiment(
@@ -107,7 +110,8 @@ function QuantumExperiment(
         integrator,
         sys.G_drift,
         sys.G_drives,
-        G_error_term
+        G_error_term,
+        d2u
     )
 end
 
@@ -121,10 +125,25 @@ function (experiment::QuantumExperiment)(
 )::MeasurementData
 
     T = length(U)
-
+    udim = length(U[1])
     Ψ̃ = Vector{typeof(experiment.ψ̃₁)}(undef, T)
-    Ψ̃[1] = experiment.ψ̃₁
+    Ψ̃[1] = experiment.d2u ? experiment.ψ̃₁[1: end - 2*udim] : experiment.ψ̃₁
 
+
+    # if experiment.d2u
+    #     for t = 2:T
+    #         Gₜ = Integrators.G(
+    #             Ψ̃[t - 1][end - 2*udim + 1:end-udim],
+    #             experiment.G_drift,
+    #             experiment.G_drives
+    #         ) + experiment.G_error_term
+
+    #         Δt = experiment.ts[t] - experiment.ts[t - 1]
+
+    #         Ψ̃[t] = [experiment.integrator(Gₜ * Δt) * Ψ̃[t - 1][1:end-2*udim]; 
+    #                 (Ψ̃[t - 1][end - 2*udim + 1:end] + Δt .* [Ψ̃[t - 1][end - udim + 1:end]; U[t-1]])]
+    #     end
+    # else 
     for t = 2:T
         Gₜ = Integrators.G(
             U[t - 1],
@@ -136,6 +155,7 @@ function (experiment::QuantumExperiment)(
 
         Ψ̃[t] = experiment.integrator(Gₜ * Δt) * Ψ̃[t - 1]
     end
+    #end
 
     Ȳ = measure(
         Ψ̃,
@@ -169,6 +189,8 @@ struct StaticQuadraticProblem <: QuadraticProblem
     mle::Bool
     dims::NamedTuple
     settings::Dict{Symbol, Any}
+    d2u::Bool
+    d2u_bounds::Vector{Float64}
 end
 
 function StaticQuadraticProblem(
@@ -184,7 +206,9 @@ function StaticQuadraticProblem(
     correction_term::Bool,
     settings::Dict{Symbol, Any},
     dims::NamedTuple;
-    mle=true
+    mle=true,
+    d2u=false,
+    d2u_bounds=fill(1e-5, length(u_bounds))
 )
     @assert size(Σ, 1) == size(Σ, 2) == dims.y
 
@@ -215,10 +239,15 @@ function StaticQuadraticProblem(
         push!(∂²gs, ∂²g(Ẑgoal.states[t]))
     end
 
-    C_u = build_controls_constraint_matrix(dims)
+    C_u = build_controls_constraint_matrix(dims, d2u=d2u)
     C_x₁ = build_initial_state_constraint_matrix(dims)
 
-    A = sparse_vcat(∂F, C_u, C_x₁)
+    if d2u 
+        C_d2u = build_d2u_constraint_matrix(dims)
+        A = sparse_vcat(∂F, C_u, C_d2u, C_x₁)
+    else 
+        A = sparse_vcat(∂F, C_u, C_x₁)
+    end
 
     Hreg = build_regularization_hessian(Q, R, dims)
 
@@ -234,7 +263,9 @@ function StaticQuadraticProblem(
         correction_term,
         mle,
         dims,
-        settings
+        settings,
+        d2u,
+        d2u_bounds
     )
 end
 
@@ -244,14 +275,19 @@ function (QP::StaticQuadraticProblem)(
 )
     model = OSQP.Model()
 
-    C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims)
+    C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims, d2u=QP.d2u)
 
     ∂F_cons = zeros(QP.dims.x * (QP.dims.T - 1))
 
     C_x₁_cons = zeros(QP.dims.x)
-
-    lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
-    ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
+    if QP.d2u
+        C_d2u_lb, C_d2u_ub = build_d2u_constraint_bounds(Ẑ, QP.dims, d2u_bounds = QP.d2u_bounds)
+        lb = vcat(∂F_cons, C_u_lb, C_d2u_lb, C_x₁_cons)
+        ub = vcat(∂F_cons, C_u_ub, C_d2u_ub, C_x₁_cons)
+    else
+        lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
+        ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
+    end
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
@@ -316,6 +352,8 @@ struct DynamicQuadraticProblem <: QuadraticProblem
     settings::Dict{Symbol, Any}
     dims::NamedTuple
     mle::Bool
+    d2u::Bool
+    d2u_bounds::Vector{Float64}
 end
 
 function DynamicQuadraticProblem(
@@ -329,7 +367,9 @@ function DynamicQuadraticProblem(
     u_bounds::Vector{Float64},
     correction_term::Bool,
     settings::Dict{Symbol, Any},
-    dims::NamedTuple
+    dims::NamedTuple;
+    d2u=false,
+    d2u_bounds=fill(1e-5, length(u_bounds))
 )
     @assert size(Σ, 1) == size(Σ, 2) == dims.y
 
@@ -355,7 +395,9 @@ function DynamicQuadraticProblem(
         correction_term,
         settings,
         dims,
-        !isnothing(Σ)
+        !isnothing(Σ),
+        d2u,
+        d2u_bounds
     )
 end
 
@@ -370,16 +412,27 @@ function (QP::DynamicQuadraticProblem)(
     ∂F = build_dynamics_constraint_jacobian(Ẑ, QP.∂f, QP.dims)
     ∂F_cons = zeros(size(∂F, 1))
 
-    C_u = build_controls_constraint_matrix(QP.dims)
-    C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims)
+    C_u = build_controls_constraint_matrix(QP.dims, d2u = QP.d2u)
+    C_u_lb, C_u_ub = build_controls_constraint_bounds(Ẑ, QP.u_bounds, QP.dims, d2u = QP.d2u)
 
+    
     C_x₁ = build_initial_state_constraint_matrix(QP.dims)
     C_x₁_cons = zeros(size(C_x₁, 1))
 
-    A = sparse_vcat(∂F, C_u, C_x₁)
+    if QP.d2u
+        C_d2u = build_d2u_constraint_matrix(QP.dims)
+        C_d2u_lb, C_d2u_ub = build_d2u_constraint_bounds(Ẑ, QP.dims, d2u_bounds = QP.d2u_bounds)
 
-    lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
-    ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
+        A = sparse_vcat(∂F, C_u, C_d2u, C_x₁)
+
+        lb = vcat(∂F_cons, C_u_lb, C_d2u_lb, C_x₁_cons)
+        ub = vcat(∂F_cons, C_u_ub, C_d2u_ub, C_x₁_cons)
+    else 
+        A = sparse_vcat(∂F, C_u, C_x₁)
+
+        lb = vcat(∂F_cons, C_u_lb, C_x₁_cons)
+        ub = vcat(∂F_cons, C_u_ub, C_x₁_cons)
+    end
 
     if QP.mle
         Hmle, ∇ = build_mle_hessian_and_gradient(
@@ -549,15 +602,90 @@ end
 
 
 @inline function build_controls_constraint_matrix(
-    dims::NamedTuple
+    dims::NamedTuple;
+    d2u=false
 )
+
     C_u = spzeros(
         dims.u * dims.T,
         dims.z * dims.T
     )
+    if d2u
+        for t = 1:dims.T
+            C_u[
+                slice(
+                    t,
+                    dims.u
+                ),
+                slice(
+                    t,
+                    dims.x - 2*dims.u + 1,
+                    dims.x - dims.u,
+                    dims.z
+                )
+            ] = sparse(I(dims.u))
+        end
+    else
+        for t = 1:dims.T
+            C_u[
+                slice(
+                    t,
+                    dims.u
+                ),
+                slice(
+                    t,
+                    dims.x + 1,
+                    dims.z,
+                    dims.z
+                )
+            ] = sparse(I(dims.u))
+        end
+    end
+    return C_u
+end
 
+@inline function build_controls_constraint_bounds(
+    Ẑ::Trajectory,
+    u_bounds::Vector,
+    dims::NamedTuple;
+    d2u=false
+)
+    if d2u
+        a_inds = (dims.x - 2*dims.u + 1):(dims.x - dims.u)
+
+        C_u_lb = -foldr(vcat, fill(u_bounds, dims.T - 2)) -
+        vcat([Ẑ.states[t][a_inds] for t = 2:dims.T - 1]...)
+
+        C_u_ub = foldr(vcat, fill(u_bounds, dims.T - 2)) -
+        vcat([Ẑ.states[t][a_inds] for t = 2:dims.T - 1]...)
+
+        C_u_lb = [zeros(dims.u); C_u_lb; zeros(dims.u)]
+
+        C_u_ub = [zeros(dims.u); C_u_ub; zeros(dims.u)]
+    else 
+        C_u_lb = -foldr(vcat, fill(u_bounds, dims.T - 2)) -
+            vcat(Ẑ.actions[2:dims.T - 1]...)
+
+        C_u_ub = foldr(vcat, fill(u_bounds, dims.T - 2)) -
+            vcat(Ẑ.actions[2:dims.T - 1]...)
+
+        C_u_lb = [zeros(dims.u); C_u_lb; zeros(dims.u)]
+
+        C_u_ub = [zeros(dims.u); C_u_ub; zeros(dims.u)]
+    end
+    return C_u_lb, C_u_ub
+end
+
+
+@inline function build_d2u_constraint_matrix( 
+    dims::NamedTuple
+)
+    C_d2u = spzeros(
+        dims.u * dims.T,
+        dims.z * dims.T
+    )
     for t = 1:dims.T
-        C_u[
+        C_d2u[
             slice(
                 t,
                 dims.u
@@ -570,26 +698,25 @@ end
             )
         ] = sparse(I(dims.u))
     end
-    return C_u
+    return C_d2u
 end
 
-@inline function build_controls_constraint_bounds(
+
+@inline function build_d2u_constraint_bounds(
     Ẑ::Trajectory,
-    u_bounds::Vector,
-    dims::NamedTuple
+    dims::NamedTuple;
+    d2u_bounds = fill(1e-5, dims.u)
 )
-    C_u_lb = -foldr(vcat, fill(u_bounds, dims.T - 2)) -
-        vcat(Ẑ.actions[2:dims.T - 1]...)
+    C_d2u_lb = -foldr(vcat, fill(d2u_bounds, dims.T)) -
+    vcat(Ẑ.actions[1:dims.T]...)
 
-    C_u_ub = foldr(vcat, fill(u_bounds, dims.T - 2)) -
-        vcat(Ẑ.actions[2:dims.T - 1]...)
+    C_d2u_ub = foldr(vcat, fill(d2u_bounds, dims.T)) -
+    vcat(Ẑ.actions[1:dims.T]...)
 
-    C_u_lb = [zeros(dims.u); C_u_lb; zeros(dims.u)]
-
-    C_u_ub = [zeros(dims.u); C_u_ub; zeros(dims.u)]
-
-    return C_u_lb, C_u_ub
+    return C_d2u_lb, C_d2u_ub
 end
+
+
 
 @inline function build_measurement_constraint_jacobian(
     Ẑ::Trajectory,
@@ -704,6 +831,7 @@ mutable struct ILCProblem
     Us::Vector{Matrix{Float64}}
     experiment::QuantumExperiment
     settings::Dict{Symbol, Any}
+    d2u::Bool
 
     function ILCProblem(
         sys::QuantumSystem,
@@ -730,6 +858,8 @@ mutable struct ILCProblem
         QP_verbose=false,
         QP_settings=Dict(),
         use_system_goal=false,
+        d2u=false,
+        d2u_bounds=fill(1e-5, length(u_bounds))
     )
         @assert length(u_bounds) == sys.ncontrols
 
@@ -762,12 +892,30 @@ mutable struct ILCProblem
             M=length(experiment.τs)
         )
 
-        f = zₜzₜ₊₁ -> begin
-            xₜ = zₜzₜ₊₁[1:dims.x]
-            uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
-            xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
-            return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
+        if d2u
+            f = zₜzₜ₊₁ -> begin 
+                xₜ = zₜzₜ₊₁[1:dims.x]
+                uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+                xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
+                return Dynamics.dynamics_sep(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt, eval(integrator)(sys), sys)
+            end
+        else
+            dynamics = eval(integrator)(sys)
+
+            f = zₜzₜ₊₁ -> begin
+                xₜ = zₜzₜ₊₁[1:dims.x]
+                uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+                xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
+                return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
+            end
         end
+
+        # f = zₜzₜ₊₁ -> begin
+        #     xₜ = zₜzₜ₊₁[1:dims.x]
+        #     uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+        #     xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
+        #     return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
+        # end
 
         if static_QP
             QP = StaticQuadraticProblem(
@@ -777,7 +925,9 @@ mutable struct ILCProblem
                 u_bounds,
                 correction_term,
                 QP_settings,
-                dims
+                dims,
+                d2u = d2u,
+                d2u_bounds = d2u_bounds
             )
         else
             QP = DynamicQuadraticProblem(
@@ -786,7 +936,9 @@ mutable struct ILCProblem
                 u_bounds,
                 correction_term,
                 QP_settings,
-                dims
+                dims,
+                d2u = d2u,
+                d2u_bounds = d2u_bounds
             )
         end
 
@@ -813,7 +965,8 @@ mutable struct ILCProblem
             MeasurementData[],
             Matrix{Float64}[],
             experiment,
-            ILC_settings
+            ILC_settings,
+            d2u
         )
     end
 end
@@ -829,9 +982,12 @@ end
 
 function ProblemSolvers.solve!(prob::ILCProblem)
     U = prob.Ẑ.actions
-    Ȳ = prob.experiment(U)
+    udim = length(U[1])
+    A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
+    println(A[1:4])
+    Ȳ = prob.experiment(prob.d2u ? A : U)
     push!(prob.Ȳs, Ȳ)
-    push!(prob.Us, hcat(U...))
+    push!(prob.Us, prob.d2u ? hcat(A...) : hcat(U...))
     ΔY = Ȳ - prob.Ygoal
     k = 1
     while norm(ΔY, prob.settings[:norm_p]) > prob.settings[:tol]
@@ -855,7 +1011,9 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         # println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
         # println()
         U = prob.Ẑ.actions
-        Ȳ = prob.experiment(U)
+        A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
+        println(A[1:4])
+        Ȳ = prob.experiment(prob.d2u ? A : U)
         ΔYnext = Ȳ - prob.Ygoal
         if norm(ΔYnext.ys[end], prob.settings[:norm_p]) >
             norm(ΔY.ys[end], prob.settings[:norm_p])
@@ -876,7 +1034,8 @@ function ProblemSolvers.solve!(prob::ILCProblem)
             ΔZ = prob.settings[:α] * ΔZ
             prob.Ẑ = prob.Ẑ + ΔZ
             U = prob.Ẑ.actions
-            Ȳ = prob.experiment(U)
+            A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
+            Ȳ = prob.experiment(prob.d2u ? A : U)
             ΔYnext = Ȳ - prob.Ygoal
             println("       iter =   $i")
             println("       |ΔY(T)| = ", norm(ΔYnext.ys[end], prob.settings[:norm_p]))
@@ -885,12 +1044,19 @@ function ProblemSolvers.solve!(prob::ILCProblem)
         end
         ΔY = ΔYnext
         push!(prob.Ȳs, Ȳ)
-        push!(prob.Us, hcat(U...))
+        push!(prob.Us, prob.d2u ? hcat(A...) : hcat(U...))
         k += 1
     end
     @info "ILC converged!" "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
 end
 
-
+function d2u_to_a(U::Vector{Vector{Float64}}, Δt::Float64)
+    udim = length(U[1])
+    aug_u = fill(zeros(2*udim), length(U))
+    for t = 2:(length(U)-1)
+        aug_u[t] = aug_u[t-1] + (Δt .* [aug_u[t-1][end-udim+1:end]; U[t-1]])
+    end
+    return [a[1:udim] for a in aug_u]
+end
 
 end
