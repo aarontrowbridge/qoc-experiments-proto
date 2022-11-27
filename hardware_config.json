@@ -1,0 +1,46 @@
+{
+  "channels": [
+    "charge1", "cavity", "sideband","qubitweak","readout", "readout_trig","m8195a_trig", "switch_trig"
+  ],"drive_los":[""],"jpa_pump_los":["RF5"],"readout_los":["RF7"],"cavity_drive_los":["RF8"],"attens":["atten"],"sideband_drive_los": ["RF5"],
+  "channels_awg": {
+   "charge1": "m8195a","cavity":"m8195a","qubitweak":"m8195a", "readout": "keysight_pxi","readout_trig": "keysight_pxi",
+    "m8195a_trig": "keysight_pxi","sideband": "m8195a", "switch_trig": "keysight_pxi"
+  },
+  "channels_delay": {
+    "readout_trig": 0,"m8195a_trig":0,"switch_trig":0,"readout": 100
+  },
+  "awg_info": {
+    "m8195a": {
+      "dt": 0.0625, "min_increment": 2560, "min_samples": 2560, "time_delay": 650,
+      "waveform_channels": ["charge1", "cavity","sideband","qubitweak"],
+      "amplitudes": [1, 1, 1, 0.4]
+    },
+    "tek5014a": {
+      "dt": 0.83333333333, "min_increment": 16, "min_samples": 256, "time_delay": 0,
+      "waveform_channels": ["hetero1_I", "hetero1_Q", "hetero2_I", "hetero2_Q"],
+      "marker_channels": ["alazar_trig", "readout1_trig", "readout2_trig", "m8195a_trig", null, null, null, null],
+      "offsets": [-0.007, -0.003, -0.015, 0]
+    },
+    "keysight_pxi": {
+      "dt": 1,"dt_dig": 2, "min_increment": 32, "min_samples": 256, "time_delay": 0,
+      "waveform_channels": ["readout","readout_trig","m8195a_trig","switch_trig"],"waveform_channel_index":[1,2,1,2],
+      "amplitudes": [1, 1, 1, 1], "amp_mark": [3, 3, 3, 3], "amp_trig": [2, 2, 2, 2],
+      "out_mod_no": 6, "samplesPerRecord": 3200, "marker_mod_no": 8,"lo_delay":250,"trig_mod_no":9,
+      "m3201a_trig_delay":140,"m3102a_card_delay":800,"abs_trig_delay":100,"m3102_vpp_range":0.125,
+      "pad_switch_trig_end": 100, "pad_switch_trig_start": 100
+    },
+    "tek70001a": {
+      "dt": 0.02, "min_increment": 16, "min_samples": 4800, "time_delay": 1500,
+      "waveform_channels": ["sideband"],
+      "amplitude": 1.0,"offset":0.0, "trig_delay":0
+    }
+  },
+  "alazar": {
+  "clock_edge": "rising", "trigger_delay": 0, "ch1_filter": true, "ch1_enabled": true, "samplesPerRecord": 8192,
+  "bufferCount": 20, "trigger_edge1": "rising", "trigger_edge2": "rising", "ch2_range": 2.0, "timeout": 100000,
+  "trigger_level2": 0.5, "trigger_level1": 0.5, "ch2_coupling": "DC", "trigger_coupling": "DC", "ch2_filter": true,
+  "trigger_operation": "or", "ch1_coupling": "DC", "trigger_source2": "disabled", "trigger_source1": "external",
+  "recordsPerAcquisition": 6200, "sample_rate": 1000000, "clock_source": "reference", "ch1_range": 2.0,
+  "ch2_enabled": true, "recordsPerBuffer": 62
+}, "trig_pulse_len": {"default": 100, "alazar": 100, "m8195a": 100},"trigger":{"period_us": 15000}
+}

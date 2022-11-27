@@ -1,7 +1,7 @@
 using Pico
 
 # data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
-data_dir = "data/multimode/good_solutions"
+data_dir = "data_tracked/multimode/good_solutions"
 
 # data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000"
 
