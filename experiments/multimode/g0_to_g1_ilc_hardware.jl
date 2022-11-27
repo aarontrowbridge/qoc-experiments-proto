@@ -1,7 +1,17 @@
+# using Pkg
+# ENV["PYTHON"] = Sys.which("python") 
+# Pkg.build("PyCall")
 using Pico
 using PyCall
+using Statistics
+using JLD2
 
-data_dir = "data/multimode/good_solutions"
+@pyinclude "experiments/multimode/run_experiment_optimize_loop.py"
+
+println("howdy")
+
+
+data_dir = "data_tracked/multimode/good_solutions"
 
 data_name = "g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5"
 
@@ -32,21 +42,7 @@ Ẑ = Trajectory(
 
 T = data.trajectory.T
 
-transmon_levels = 3
 cavity_levels = 14
-ψ1 = "g0"
-ψf = "g1"
-χ = 1.2 * data.system.params[:χ]
-
-experimental_system = MultiModeSystem(
-    transmon_levels,
-    cavity_levels,
-    ψ1,
-    ψf;
-    χ=χ
-)
-
-g(ψ̃) = abs2.(iso_to_ket(ψ̃))
 
 function g_pop(x)
     y = []
@@ -72,45 +68,100 @@ function g_pop(x)
     return convert(typeof(x), y)
 end
 
+ydim = length(g_pop(data.trajectory.states[1]))
+
 τs = [T]
 
-experiment = HardwareExperiment(
-    g_hardware,
-    g_pop,
-    τs
-)
+function g_hardware(
+    us::Vector{Vector{Float64}},
+    times::AbstractVector{Float64},
+    τs::AbstractVector{Int}
+)::MeasurementData
+    # display(us) 
+    intermediate = length(τs) == 1 ? false : true
+    ys = py"take_controls_and_measure"(times, us, τs, intermediate) |> transpose
+    display(ys)
+    println(typeof(ys))
+    ys = collect(eachcol(ys)) 
+    return MeasurementData(ys, τs, ydim)
+end
+    
 
-max_iter = 20
+
+
+
+# function build_cov_matrix(N=20)
+#     us = Ẑ.actions
+#     ys = []
+#     for _ = 1:N
+#         y = experiment(us).ys[end]
+#         push!(ys, y)
+#     end
+#     Y = hcat(ys...)
+#     return cov(Y; dims=2)
+# end
+
+# Σ = build_cov_matrix(15)
+
+# @info "cov matrix"
+# display(Σ)
+
+max_iter = 10 
 max_backtrack_iter = 10
 fps = 2
 α = 0.5
 β = 0.01
-R = 1.0e2
+R = 1.0e0
 Qy = 1.0e1
-Qf = 2.0e2
+Qf = 1.0e2
+
+for τs in [ 
+    # [Ẑ.T],
+    [25, Ẑ.T], 
+    [25, 50, Ẑ.T], 
+    [25, 50, 75, Ẑ.T], 
+] 
+    save_dir = "hardware_ILC"
+    save_name = "taus_" * join(τs, "_")
+
+    experiment = HardwareExperiment(
+        g_hardware,
+        g_pop,
+        τs,
+        data.trajectory.times,
+        ydim
+    )
+
+    prob = ILCProblem(
+        data.system,
+        Ẑ,
+        experiment;
+        max_iter=max_iter,
+        QP_verbose=false,
+        correction_term=true,
+        norm_p=1,
+        R=R,
+        static_QP=false,
+        Qy=Qy,
+        Qf=Qf,
+        use_system_goal=true,
+        α=α,
+        β=β,
+        # Σ=Σ,
+        max_backtrack_iter=max_backtrack_iter,
+    )
 
 
-prob = ILCProblem(
-    data.system,
-    Ẑ,
-    experiment;
-    max_iter=max_iter,
-    QP_verbose=false,
-    correction_term=true,
-    norm_p=1,
-    R=R,
-    static_QP=false,
-    Qy=Qy,
-    Qf=Qf,
-    use_system_goal=true,
-    α=α,
-    β=β,
-    max_backtrack_iter=max_backtrack_iter,
-)
 
-solve!(prob)
+    log_dir = "log/multimode/hardware/ILC"
+    log_path = generate_file_path("jld2", save_name, log_dir)
 
-plot_dir = "plots/multimode/good_solutions/ILC"
-plot_path = generate_file_path("gif", data_name, plot_dir)
+    solve!(prob)
 
-animate_ILC_multimode(prob, plot_path; fps=fps)
+    @save log_path prob
+
+    plot_dir = "plots/multimode/hardware/ILC"
+    plot_path = generate_file_path("gif", save_name, plot_dir)
+
+    animate_ILC_multimode(prob, plot_path; fps=fps)
+end
