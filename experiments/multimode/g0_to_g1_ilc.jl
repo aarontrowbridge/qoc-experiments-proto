@@ -98,7 +98,7 @@ fps = 2
 R = 1.0e2
 Qy = 1.0e1
 Qf = 2.0e2
-
+QP_tol = 1e-12
 
 prob = ILCProblem(
     data.system,
@@ -116,6 +116,7 @@ prob = ILCProblem(
     α=α,
     β=β,
     max_backtrack_iter=max_backtrack_iter,
+    QP_tol=QP_tol
 )
 
 solve!(prob)

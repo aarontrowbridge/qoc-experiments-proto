@@ -6,23 +6,22 @@ cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
 
-T             = 200
-Δt            = 3.0
-Q             = 500.0
-R             = 1.0e-1
+T             = 100
+Δt            = 4.0
+Q             = 1000.0
+R             = 1.0e-5
 iter          = 2000
-resolves      = 5
+resolves      = 1
 α_transmon    = 20.0
 α_cavity      = 20.0
 u_bound       = 1e-5
-Δt_max_factor = 1.5
+Δt_max_factor = 1.2
 
 system = MultiModeSystem(
     transmon_levels,
     cavity_levels,
     ψ1,
-    ψf;
-    u_bounds=fill(u_bound, 4)
+    ψf
 )
 
 options = Options(
@@ -64,6 +63,7 @@ prob = QuantumControlProblem(
         fill(α_transmon, length(transmon_f_states));
         fill(α_cavity, length(highest_cavity_modes))
     ],
+    u_bounds=fill(u_bound, 4)
 )
 
 for i = 1:resolves

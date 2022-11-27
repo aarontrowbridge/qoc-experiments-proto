@@ -721,8 +721,7 @@ mutable struct ILCProblem
     function ILCProblem(
         sys::QuantumSystem,
         Ẑgoal::Trajectory,
-        experiment::HardwareExperiment,
-        end_state_goal::Vector{Float64};
+        experiment::HardwareExperiment;
         integrator=:FourthOrderPade,
         Q=0.0,
         Qy=1.0,
@@ -743,6 +742,7 @@ mutable struct ILCProblem
         QP_max_iter=100_000,
         QP_verbose=false,
         QP_settings=Dict(),
+        QP_tol=1e-9,
         use_system_goal=false,
     )
         @assert length(u_bounds) == sys.ncontrols
@@ -760,6 +760,10 @@ mutable struct ILCProblem
         QP_kw_settings::Dict{Symbol, Any} = Dict(
             :max_iter => QP_max_iter,
             :verbose => QP_verbose,
+            :eps_abs => QP_tol,
+            :eps_rel => QP_tol,
+            :eps_prim_inf => QP_tol,
+            :eps_dual_inf => QP_tol,
         )
 
         QP_settings::Dict{Symbol, Any} =
@@ -855,6 +859,7 @@ mutable struct ILCProblem
         QP_max_iter=100_000,
         QP_verbose=false,
         QP_settings=Dict(),
+        QP_tol=1e-9,
         use_system_goal=false,
     )
         @assert length(u_bounds) == sys.ncontrols
@@ -872,6 +877,10 @@ mutable struct ILCProblem
         QP_kw_settings::Dict{Symbol, Any} = Dict(
             :max_iter => QP_max_iter,
             :verbose => QP_verbose,
+            :eps_abs => QP_tol,
+            :eps_rel => QP_tol,
+            :eps_prim_inf => QP_tol,
+            :eps_dual_inf => QP_tol,
         )
 
         QP_settings::Dict{Symbol, Any} =
