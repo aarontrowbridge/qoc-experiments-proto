@@ -26,32 +26,32 @@ abstract type AbstractObjective end
 struct Objective <: AbstractObjective
 	L::Function
 	∇L::Function
-	∇²L::Union{Function, Nothing}
-	∇²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
+	∂²L::Union{Function, Nothing}
+	∂²L_structure::Union{Vector{Tuple{Int,Int}}, Nothing}
     terms::Vector{Dict}
 end
 
 function Base.:+(obj1::Objective, obj2::Objective)
 	L = Z -> obj1.L(Z) + obj2.L(Z)
 	∇L = Z -> obj1.∇L(Z) + obj2.∇L(Z)
-	if isnothing(obj1.∇²L) && isnothing(obj2.∇²L)
-		∇²L = Nothing
-		∇²L_structure = Nothing
-	elseif isnothing(obj1.∇²L)
-		∇²L = Z -> obj2.∇²L(Z)
-		∇²L_structure = obj2.∇²L_structure
-	elseif isnothing(obj2.∇²L)
-		∇²L = Z -> obj1.∇²L(Z)
-		∇²L_structure = obj1.∇²L_structure
+	if isnothing(obj1.∂²L) && isnothing(obj2.∂²L)
+		∂²L = Nothing
+		∂²L_structure = Nothing
+	elseif isnothing(obj1.∂²L)
+		∂²L = Z -> obj2.∂²L(Z)
+		∂²L_structure = obj2.∂²L_structure
+	elseif isnothing(obj2.∂²L)
+		∂²L = Z -> obj1.∂²L(Z)
+		∂²L_structure = obj1.∂²L_structure
 	else
-		∇²L = Z -> vcat(obj1.∇²L(Z), obj2.∇²L(Z))
-		∇²L_structure = vcat(
-			obj1.∇²L_structure,
-			obj2.∇²L_structure
+		∂²L = Z -> vcat(obj1.∂²L(Z), obj2.∂²L(Z))
+		∂²L_structure = vcat(
+			obj1.∂²L_structure,
+			obj2.∂²L_structure
 		)
 	end
     terms = vcat(obj1.terms, obj2.terms)
-	return Objective(L, ∇L, ∇²L, ∇²L_structure, terms)
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, terms)
 end
 
 Base.:+(obj::Objective, ::Nothing) = obj
@@ -100,16 +100,16 @@ function QuantumObjective(;
 		return ∇
 	end
 
-	∇²L = nothing
-	∇²L_structure = nothing
+	∂²L = nothing
+	∂²L_structure = nothing
 
 	if eval_hessian
 		∇²c = QuantumCostHessian(cost)
 
 		# ℓⁱs Hessian structure (eq. 17)
-		∇²L_structure = structure(∇²c, T, system.vardim)
+		∂²L_structure = structure(∇²c, T, system.vardim)
 
-		∇²L = Z::AbstractVector -> begin
+		∂²L = Z::AbstractVector -> begin
 			ψ̃T = view(
 				Z,
 				slice(T, system.n_wfn_states, system.vardim)
@@ -118,7 +118,7 @@ function QuantumObjective(;
 		end
 	end
 
-	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 function QuadraticRegularizer(;
@@ -161,12 +161,12 @@ function QuadraticRegularizer(;
 		return ∇
 	end
 
-	∇²L = nothing
-	∇²L_structure = nothing
+	∂²L = nothing
+	∂²L_structure = nothing
 
 	if eval_hessian
 
-		∇²L_structure = []
+		∂²L_structure = []
 
 		# vₜ Hessian structure (eq. 17)
 		for t in times
@@ -176,15 +176,15 @@ function QuadraticRegularizer(;
 				vardim
 			)
 			append!(
-				∇²L_structure,
+				∂²L_structure,
 				collect(zip(vₜ_slice, vₜ_slice))
 			)
 		end
 
-		∇²L = Z -> fill(R, length(indices) * length(times))
+		∂²L = Z -> fill(R, length(indices) * length(times))
 	end
 
-	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 
@@ -241,7 +241,7 @@ function QuadraticSmoothnessRegularizer(;
 
 	if eval_hessian
 
-		∇²L_structure = []
+		∂²L_structure = []
 
 		# u smoothness regularizer Hessian main diagonal structure
 
@@ -253,7 +253,7 @@ function QuadraticSmoothnessRegularizer(;
 			# components: ∂²vₜSₜ
 
 			append!(
-				∇²L_structure,
+				∂²L_structure,
 				collect(
 					zip(
 						vₜ_slice,
@@ -274,7 +274,7 @@ function QuadraticSmoothnessRegularizer(;
 			# off diagonal -Rₛ I components: ∂vₜ₊₁∂vₜSₜ
 
 			append!(
-				∇²L_structure,
+				∂²L_structure,
 				collect(
 					zip(
 						vₜ_slice,
@@ -285,7 +285,7 @@ function QuadraticSmoothnessRegularizer(;
 		end
 
 
-		∇²L = Z::AbstractVector -> begin
+		∂²L = Z::AbstractVector -> begin
 
 			H = []
 
@@ -310,7 +310,7 @@ function QuadraticSmoothnessRegularizer(;
 		end
 	end
 
-	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 
@@ -342,44 +342,49 @@ function L1SlackRegularizer(;
     end
 
     if eval_hessian
-        ∇²L_structure = []
-        ∇²L = Z -> []
+        ∂²L_structure = []
+        ∂²L = Z -> []
     else
-        ∇²L_structure = nothing
-        ∇²L = nothing
+        ∂²L_structure = nothing
+        ∂²L = nothing
     end
 
-    return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+    return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 
-function MinTimeObjective(;T::Int=nothing, eval_hessian=true)
-
+function MinTimeObjective(;
+    Δt_indices::UnitRange{Int}=nothing,
+    T::Int=nothing,
+    eval_hessian::Bool=true
+)
+    @assert !isnothing(Δt_indices) "Δt_indices must be specified"
     @assert !isnothing(T) "T must be specified"
 
     params = Dict(
         :type => :MinTimeObjective,
+        :Δt_indices => Δt_indices,
         :T => T,
         :eval_hessian => eval_hessian
     )
 
-	L(Z::AbstractVector) = sum(Z[(end - (T - 1) + 1):end])
+	L(Z::AbstractVector) = sum(Z[Δt_indices])
 
 	∇L = (Z::AbstractVector) -> begin
 		∇ = zeros(typeof(Z[1]), length(Z))
-		∇[end - (T - 1) + 1:end] .= 1.0
+		∇[Δt_indices] .= 1.0
 		return ∇
 	end
 
 	if eval_hessian
-		∇²L = Z -> []
-		∇²L_structure = []
+		∂²L = Z -> []
+		∂²L_structure = []
 	else
-		∇²L = nothing
-		∇²L_structure = nothing
+		∂²L = nothing
+		∂²L_structure = nothing
 	end
 
-	return Objective(L, ∇L, ∇²L, ∇²L_structure, Dict[params])
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 # TODO: add symmetry objective

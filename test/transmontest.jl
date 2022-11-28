@@ -124,8 +124,8 @@ obj = QuantumObjective(
 # sparse objective Hessian data
 
 H = dense(
-    obj.∇²L(Z),
-    obj.∇²L_structure,
+    obj.∂²L(Z),
+    obj.∂²L_structure,
     (system.vardim * T, system.vardim * T)
 )
 
@@ -179,8 +179,8 @@ for integrator in integrators
     # dynamics Jacobian
 
     J = dense(
-        dyns.∇F(Z),
-        dyns.∇F_structure,
+        dyns.∂F(Z),
+        dyns.∂F_structure,
         (system.nstates * (T - 1), system.vardim * T)
     )
 
@@ -230,12 +230,12 @@ for integrator in integrators
 
     μ = randn(system.nstates * (T - 1))
 
-    m = dyns.μ∇²F(Z, μ)
-    struc = dyns.μ∇²F_structure
+    m = dyns.μ∂²F(Z, μ)
+    struc = dyns.μ∂²F_structure
     print("test")
     display(m)
     display(struc)
-    μ∇²F = dense(
+    μ∂²F = dense(
         m,
         struc,
         (system.vardim * T, system.vardim * T)
@@ -244,7 +244,7 @@ for integrator in integrators
     HofL(Z) = dot(μ, dyns.F(Z))
 
     # # for (H_analytic, H_numerical) in zip(
-    # #     μ∇²F,
+    # #     μ∂²F,
     # #     FiniteDiff.finite_difference_hessian(HofL, Z)
     # # )
     # #     if !isapprox(H_analytic, H_numerical, atol=ATOL)
@@ -257,7 +257,7 @@ for integrator in integrators
 
     # # @test all(
     # #     isapprox.(
-    # #         μ∇²F,
+    # #         μ∂²F,
     # #         FiniteDiff.finite_difference_hessian(HofL, Z),
     # #         atol=ATOL
     # #     )
@@ -267,10 +267,10 @@ for integrator in integrators
     # # test dynamics Hessian of Lagrangian vs forward diff
 
     dH = ForwardDiff.hessian(HofL, Z)
-    display(μ∇²F[1:18, 1:18])
+    display(μ∂²F[1:18, 1:18])
     display(dH[1:18, 1:18])
     res2 = isapprox.(
-            μ∇²F,
+            μ∂²F,
             dH,
             atol=1e-2
         )
@@ -278,7 +278,7 @@ for integrator in integrators
     display(res2)
     @test all(
         isapprox.(
-            μ∇²F,
+            μ∂²F,
             dH,
             atol=ATOL
         )

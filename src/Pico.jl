@@ -39,20 +39,26 @@ include("nlmoi.jl")
 include("trajectories.jl")
 @reexport using .Trajectories
 
+include("trajectory_utils.jl")
+@reexport using .TrajectoryUtils
+
 include("constraints.jl")
 @reexport using .Constraints
 
 include("problems.jl")
 @reexport using .Problems
 
-include("problems_mintime.jl")
-@reexport using .MinTimeProblems
+# include("problems_mintime.jl")
+# @reexport using .MinTimeProblems
 
 include("problem_utils.jl")
 @reexport using .ProblemUtils
 
 include("problem_solvers.jl")
 @reexport using .ProblemSolvers
+
+include("iterative_learning_control.jl")
+@reexport using .IterativeLearningControl
 
 include("plotting_utils.jl")
 @reexport using .PlottingUtils

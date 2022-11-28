@@ -1,8 +1,0 @@
-\BOOKMARK [1][-]{section.0}{Introduction}{}% 1
-\BOOKMARK [1][-]{section.1}{Problem Formulation}{}% 2
-\BOOKMARK [1][-]{section.2}{Dynamics}{}% 3
-\BOOKMARK [2][-]{subsection.2.1}{Pad\351 integrators}{section.2}% 4
-\BOOKMARK [1][-]{section.3}{Differentiation}{}% 5
-\BOOKMARK [2][-]{subsection.3.1}{Objective Gradient}{section.3}% 6
-\BOOKMARK [2][-]{subsection.3.2}{Dynamics Jacobian}{section.3}% 7
-\BOOKMARK [2][-]{subsection.3.3}{Hessian of the Lagrangian}{section.3}% 8

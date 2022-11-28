@@ -24,7 +24,7 @@ const MOI = MathOptInterface
 #
 #
 
-abstract type MinTimeProblem <: AbstractProblem end
+abstract type MinTimeProblem end
 
 struct MinTimeQuantumControlProblem <: MinTimeProblem
     subprob::AbstractProblem
@@ -34,8 +34,6 @@ struct MinTimeQuantumControlProblem <: MinTimeProblem
     constraints::Vector{AbstractConstraint}
     params::Dict
 end
-
-# TODO: rewrite this constructor (hacky implementation rn)
 
 
 
@@ -116,9 +114,18 @@ function MinTimeQuantumControlProblem(
         mintime_objective +
         mintime_additional_objective
 
+    # Z̄ = [Z; Δt]
+    Z_indices = 1:subprob.params[:n_variables]
+    Δt_indices = subprob.params[:n_variables] .+ (1:T-1)
+
+    params[:Z_indices] = Z_indices
+    params[:Δt_indices] = Δt_indices
+
     dynamics = MinTimeQuantumDynamics(
         system,
         mintime_integrator,
+        Z_indices,
+        Δt_indices,
         T;
         eval_hessian=mintime_eval_hessian
     )
