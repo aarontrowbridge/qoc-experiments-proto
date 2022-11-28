@@ -235,6 +235,7 @@ function Trajectory(
     return Trajectory(states, actions, times, T, Δt)
 end
 
+
 function dumb_downsample(traj::Trajectory, take_every_n::Int)
     @assert traj.T % take_every_n == 0
     Δt_new = traj.Δt * take_every_n

@@ -19,10 +19,24 @@ Im2 = [
 
 iso(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
+"""
+```julia
+AbstractSystem
+```
+
+Abstract type for defining systems.
+"""
 abstract type AbstractSystem end
 
 # TODO: make subtypes: SingleQubitSystem, TwoQubitSystem, TransmonSystem, MultimodeSystem, etc.
 
+"""
+```julia
+QuantumSystem <: AbstractSystem
+```
+
+Defines a struct that contains all the information and parameters pertinent to a quantum system.
+"""
 struct QuantumSystem <: AbstractSystem
     n_wfn_states::Int
     n_aug_states::Int
@@ -45,7 +59,29 @@ end
 
 
 # TODO: move ψinit and ψgoal into prob def
+"""
+```julia
+QuantumSystem(
+    H_drift::Matrix,
+    H_drive::Union{Matrix{T}, Vector{Matrix{T}}},
+    ψinit::Union{Vector{C1}, Vector{Vector{C1}}},
+    ψgoal::Union{Vector{C2}, Vector{Vector{C2}}},
+    control_bounds::Vector{Float64};
+    ∫a=false,
+    control_order=2,
+    goal_phase=0.0
+) where {C1 <: Number, C2 <: Number, T <: Number}
+```
 
+* `H_drift`: drift Hamiltonian
+* `H_drive`: drive Hamiltonian(s)
+* `ψinit`: initial state(s)
+* `ψgoal`: goal state(s)
+* `control_bounds`: bounds on control amplitudes
+* `∫a`: whether to include the integral of the control varialbes in the augmented state - defaults to `false`
+* `control_order`: the control derivative order which functions as the actual decision variable - defaults to `2` (i.e. the decision variable is the second derivative: ``\\ddot a(t)``)
+* `goal_phase`: the phase of the initial guess goal state(s) (which is linearly interpolated from the initial state when problem is cold started) - defaults to `0.0`
+"""
 function QuantumSystem(
     H_drift::Matrix,
     H_drives::Vector{Matrix{T}},
@@ -115,6 +151,34 @@ function QuantumSystem(
     )
 end
 
+
+"""
+```julia
+MultiModeSystem(
+    transmon_levels::Int,
+    cavity_levels::Int,
+    ψ1::String, # e.g. "g0" or "e3" or "eN"
+    ψf::String; # e.g. "g1" or "e4" or "eN";
+    χ=2π * -0.5459e-3,
+    κ=2π * 4e-6,
+    transmon_control_bound=2π * 0.018,
+    cavity_control_bound=0.03,
+    n_cavities=1, # TODO: add functionality for multiple cavities
+    kwargs...
+)
+```
+
+* `transmon_levels`: available levels for transmon qubit
+* `cavity_levels`: available levels for cavity
+* `ψ1`: initial state as a string (e.g. "g0", "e3", ..., or "eN")
+* `ψf`: final state as a string (e.g. "g1", "e4", ..., or "eN")
+* `χ`: transmon-cavity coupling strength - defaults to `2π * -0.5459e-3`
+* `κ`: cavity decay rate - defaults to `2π * 4e-6`
+* `transmon_control_bound`: bound on transmon control amplitude - defaults to `2π * 0.018`
+* `cavity_control_bound`: bound on cavity control amplitude - defaults to `0.03`
+* `n_cavities`: number of cavities - defaults to `1`
+* `kwargs...`: keyword arguments to pass to the `QuantumSystem` constructor function
+"""
 function MultiModeSystem(
     transmon_levels::Int,
     cavity_levels::Int,
