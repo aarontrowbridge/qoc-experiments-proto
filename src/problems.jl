@@ -297,6 +297,7 @@ function QuantumControlProblem(
             additional_objective
     end
 
+
     if !isempty(L1_regularized_states)
 
         n_slack_variables = 2 * length(L1_regularized_states) * T
@@ -308,6 +309,8 @@ function QuantumControlProblem(
                     for t = 1:T
             ]
         )
+
+        params[:x_indices] = x_indices
 
         s1_indices = n_prob_variables .+ (1:n_slack_variables÷2)
 
@@ -367,6 +370,8 @@ function QuantumControlProblem(
         params[:n_dynamics_constraints],
         params[:n_variables]
     )
+
+    params[:objective_terms] = objective.terms
 
     return QuantumControlProblem(
         system,

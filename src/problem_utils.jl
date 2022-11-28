@@ -25,31 +25,16 @@ using Ipopt
 
 struct ProblemData <: AbstractProblem
     system::AbstractSystem
-    # objective_terms::Vector{Dict}
-    # constraints::Vector{AbstractConstraint}
     trajectory::Trajectory
     params::Dict
 
     function ProblemData(prob::QuantumControlProblem)
         return new(
             prob.system,
-            # prob.objective_terms,
-            # prob.constraints,
             prob.trajectory,
             prob.params
         )
     end
-
-    # function ProblemData(prob::MinTimeProblem)
-    #     return new(
-    #         :MinTime,
-    #         prob.subprob.system,
-    #         prob.objective_terms,
-    #         prob.constraints,
-    #         prob.subprob.trajectory,
-    #         merge(prob.params, prob.subprob.params)
-    #     )
-    # end
 end
 
 function Problems.QuantumControlProblem(data::ProblemData)
@@ -66,48 +51,6 @@ function Problems.QuantumControlProblem(data::ProblemData)
         data.params...
     )
 end
-
-# function Problems.QuantumControlProblem(data::ProblemData)
-
-#     objective = Objective(data.objective_terms)
-
-#     dynamics = QuantumDynamics(
-#         data.system,
-#         data.params[:integrator],
-#         data.params[:Z_indices],
-#         data.params[:Δt_indices],
-#         data.trajectory.T;
-#         eval_hessian=data.params[:eval_hessian]
-#     )
-
-#     evaluator = PicoEvaluator(
-#         objective,
-#         dynamics,
-#         data.params[:eval_hessian]
-#     )
-
-#     optimizer = Ipopt.Optimizer()
-
-#     set!(optimizer, data.params[:options])
-
-#     variables = Problems.initialize_optimizer!(
-#         optimizer,
-#         evaluator,
-#         data.constraints,
-#         data.params[:n_dynamics_constraints],
-#         data.params[:n_variables]
-#     )
-
-#     return QuantumControlProblem(
-#         data.system,
-#         variables,
-#         optimizer,
-#         objective.terms,
-#         data.constraints,
-#         data.trajectory,
-#         data.params
-#     )
-# end
 
 function save_problem(prob::QuantumControlProblem, path::String)
     mkpath(dirname(path))

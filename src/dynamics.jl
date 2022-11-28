@@ -2,7 +2,6 @@ module Dynamics
 
 export AbstractDynamics
 export QuantumDynamics
-export MinTimeQuantumDynamics
 
 using ..Utils
 using ..QuantumLogic
@@ -786,6 +785,8 @@ function QuantumDynamics(
     )
 end
 
+
+# method for min time problem
 function QuantumDynamics(
     sys::AbstractSystem,
     integrator::Symbol,
