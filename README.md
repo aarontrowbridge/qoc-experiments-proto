@@ -12,6 +12,12 @@ To install and use this repo on your own machine:
 4. then run `(Pico) pkg> instantiate`
 5. now the package can be used via `using Pico`
 
+## Launching the docs
+
+See [Documenter.jl](https://juliadocs.github.io/Documenter.jl/stable/) for more details.
+
+1. run `julia --project=. docs/make.jl` in the shell
+2. in the REPL, run `using LiveServer; serve(dir="docs/build")`
 
 ## Problem formulation
 

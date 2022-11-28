@@ -235,19 +235,153 @@ function Trajectory(
     return Trajectory(states, actions, times, T, Δt)
 end
 
-function dumb_downsample(traj::Trajectory, take_every_n::Int)
-    @assert traj.T % take_every_n == 0
-    Δt_new = traj.Δt * take_every_n
-    states_new = traj.states[1:take_every_n:end]
-    actions_new = traj.actions[1:take_every_n:end]
-    times_new = traj.times[1:take_every_n:end]
-    return Trajectory(
-        states_new,
-        actions_new,
-        times_new,
-        traj.T ÷ take_every_n,
-        Δt_new
-    )
+function jth_order_controls(
+    traj::Trajectory,
+    sys::AbstractSystem,
+    j::Int;
+    d2pi=true
+)
+    if sys.∫a
+        @assert j ∈ -1:sys.control_order
+    else
+        @assert j ∈ 0:sys.control_order
+    end
+
+    if j != sys.control_order
+        jth_order_slice = slice(sys.∫a + 1 + j, sys.ncontrols)
+        return [
+            traj.states[t][
+                sys.n_wfn_states .+ (jth_order_slice)
+            ] for t = 1:traj.T
+        ] / (1. + (2π - 1.) * d2pi)
+    else
+        # returns same value for actions at T-1 and T to make plots cleaner
+        return [traj.actions[1:end-1]..., traj.actions[end-1]] /
+            (1. + (2π - 1.) * d2pi)
+    end
+end
+
+
+function jth_order_controls_matrix(traj, sys, j; kwargs...)
+    return hcat(jth_order_controls(traj, sys, j; kwargs...)...)
+end
+
+controls_matrix(traj, sys) =
+    jth_order_controls_matrix(traj, sys, 0)
+
+actions_matrix(traj::Trajectory) = hcat(traj.actions...)
+
+function wfn_components(
+    traj::Trajectory,
+    sys::AbstractSystem;
+    i=1,
+    components=nothing
+)
+    if isnothing(components)
+        ψs = [traj.states[t][slice(i, sys.isodim)] for t = 1:traj.T]
+    else
+        ψs = [traj.states[t][index(i, 0, sys.isodim) .+ (components)] for t = 1:traj.T]
+    end
+    return ψs
+end
+
+function pop_components(
+    traj::Trajectory,
+    sys::AbstractSystem;
+    i=1,
+    components=nothing
+)
+    if isnothing(components)
+        pops = [
+            abs2.(
+                iso_to_ket(
+                    traj.states[t][slice(i, sys.isodim)]
+                )
+            ) for t = 1:traj.T
+        ]
+    else
+        pops = [
+            abs2.(
+                iso_to_ket(
+                    traj.states[t][slice(i, sys.isodim)]
+                )[components]
+            ) for t = 1:traj.T
+        ]
+    end
+    return pops
+end
+
+
+
+pop_matrix(args...; kwargs...) =
+    hcat(pop_components(args...; kwargs...)...)
+
+# get the second final state
+final_state(traj, sys) = final_state_i(traj, sys, 1)
+final_state_2(traj, sys) = final_state_i(traj, sys, 2)
+
+function final_state_i(
+    traj::Trajectory,
+    sys::AbstractSystem,
+    i::Int
+)
+    return traj.states[traj.T][slice(i, sys.isodim)]
+end
+
+# function populations(
+#     traj::Trajectory,
+#     sys::AbstractSystem,
+#     i = 1,
+#     components=nothing
+# )
+
+wfn_components_matrix(args...; kwargs...) =
+    hcat(wfn_components(args...; kwargs...)...)
+
+
+#
+# saving and loading trajectories
+#
+
+function save_trajectory(traj::Trajectory, path::String)
+    path_parts = split(path, "/")
+    dir = joinpath(path_parts[1:end-1])
+    if !isdir(dir)
+        mkpath(dir)
+    end
+    h5open(path, "cw") do f
+        f["states"] = hcat(traj.states...)
+        f["actions"] = hcat(traj.actions...)
+        f["times"] = traj.times
+        f["T"] = traj.T
+        f["dt"] = traj.Δt
+    end
+end
+
+function load_trajectory(path::String)
+    try
+        h5open(path, "r") do f
+            states_matrix = f["states"]
+            actions_matrix = f["actions"]
+            times = f["times"][]
+            T = f["T"][]
+            Δt = f["dt"][]
+            states = [states_matrix[:, t] for t = 1:T]
+            actions = [actions_matrix[:, t] for t = 1:T]
+            return Trajectory(states, actions, times, T, Δt)
+        end
+    catch
+        @warn "Could not load trajectory from file: " path
+    end
+end
+
+function load_controls_matrix_and_times(
+    path::String,
+    sys::AbstractSystem
+)
+    traj = load_trajectory(path)
+    controls = controls_matrix(traj, sys)
+    return controls, traj.times
 end
 
 end
