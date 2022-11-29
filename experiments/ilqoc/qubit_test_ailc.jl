@@ -60,11 +60,32 @@ prob = QuantumControlProblem(
     options = options
 )
 
-function g(x, sys::QuantumSystem)
+solve!(prob)
+
+xs = [
+    prob.trajectory.states[t]
+        for t = 1:prob.trajectory.T
+]
+
+us = [
+    prob.trajectory.actions[t]
+        for t = 1:prob.trajectory.T
+]
+
+
+Ẑ = Trajectory(
+    xs,
+    us,
+    prob.trajectory.times,
+    prob.trajectory.T,
+    prob.trajectory.Δt
+)
+
+function g(x) #sys::QuantumSystem)
     #x[1:sys.n_wfn_states]
     y = []
-    for i = 1:sys.nqstates
-        ψ_i = x[slice(i, sys.isodim)]
+    for i = 1:system.nqstates
+        ψ_i = x[slice(i, system.isodim)]
         append!(y, meas_x_iso(ψ_i))
         append!(y, meas_y_iso(ψ_i))
         append!(y, meas_z_iso(ψ_i))
@@ -72,25 +93,22 @@ function g(x, sys::QuantumSystem)
     return y 
 end
 
-function exp_rollout(utraj::Matrix{Float64})
-    state = [ket_to_iso(ψg); ket_to_iso(ψe); zeros(4)]
-    ys = []
-    ts = []
-    for k in 1:size(utraj,2)
-        G = system.G_drift + 0.01*get_mat_iso(-1im * sigmaz()) + state[end - 3] * system.G_drives[1] + state[end-2] * system.G_drives[2]
-        h_prop = exp(G * Δt)
-        state1_ = h_prop*state[1:4]
-        state2_ = h_prop*state[5:8]
-        controls = state[9:10] + state[11:12] .* Δt
-        dcontrols = state[11:12] + utraj[:, k] .* Δt
-        state = [state1_; state2_; controls; dcontrols]
-        append!(ys, [g(state, system)])
-        append!(ts, k+1)
-    end
-    return ys, ts
-end
+experiment = QuantumExperiment(
+    prob.system,
+    Ẑ.states[1],
+    Ẑ.Δt,
+    g,
+    3*prob.system.nqstates,
+    1:Ẑ.T
+)
 
-ilc_prob = ILCProblem(prob, g, exp_rollout, 6)
-answer, jku = solve_ilc!(ilc_prob; iter = 2)
+prob = ILCProblem(
+    prob.system,
+    Ẑ,
+    experiment;
+    max_iter = 10
+)
 
-println(answer[end])
+solve!(prob)
+
+

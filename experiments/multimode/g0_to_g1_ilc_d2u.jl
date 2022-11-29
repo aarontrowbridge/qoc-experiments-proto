@@ -12,17 +12,20 @@ data_path = joinpath(data_dir, data_name * ".jld2")
 data = load_data(data_path)
 
 xs = [
-    data.trajectory.states[t][1:data.system.isodim]
+    data.trajectory.states[t]
         for t = 1:data.trajectory.T
 ]
 
 us = [
-    data.trajectory.states[t][
-        (data.system.n_wfn_states +
-        data.system.∫a * data.system.ncontrols) .+
-        (1:data.system.ncontrols)
-    ] for t = 1:data.trajectory.T
+    data.trajectory.actions[t] 
+        for t = 1:data.trajectory.T
 ]
+
+udim = length(us[1])
+
+for i = 1:data.trajectory.T-1
+    us[i] = us[i+1]
+end
 
 Ẑ = Trajectory(
     xs,
@@ -51,22 +54,9 @@ g(ψ̃) = abs2.(iso_to_ket(ψ̃))
 function g_pop(x)
     y = []
     append!(y, sum(x[1:cavity_levels].^2 + x[3*cavity_levels .+ (1:cavity_levels)].^2))
-    append!(
-        y,
-        sum(
-            x[cavity_levels .+ (1:cavity_levels)].^2 +
-            x[4*cavity_levels .+ (1:cavity_levels)].^2
-        )
-    )
+    append!(y, sum(x[cavity_levels .+ (1:cavity_levels)].^2 + x[4*cavity_levels .+ (1:cavity_levels)].^2))
     for i = 1:10
-        append!(y,
-            x[i]^2 +
-            x[i + 3 * cavity_levels]^2 +
-            x[i + cavity_levels]^2 +
-            x[i + 4 * cavity_levels]^2 +
-            x[i + 2 * cavity_levels]^2 +
-            x[i + 5 * cavity_levels]^2
-        )
+        append!(y, x[i]^2 + x[i+3*cavity_levels]^2 + x[i + cavity_levels]^2 + x[i+4*cavity_levels]^2 + x[i + 2*cavity_levels]^2 + x[i + 5*cavity_levels]^2)
         #append!(y, x[i + cavity_levels]^2 + x[i+3*cavity_levels]^2)
     end
     return convert(typeof(x), y)
@@ -78,27 +68,26 @@ experiment = QuantumExperiment(
     Ẑ.times,
     # x -> x,
     g_pop,
-    # [5:5:50; 75; Ẑ.T];
-    # [10:10:100; Ẑ.T];
-    # [25, 50, 75, Ẑ.T];
+    # [5:5:50; Ẑ.T];
+    #[10:10:100; Ẑ.T];
+    [25, 50, 75, Ẑ.T];
     # [50, Ẑ.T];
-    # [10, 25, 50, 75, Ẑ.T];
-    [Ẑ.T];
     # [2:2:Ẑ.T - 10; Ẑ.T];
     # [1:Ẑ.T ÷ 2; Ẑ.T];
     # 1:Ẑ.T;
-    integrator=exp
+    integrator=exp,
+    d2u=true,
 )
 
 max_iter = 20
-max_backtrack_iter = 10
+max_backtrack_iter = 15
 fps = 2
 α = 0.5
-β = 0.01
+β = 1.0
 R = 1.0e2
-Qy = 1.0e1
-Qf = 2.0e2
-QP_tol = 1e-12
+Qy = 1.0e2
+Qf = 1.0e2
+
 
 prob = ILCProblem(
     data.system,
@@ -116,7 +105,9 @@ prob = ILCProblem(
     α=α,
     β=β,
     max_backtrack_iter=max_backtrack_iter,
-    QP_tol=QP_tol
+    d2u=true,
+    d2u_bounds=fill(1e-6, 4),
+    QP_tol = 1e-3
 )
 
 solve!(prob)
