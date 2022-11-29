@@ -52,15 +52,27 @@ function problem_constraints(
     )
     push!(cons, ψ1_con)
 
-    # initial and final a(t ∈ {1, T}) constraints: ∫a, a, da = 0
-    aug_cons = EqualityConstraint(
+    #TODO: maybe add ∫a constraint
+
+    # initial and final a(t ∈ {1, T}) = 0 constraints
+    a_cons = EqualityConstraint(
         [1, params[:T]],
-        system.n_wfn_states .+ (1:system.n_aug_states),
+        system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
         0.0,
         system.vardim;
         name="initial and final augmented state constraints"
     )
-    push!(cons, aug_cons)
+    push!(cons, a_cons)
+
+    # initial and final da(t ∈ {1, T}) = 0 constraints
+    # aug_cons = EqualityConstraint(
+    #     [1, params[:T]],
+    #     system.n_wfn_states .+ slice(system.∫a + 2, system.ncontrols),
+    #     0.0,
+    #     system.vardim;
+    #     name="initial and final augmented state constraints"
+    # )
+    # push!(cons, da_cons)
 
     # bound |a(t)| < a_bound
     a_bound_con = BoundsConstraint(
@@ -285,6 +297,7 @@ function QuantumControlProblem(
             additional_objective
     end
 
+
     if !isempty(L1_regularized_states)
 
         n_slack_variables = 2 * length(L1_regularized_states) * T
@@ -296,6 +309,8 @@ function QuantumControlProblem(
                     for t = 1:T
             ]
         )
+
+        params[:x_indices] = x_indices
 
         s1_indices = n_prob_variables .+ (1:n_slack_variables÷2)
 
@@ -355,6 +370,8 @@ function QuantumControlProblem(
         params[:n_dynamics_constraints],
         params[:n_variables]
     )
+
+    params[:objective_terms] = objective.terms
 
     return QuantumControlProblem(
         system,

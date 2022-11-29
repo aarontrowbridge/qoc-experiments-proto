@@ -8,6 +8,8 @@ export QuadraticProblem
 export MeasurementData
 export measure
 
+export AbstractExperiment
+export HardwareExperiment
 export QuantumExperiment
 export experiment
 
@@ -23,6 +25,7 @@ using LinearAlgebra
 using SparseArrays
 using ForwardDiff
 using Einsum
+using Statistics
 using OSQP
 
 
@@ -77,7 +80,28 @@ function measure(
     return MeasurementData(ys, τs, ydim)
 end
 
-struct QuantumExperiment
+abstract type AbstractExperiment end
+
+struct HardwareExperiment <: AbstractExperiment
+    g_hardware::Function
+    g_analytic::Function
+    τs::AbstractVector{Int}
+    u_times::Vector{Float64}
+    ydim::Int
+end
+
+function (experiment::HardwareExperiment)(
+    us::Vector{Vector{Float64}};
+    backtracking=false
+)::MeasurementData
+    if !backtracking
+        return experiment.g_hardware(us, experiment.u_times, experiment.τs)
+    else
+        return experiment.g_hardware(us, experiment.u_times, [experiment.τs[end]])
+    end
+end
+
+struct QuantumExperiment <: AbstractExperiment
     ψ̃₁::Vector{Float64}
     ts::Vector{Float64}
     g::Function
@@ -121,7 +145,8 @@ end
 # - show fidelity
 
 function (experiment::QuantumExperiment)(
-    U::Vector{Vector{Float64}}
+    U::Vector{Vector{Float64}};
+    backtracking=false
 )::MeasurementData
 
     T = length(U)
@@ -157,12 +182,22 @@ function (experiment::QuantumExperiment)(
     end
     #end
 
-    Ȳ = measure(
-        Ψ̃,
-        experiment.g,
-        experiment.τs,
-        experiment.ydim
-    )
+    if backtracking 
+        Ȳ = measure(
+            Ψ̃,
+            experiment.g,
+            experiment.τs[end:end],
+            experiment.ydim
+        )
+    else
+        Ȳ = measure(
+            Ψ̃,
+            experiment.g,
+            experiment.τs,
+            experiment.ydim
+        )
+    end
+
 
     return Ȳ
 end
@@ -181,7 +216,7 @@ struct StaticQuadraticProblem <: QuadraticProblem
     A::SparseMatrixCSC
     ∂gs::Vector{Matrix{Float64}}
     ∂²gs::Vector{Array{Float64}}
-    Σinv::AbstractMatrix{Float64}
+    Σinv::Symmetric{Float64}
     Qy::Float64
     Qf::Float64
     u_bounds::Vector{Float64}
@@ -251,12 +286,14 @@ function StaticQuadraticProblem(
 
     Hreg = build_regularization_hessian(Q, R, dims)
 
+    Σinv = Symmetric(inv(Σ))
+
     return StaticQuadraticProblem(
         Hreg,
         A,
         ∂gs,
         ∂²gs,
-        inv(Σ),
+        Σinv,
         Qy,
         Qf,
         u_bounds,
@@ -346,7 +383,7 @@ struct DynamicQuadraticProblem <: QuadraticProblem
     Qy::Float64
     Qf::Float64
     R::Float64
-    Σinv::Union{Matrix{Float64}, Nothing}
+    Σinv::Union{Symmetric{Float64}, Nothing}
     u_bounds::Vector{Float64}
     correction_term::Bool
     settings::Dict{Symbol, Any}
@@ -382,6 +419,8 @@ function DynamicQuadraticProblem(
         return reshape(H, dims.y, dims.x, dims.x)
     end
 
+    Σinv = Symmetric(inv(Σ))
+
     return DynamicQuadraticProblem(
         ∂f,
         ∂g,
@@ -390,7 +429,7 @@ function DynamicQuadraticProblem(
         Qy,
         Qf,
         R,
-        inv(Σ),
+        Σinv,
         u_bounds,
         correction_term,
         settings,
@@ -829,14 +868,15 @@ mutable struct ILCProblem
     Ygoal::MeasurementData
     Ȳs::Vector{MeasurementData}
     Us::Vector{Matrix{Float64}}
-    experiment::QuantumExperiment
+    experiment::AbstractExperiment
     settings::Dict{Symbol, Any}
     d2u::Bool
+    bt_dict::Dict{Int, Vector}
 
     function ILCProblem(
         sys::QuantumSystem,
         Ẑgoal::Trajectory,
-        experiment::QuantumExperiment;
+        experiment::HardwareExperiment;
         integrator=:FourthOrderPade,
         Q=0.0,
         Qy=1.0,
@@ -857,9 +897,10 @@ mutable struct ILCProblem
         QP_max_iter=100_000,
         QP_verbose=false,
         QP_settings=Dict(),
-        use_system_goal=false,
         d2u=false,
-        d2u_bounds=fill(1e-5, length(u_bounds))
+        d2u_bounds=fill(1e-5, length(u_bounds)),
+        QP_tol=1e-9,
+        use_system_goal=false,
     )
         @assert length(u_bounds) == sys.ncontrols
 
@@ -876,12 +917,14 @@ mutable struct ILCProblem
         QP_kw_settings::Dict{Symbol, Any} = Dict(
             :max_iter => QP_max_iter,
             :verbose => QP_verbose,
+            :eps_abs => QP_tol,
+            :eps_rel => QP_tol,
+            :eps_prim_inf => QP_tol,
+            :eps_dual_inf => QP_tol,
         )
 
         QP_settings::Dict{Symbol, Any} =
             merge(QP_kw_settings, QP_settings)
-
-        dynamics = eval(integrator)(sys)
 
         dims = (
             x=size(Ẑgoal.states[1], 1),
@@ -910,12 +953,134 @@ mutable struct ILCProblem
             end
         end
 
-        # f = zₜzₜ₊₁ -> begin
-        #     xₜ = zₜzₜ₊₁[1:dims.x]
-        #     uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
-        #     xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
-        #     return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
-        # end
+        if static_QP
+            QP = StaticQuadraticProblem(
+                Ẑgoal,
+                f, experiment.g_analytic,
+                Q, Qy, Qf, R, Σ,
+                u_bounds,
+                correction_term,
+                QP_settings,
+                dims
+            )
+        else
+            QP = DynamicQuadraticProblem(
+                f, experiment.g_analytic,
+                Q, Qy, Qf, R, Σ,
+                u_bounds,
+                correction_term,
+                QP_settings,
+                dims
+            )
+        end
+
+        Ygoal = measure(
+            Ẑgoal,
+            experiment.g_analytic,
+            experiment.τs,
+            experiment.ydim
+        )
+
+        if use_system_goal
+            Ygoal.ys[end] = experiment.g_analytic(sys.ψ̃goal[slice(1, sys.isodim)])
+        end
+
+        # display(Ygoal.ys[end])
+        # println()
+        # display(Ẑgoal.states[end])
+
+        return new(
+            Ẑgoal,
+            Ẑgoal,
+            QP,
+            Ygoal,
+            MeasurementData[],
+            Matrix{Float64}[],
+            experiment,
+            ILC_settings,
+            Dict{Int, Vector}()
+        )
+    end
+
+    function ILCProblem(
+        sys::QuantumSystem,
+        Ẑgoal::Trajectory,
+        experiment::QuantumExperiment;
+        integrator=:FourthOrderPade,
+        Q=0.0,
+        Qy=1.0,
+        Qf=100.0,
+        R=1.0,
+        # identity matrix of Float64
+        Σ=Diagonal(fill(1.0, experiment.ydim)),
+        u_bounds=sys.a_bounds,
+        correction_term=true,
+        verbose=true,
+        max_iter=100,
+        max_backtrack_iter=10,
+        tol=1e-6,
+        α=0.5,
+        β=0.5,
+        norm_p=Inf,
+        static_QP=false,
+        QP_max_iter=100_000,
+        QP_verbose=false,
+        QP_settings=Dict(),
+        d2u=false,
+        d2u_bounds=fill(1e-5, length(u_bounds)),
+        QP_tol=1e-9,
+        use_system_goal=false,
+    )
+        @assert length(u_bounds) == sys.ncontrols
+
+        ILC_settings::Dict{Symbol, Any} = Dict(
+            :max_iter => max_iter,
+            :max_backtrack_iter => max_backtrack_iter,
+            :α => α,
+            :β => β,
+            :tol => tol,
+            :norm_p => norm_p,
+            :verbose => verbose,
+        )
+
+        QP_kw_settings::Dict{Symbol, Any} = Dict(
+            :max_iter => QP_max_iter,
+            :verbose => QP_verbose,
+            :eps_abs => QP_tol,
+            :eps_rel => QP_tol,
+            :eps_prim_inf => QP_tol,
+            :eps_dual_inf => QP_tol,
+        )
+
+        QP_settings::Dict{Symbol, Any} =
+            merge(QP_kw_settings, QP_settings)
+
+        dims = (
+            x=size(Ẑgoal.states[1], 1),
+            u=size(Ẑgoal.actions[1], 1),
+            z=size(Ẑgoal.states[1], 1) + size(Ẑgoal.actions[1], 1),
+            y=experiment.ydim,
+            T=Ẑgoal.T,
+            M=length(experiment.τs)
+        )
+
+        if d2u
+            f = zₜzₜ₊₁ -> begin 
+                xₜ = zₜzₜ₊₁[1:dims.x]
+                uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+                xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
+                return Dynamics.dynamics_sep(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt, eval(integrator)(sys), sys)
+            end
+        else
+            dynamics = eval(integrator)(sys)
+
+            f = zₜzₜ₊₁ -> begin
+                xₜ = zₜzₜ₊₁[1:dims.x]
+                uₜ = zₜzₜ₊₁[dims.x .+ (1:dims.u)]
+                xₜ₊₁ = zₜzₜ₊₁[dims.z .+ (1:dims.x)]
+                return dynamics(xₜ₊₁, xₜ, uₜ, Ẑgoal.Δt)
+            end
+        end
 
         if static_QP
             QP = StaticQuadraticProblem(
@@ -937,8 +1102,8 @@ mutable struct ILCProblem
                 correction_term,
                 QP_settings,
                 dims,
-                d2u = d2u,
-                d2u_bounds = d2u_bounds
+                d2u=d2u,
+                d2u_bounds=d2u_bounds
             )
         end
 
@@ -966,7 +1131,8 @@ mutable struct ILCProblem
             Matrix{Float64}[],
             experiment,
             ILC_settings,
-            d2u
+            d2u,
+            Dict{Int, Vector}()
         )
     end
 end
@@ -984,65 +1150,99 @@ function ProblemSolvers.solve!(prob::ILCProblem)
     U = prob.Ẑ.actions
     udim = length(U[1])
     A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
-    println(A[1:4])
     Ȳ = prob.experiment(prob.d2u ? A : U)
     push!(prob.Ȳs, Ȳ)
     push!(prob.Us, prob.d2u ? hcat(A...) : hcat(U...))
     ΔY = Ȳ - prob.Ygoal
+    println()
+    printstyled()
+    ΔyT_norms = [norm(ΔY.ys[end], prob.settings[:norm_p])]
     k = 1
-    while norm(ΔY, prob.settings[:norm_p]) > prob.settings[:tol]
+    while true 
         if k > prob.settings[:max_iter]
-            @info "max iterations reached" max_iter = prob.settings[:max_iter] "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol]
+            @info "max iterations reached" max_iter = prob.settings[:max_iter] 
             return
         end
-        # TODO: make jacobians constant about nominal trajectory
         if prob.settings[:verbose]
-            println("iter =    ", k)
-            println("⟨|ΔY|⟩ =  ", (norm(ΔY, prob.settings[:norm_p])) / length(ΔY.ys))
-            # println(
-            #     "fidelity =  ",
-            #     fidelity(prob.Ẑ.states[end], prob.Ẑgoal.states[end])
-            # )
-            println("|ΔY(T)| = ", norm(ΔY.ys[end], prob.settings[:norm_p]))
+            println()
+            printstyled("iter    = ", k; color=:magenta)
+            println()
+            printstyled("⟨|ΔY|⟩  = ", mean([norm(y, prob.settings[:norm_p]) for y in ΔY.ys]); color=:magenta)
+            println()
+            printstyled("|ΔY(T)| = ", norm(ΔY.ys[end], prob.settings[:norm_p]); color=:magenta)
+            println()
             println()
         end
         ΔZ = prob.settings[:β] * prob.QP(prob.Ẑ, ΔY)
         prob.Ẑ = prob.Ẑ + ΔZ
-        # println("norm(ψ₁) = ", norm(prob.Ẑ.states[1]))
-        # println()
+
         U = prob.Ẑ.actions
         A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
-        println(A[1:4])
         Ȳ = prob.experiment(prob.d2u ? A : U)
         ΔYnext = Ȳ - prob.Ygoal
-        if norm(ΔYnext.ys[end], prob.settings[:norm_p]) >
-            norm(ΔY.ys[end], prob.settings[:norm_p])
+        ΔyTnext = ΔYnext.ys[end]
 
-            println("   backtracking")
+        # backtracking
+        if norm(ΔyTnext, prob.settings[:norm_p]) >
+            minimum(ΔyT_norms)
+
+            printstyled("   backtracking"; color=:magenta)
+            println()
             println()
             i = 1
-        end
-        while norm(ΔYnext.ys[end], prob.settings[:norm_p]) >
-            norm(ΔY.ys[end], prob.settings[:norm_p])
-            if i > prob.settings[:max_backtrack_iter]
-                println("   max backtracking iterations reached")
+            backtrack_yts = []
+
+            iter_ΔyT_norms = []
+
+            while norm(ΔyTnext, prob.settings[:norm_p]) >
+                minimum(ΔyT_norms)
+                # norm(ΔY.ys[end], prob.settings[:norm_p])
+                if i > prob.settings[:max_backtrack_iter]
+                    println()
+                    printstyled("   max backtracking iterations reached"; color=:magenta)
+                    println()
+                    println()
+                    ΔY = ΔYnext
+                    return
+                end
+                prob.Ẑ = prob.Ẑ - ΔZ
+                ΔZ = prob.settings[:α] * ΔZ
+                prob.Ẑ = prob.Ẑ + ΔZ
+                U = prob.Ẑ.actions
+                A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
+
+                yTnext = prob.experiment(prob.d2u ? A : U; backtracking=true).ys[end]
+                ΔyTnext = yTnext - prob.Ygoal.ys[end]
+
+                push!(backtrack_yts, yTnext)
+                push!(iter_ΔyT_norms, norm(ΔyTnext, prob.settings[:norm_p]))
+
                 println()
-                ΔY = ΔYnext
-                return
+                printstyled("       bt_iter     = ", i; color=:cyan)
+                println()
+                printstyled("       min |ΔY(T)| = ", minimum(ΔyT_norms); color=:cyan)
+                println()
+                printstyled("       |ΔY(T)|     = ", norm(ΔyTnext, prob.settings[:norm_p]); color=:cyan)
+                println()
+                println()
+
+                i += 1
             end
-            prob.Ẑ = prob.Ẑ - ΔZ
-            ΔZ = prob.settings[:α] * ΔZ
-            prob.Ẑ = prob.Ẑ + ΔZ
+            push!(ΔyT_norms, minimum(iter_ΔyT_norms))
+            prob.bt_dict[k] = backtrack_yts
+
             U = prob.Ẑ.actions
             A = [state[end - 2*udim + 1 : end - udim] for state in prob.Ẑ.states]
-            Ȳ = prob.experiment(prob.d2u ? A : U)
-            ΔYnext = Ȳ - prob.Ygoal
-            println("       iter =   $i")
-            println("       |ΔY(T)| = ", norm(ΔYnext.ys[end], prob.settings[:norm_p]))
-            println()
-            i += 1
+            # remeasure with new controls to get full measurement
+            Ȳ_bt = prob.experiment(prob.d2u ? A : U)
+            ΔY = Ȳ_bt - prob.Ygoal 
+
+            # push remeasured norm(ΔyT) to tracked errors
+            push!(ΔyT_norms, norm(ΔY.ys[end], prob.settings[:norm_p]))
+        else
+            ΔY = ΔYnext
+            push!(ΔyT_norms, norm(ΔY.ys[end], prob.settings[:norm_p]))
         end
-        ΔY = ΔYnext
         push!(prob.Ȳs, Ȳ)
         push!(prob.Us, prob.d2u ? hcat(A...) : hcat(U...))
         k += 1
@@ -1050,13 +1250,13 @@ function ProblemSolvers.solve!(prob::ILCProblem)
     @info "ILC converged!" "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
 end
 
-function d2u_to_a(U::Vector{Vector{Float64}}, Δt::Float64)
-    udim = length(U[1])
-    aug_u = fill(zeros(2*udim), length(U))
-    for t = 2:(length(U)-1)
-        aug_u[t] = aug_u[t-1] + (Δt .* [aug_u[t-1][end-udim+1:end]; U[t-1]])
-    end
-    return [a[1:udim] for a in aug_u]
-end
+# function d2u_to_a(U::Vector{Vector{Float64}}, Δt::Float64)
+#     udim = length(U[1])
+#     aug_u = fill(zeros(2*udim), length(U))
+#     for t = 2:(length(U)-1)
+#         aug_u[t] = aug_u[t-1] + (Δt .* [aug_u[t-1][end-udim+1:end]; U[t-1]])
+#     end
+#     return [a[1:udim] for a in aug_u]
+# end
 
 end

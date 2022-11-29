@@ -106,7 +106,8 @@ prob = ILCProblem(
     β=β,
     max_backtrack_iter=max_backtrack_iter,
     d2u=true,
-    d2u_bounds=fill(1e-6, 4)
+    d2u_bounds=fill(1e-6, 4),
+    QP_tol = 1e-3
 )
 
 solve!(prob)

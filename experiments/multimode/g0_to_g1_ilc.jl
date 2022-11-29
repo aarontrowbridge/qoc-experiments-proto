@@ -78,10 +78,12 @@ experiment = QuantumExperiment(
     Ẑ.times,
     # x -> x,
     g_pop,
-    # [5:5:50; Ẑ.T];
+    # [5:5:50; 75; Ẑ.T];
     # [10:10:100; Ẑ.T];
-    [25, 50, 75, Ẑ.T];
+    # [25, 50, 75, Ẑ.T];
     # [50, Ẑ.T];
+    # [10, 25, 50, 75, Ẑ.T];
+    [Ẑ.T];
     # [2:2:Ẑ.T - 10; Ẑ.T];
     # [1:Ẑ.T ÷ 2; Ẑ.T];
     # 1:Ẑ.T;
@@ -89,14 +91,14 @@ experiment = QuantumExperiment(
 )
 
 max_iter = 20
-max_backtrack_iter = 15
+max_backtrack_iter = 10
 fps = 2
 α = 0.5
-β = 1.0
-R = 1.0e1
-Qy = 1.0e2
-Qf = 1.0e2
-
+β = 0.01
+R = 1.0e2
+Qy = 1.0e1
+Qf = 2.0e2
+QP_tol = 1e-12
 
 prob = ILCProblem(
     data.system,
@@ -114,6 +116,7 @@ prob = ILCProblem(
     α=α,
     β=β,
     max_backtrack_iter=max_backtrack_iter,
+    QP_tol=QP_tol
 )
 
 solve!(prob)

@@ -8,3 +8,6 @@ output.txt
 .github/workflows/documentation.yml
 output.txt
 plots/
+sequences/
+log/
+

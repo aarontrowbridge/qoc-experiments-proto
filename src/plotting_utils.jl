@@ -805,6 +805,8 @@ function animate_ILC_multimode(
 )
     fig = Figure(resolution=(1200, 1200))
 
+    color = :glasbey_bw_minc_20_n256
+
     Ygoalax = Axis(fig[1, :]; title="Y goal", xlabel=L"t")
 
     Ȳax = Axis(fig[2, :]; title="Ȳ", xlabel=L"t")
@@ -813,7 +815,8 @@ function animate_ILC_multimode(
     τs = prob.Ygoal.times
 
     series!(Ygoalax, τs, Ygoal;
-        color=:phase,
+        color=color,
+        markersize=5
     )
 
     # axislegend(Ygoalax; position=:lb)
@@ -821,7 +824,8 @@ function animate_ILC_multimode(
     Ȳ₁ = hcat(prob.Ȳs[1].ys...)
 
     Ȳsp = series!(Ȳax, τs, Ȳ₁;
-        color=:phase,
+        color=color,
+        markersize=5
     )
 
     # axislegend(Ȳax; position=:lb)
@@ -831,7 +835,8 @@ function animate_ILC_multimode(
     ΔY₁ = Ȳ₁ - Ygoal
 
     ΔYsp = series!(ΔYax, τs, ΔY₁;
-        color=:phase,
+        color=color,
+        markersize=5
     )
 
     autolimits!(ΔYax)

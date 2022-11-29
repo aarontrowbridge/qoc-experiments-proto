@@ -27,12 +27,14 @@ gate = :X
 ψ = [ψ0, ψ1]
 ψf = apply.(gate, ψ)
 
+a_bounds = [1.0, 0.5]
+
 system = QuantumSystem(
     H_drift,
     H_drive,
     ψ,
-    ψf,
-    [1.0, 0.5]
+    ψf;
+    a_bounds=a_bounds,
 )
 
 
@@ -131,11 +133,6 @@ u_regularizer = QuadraticRegularizer(;
     times=1:T-1,
     R=R,
     eval_hessian=eval_hessian
-)
-
-mintime_obj = MinTimeObjective(;
-    T=T,
-    eval_hessian=true
 )
 
 u_smoothness_regularizer = QuadraticSmoothnessRegularizer(;
@@ -285,9 +282,14 @@ end
 #
 
 @testset "testing mintime objective + regularizer + smoothness regularizer " begin
-    n_variables_mintime = system.vardim * T + T - 1
+    n_variables_mintime = system.vardim * T + T
 
     Z_mintime = 2 * rand(n_variables_mintime) .- 1
+
+    mintime_obj = MinTimeObjective(;
+        Δt_indices=system.vardim * T .+ (1:T),
+        T=T
+    )
 
     obj = mintime_obj + u_regularizer + u_smoothness_regularizer
 
@@ -363,7 +365,7 @@ end
 
         # setting up dynamics struct
 
-        D = MinTimeQuantumDynamics(
+        D = QuantumDynamics(
             system,
             integrator,
             Z_indices,
@@ -422,7 +424,7 @@ end
 
     Z_slack_prob = get_variables(slack_prob)
 
-    slack_obj = filter(slack_prob.objective_terms) do term
+    slack_obj = filter(slack_prob.params[:objective_terms]) do term
         term[:type] == :L1SlackRegularizer
     end[1] |> Objective
 
@@ -435,14 +437,10 @@ end
 
     @test all(isapprox.(∇L, ∇L_forward_diff; atol=ATOL))
 
-    slack_con = filter!(slack_prob.constraints) do con
-        con isa L1SlackConstraint
-    end[1]
-
     # test slack constraint is satisfied on solved problem
-    s1 = Z_slack_prob[slack_con.s1_indices]
-    s2 = Z_slack_prob[slack_con.s2_indices]
-    x = Z_slack_prob[slack_con.x_indices]
+    s1 = Z_slack_prob[slack_prob.params[:s1_indices]]
+    s2 = Z_slack_prob[slack_prob.params[:s2_indices]]
+    x = Z_slack_prob[slack_prob.params[:x_indices]]
 
     @test all(isapprox.(s1 - s2, x; atol=ATOL))
 end
@@ -455,7 +453,6 @@ end
 
 @testset "testing saving and loading of problems" begin
 
-
     fixed_time_save_path = generate_file_path(
         "jld2",
         "test_save",
@@ -466,43 +463,13 @@ end
 
     save_problem(prob, fixed_time_save_path)
 
-    min_time_save_path = generate_file_path(
-        "jld2",
-        "test_save",
-        pwd()
-    )
-
-    min_time_prob = MinTimeQuantumControlProblem(system)
-
-    save_problem(min_time_prob, min_time_save_path)
-
-
-
     @testset "fixed time problems" begin
         prob_loaded = load_problem(fixed_time_save_path)
         data_loaded = load_data(fixed_time_save_path)
 
         @test prob_loaded isa QuantumControlProblem
         @test data_loaded isa ProblemData
-
-        @test data_loaded.type == :FixedTime
     end
-
-    @testset "min time problems" begin
-        min_time_prob_loaded = load_problem(min_time_save_path)
-        min_time_data_loaded = load_data(min_time_save_path)
-
-
-        @test min_time_prob_loaded isa MinTimeQuantumControlProblem
-        @test min_time_data_loaded isa ProblemData
-        @test min_time_data_loaded.type == :MinTime
-    end
-
-    @test min_time_save_path[1:end-6] * "0" == fixed_time_save_path[1:end-5]
 
     rm(fixed_time_save_path)
-    rm(min_time_save_path)
-
-
-
 end

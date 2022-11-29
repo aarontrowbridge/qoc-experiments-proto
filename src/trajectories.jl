@@ -384,4 +384,19 @@ function load_controls_matrix_and_times(
     return controls, traj.times
 end
 
+function dumb_downsample(traj::Trajectory, take_every_n::Int)
+    @assert traj.T % take_every_n == 0
+    Δt_new = traj.Δt * take_every_n
+    states_new = traj.states[1:take_every_n:end]
+    actions_new = traj.actions[1:take_every_n:end]
+    times_new = traj.times[1:take_every_n:end]
+    return Trajectory(
+        states_new,
+        actions_new,
+        times_new,
+        traj.T ÷ take_every_n,
+        Δt_new
+    )
+end
+
 end
