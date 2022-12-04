@@ -82,11 +82,26 @@ def take_controls_and_measure(times, controls, taus, measure_with_piby2s=True):
                 # expt_cfg = (json.loads(a.attrs['experiment_cfg']))[experiment_names[0]]
                 I, Q = np.array(a['I']), np.array(a['Q'])
             data_to_look_at = I
-            Is.append(data_to_look_at)
+            if experiment_cfg['optimal_control_test_1step']['singleshot']:
+                data_means = np.mean(data_to_look_at, axis=0)
+                g_val = data_means[-2]
+                e_val = data_means[-1]
+                Is.append((data_means[:-2] - g_val) / (e_val - g_val))
+                # Additional things, not sure what quantities are desired
+                # measurements formatted with each row corresponding to a photon peak, so actual_meas_dat[0] will be
+                # the 0 photon peak, etc.
+                actual_meas_dat = np.array(data_to_look_at).T[:-2]
+                # all values corresponding to qubit in g for normalization
+                g_dat = np.array(data_to_look_at).T[-2]
+                # all values corresponding to qubit in e for normalization
+                e_dat = np.array(data_to_look_at).T[-1]
+            else:
+                Is.append(data_to_look_at)
         Is = np.array(Is)
         e_pop = np.mean(Is[0][-3:])  # higher photon numbers should be flat at baseline value, average last 3
-        g_pop = 1 - e_pop
-        output = [g_pop, e_pop]
+        # g_pop = 1 - e_pop
+        # output = [g_pop, e_pop]
+        output = [e_pop]
 
         ##### Data analysis and manipulation #####
         look_at_n_peaks = 10  # number of peaks to look at
@@ -102,11 +117,14 @@ def take_controls_and_measure(times, controls, taus, measure_with_piby2s=True):
         cav_pops_norm = np.abs(cav_pops - norm_scale)
         cav_pops_norm = cav_pops_norm / np.sum(cav_pops_norm)
 
+        cav_cov = np.cov(cav_pops_collected)
+
         for pop in cav_pops_norm:
             output.append(pop)
+            
         final_output.append(output)
 
-    return np.array(final_output)  # remove [0] later
+    return np.array(final_output)
 
 # # Testing that the code runs
 # filename = "S:\\KevinHe\\Optimal Control and Blockade\\Aditya work\\221114_Aaron_pulses\\converted\\g0_to_g1_T_102_dt_4.0_Q_200.0_R_0.1_u_bound_0.0001_iter_10000_00005_noflip.h5"
