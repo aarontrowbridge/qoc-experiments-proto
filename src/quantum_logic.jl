@@ -63,6 +63,27 @@ function annihilate(levels::Int)
     return diagm(1 => map(sqrt, 1:levels - 1))
 end
 
+function annihilate(levels::Int, pos::Int, total::Int)
+    a_temp = I(levels^(pos-1))
+    a_temp = kron(a_temp, annihilate(levels))
+    return kron(a_temp, I(levels^(total - pos)))
+end
+
+function create(levels::Int, pos::Int, total::Int)
+    return (annihilate(levels, pos, total))'
+end
+
+function number(levels::Int, pos::Int, total::Int)
+    return create(levels, pos, total) * 
+           annihilate(levels, pos, total)
+end
+
+function quad(levels::Int, pos::Int, total::Int)
+    return number(levels, pos, total) * 
+           (number(levels, pos, total) - I(levels^total))
+end
+
+
 function create(levels::Int)
     return (annihilate(levels))'
 end

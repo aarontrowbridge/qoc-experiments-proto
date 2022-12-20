@@ -37,6 +37,15 @@ function plot_single_qubit_1_qstate_with_controls(
     )
 end
 
+function plot_bose_hubbard(
+    system::QuantumSystem,
+    traj::Trajectory,
+    path::String;
+    fig_title=nothing
+)
+
+
+end
 
 function plot_single_qubit_1_qstate_with_controls(
     traj::Trajectory,
