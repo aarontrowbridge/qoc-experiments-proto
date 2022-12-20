@@ -40,11 +40,44 @@ end
 function plot_bose_hubbard(
     system::QuantumSystem,
     traj::Trajectory,
+    N::Int,
+    sites::Int,
     path::String;
     fig_title=nothing
 )
+    fig = Figure(resolution=(1200, 1500))
+    ψs = pop_matrix(traj, system, components=[N+1, N^(sites - 1) + 1])
+    ψax = Axis(fig[1:2, :]; title="Highest energy eigenstates", xlabel=L"t")
+    series!(ψax, traj.times, ψs;
+    labels=[
+        L"|0000010\rangle",
+        L"|1000000\rangle"
+        ]
+)
+    for j = 0:system.control_order
 
+        ax_j = Axis(fig[3 + j, :]; xlabel = L"t")
 
+        series!(
+            ax_j,
+            traj.times,
+            jth_order_controls_matrix(traj, system, j);
+            labels = [
+                j == 0 ?
+                latexstring("a_$k (t)") :
+                latexstring(
+                    "\\mathrm{d}^{",
+                    j == 1 ? "" : "$j",
+                    "}_t a_$k"
+                )
+                for k = 1:system.ncontrols
+            ]
+        )
+
+        axislegend(ax_j; position=:lt)
+    end
+
+    save(path, fig)
 end
 
 function plot_single_qubit_1_qstate_with_controls(
