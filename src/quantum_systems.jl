@@ -9,6 +9,7 @@ export TransmonSystem
 using ..QuantumLogic
 
 using HDF5
+using SparseArrays
 
 using LinearAlgebra
 
@@ -83,16 +84,16 @@ QuantumSystem(
 * `goal_phase`: the phase of the initial guess goal state(s) (which is linearly interpolated from the initial state when problem is cold started) - defaults to `0.0`
 """
 function QuantumSystem(
-    H_drift::Matrix,
-    H_drives::Vector{Matrix{T}},
-    ψinit::Union{Vector{C1}, Vector{Vector{C1}}},
-    ψgoal::Union{Vector{C2}, Vector{Vector{C2}}};
+    H_drift::Union{Matrix, SparseMatrixCSC},
+    H_drives::Union{Vector{Matrix{T}},Vector{SparseMatrixCSC{T, Ti}}},
+    ψinit::Union{Vector{C1}, Vector{Vector{C1}}, SparseVector{C1, Ti}},
+    ψgoal::Union{Vector{C2}, Vector{Vector{C2}}, SparseVector{C2, Ti}};
     a_bounds::Vector{Float64}=fill(Inf, length(H_drives)),
     ∫a=false,
     control_order=2,
     goal_phase=0.0,
     params=Dict()
-) where {C1 <: Number, C2 <: Number, T <: Number}
+) where {C1 <: Number, C2 <: Number, T <: Number, Ti <: Integer}
 
     params[:goal_phase] = goal_phase
 
