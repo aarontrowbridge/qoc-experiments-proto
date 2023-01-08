@@ -35,8 +35,8 @@ function Base.:+(obj1::Objective, obj2::Objective)
 	L = Z -> obj1.L(Z) + obj2.L(Z)
 	∇L = Z -> obj1.∇L(Z) + obj2.∇L(Z)
 	if isnothing(obj1.∂²L) && isnothing(obj2.∂²L)
-		∂²L = Nothing
-		∂²L_structure = Nothing
+		∂²L = nothing
+		∂²L_structure = nothing
 	elseif isnothing(obj1.∂²L)
 		∂²L = Z -> obj2.∂²L(Z)
 		∂²L_structure = obj2.∂²L_structure
