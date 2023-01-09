@@ -36,8 +36,17 @@ end
 
 ψ1 = zeros(N^sites)
 ψ1[N+1] = 1.
+
+
 ψf = zeros(N^sites)
-ψf[N^(sites - 1) + 1] = 1.
+
+eigs = [-0.191, 0.354, -0.462, 0.500, 
+        -0.462, 0.354, -0.191]
+
+for i = 0:sites-1
+    ψf[N^i + 1] = eigs[i + 1]
+end
+
 
 control_bounds = 2π*[0.5 for i = 1:sites]
 
