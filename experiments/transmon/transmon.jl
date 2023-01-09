@@ -27,7 +27,7 @@ system = QuantumSystem(
     H_drive,
     ψ1,
     ψf,
-    [2π * 19e-3,  2π * 19e-3]
+    a_bounds = [2π * 19e-3,  2π * 19e-3]
 )
 
 #T is number of time steps, not total time
@@ -62,6 +62,7 @@ display(prob.trajectory.states[2])
 
 solve!(prob)
 
+println(prob.trajectory.times)
 display(prob.trajectory.states[2])
 
 raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)

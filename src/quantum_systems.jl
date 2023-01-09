@@ -49,11 +49,11 @@ struct QuantumSystem <: AbstractSystem
     vardim::Int
     ncontrols::Int
     control_order::Int
-    G_drift::Matrix{Float64}
-    G_drives::Vector{Matrix{Float64}}
+    G_drift::Union{Matrix{Float64}, SparseMatrixCSC{Float64, Int64}}
+    G_drives::Union{Vector{Matrix{Float64}}, Vector{SparseMatrixCSC{Float64, Int64}}}
     a_bounds::Vector{Float64}
-    ψ̃init::Vector{Float64}
-    ψ̃goal::Vector{Float64}
+    ψ̃init::Union{Vector{Float64}, SparseVector{Float64, Int64}}
+    ψ̃goal::Union{Vector{Float64}, SparseVector{Float64, Int64}}
     ∫a::Bool
     params::Dict{Symbol, Any}
 end
@@ -97,7 +97,7 @@ function QuantumSystem(
 
     params[:goal_phase] = goal_phase
 
-    if isa(ψinit, Vector{C1})
+    if isa(ψinit, Vector{C1}) || isa(ψinit, SparseVector{C1, Ti})
         nqstates = 1
         ketdim = length(ψinit)
         isodim = 2 * ketdim

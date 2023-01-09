@@ -9,6 +9,7 @@ export plot_single_qubit
 export plot_transmon
 export plot_transmon_population
 export plot_twoqubit
+export plot_bose_hubbard
 export animate_ILC
 export animate_ILC_multimode
 
