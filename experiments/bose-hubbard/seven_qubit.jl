@@ -117,9 +117,9 @@ raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)
 save_controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
 
 result = Dict(
-    "total_time" => T * Δt,
+    "total_time" => prob.trajectory.times[end],
     "T" => T,
-    "delta_t" => Δt,
+    "times" => prob.trajectory.times,
     # "trajectory" => prob.trajectory,
     #"a_max" => amax,
     "controls" => save_controls,
