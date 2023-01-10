@@ -55,15 +55,35 @@ function problem_constraints(
     #TODO: maybe add ∫a constraint
 
     # initial and final a(t ∈ {1, T}) = 0 constraints
-    a_cons = EqualityConstraint(
-        [1, params[:T]],
-        system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
-        0.0,
-        system.vardim;
-        name="initial and final augmented state constraints"
-    )
-    push!(cons, a_cons)
 
+    aT_con = EqualityConstraint(
+            [params[:T]],
+            system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
+            0.0,
+            system.vardim;
+            name="initial and final augmented state constraints"
+    )
+    push!(cons, aT_con)
+
+    if params[:zero_a₀]
+        a0_cons = EqualityConstraint(
+            [1],
+            system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
+            0.0,
+            system.vardim;
+            name="initial and final augmented state constraints"
+        )
+        push!(cons, a0_cons)
+    elseif !isnothing(params[:a₀s])
+        a0_cons = EqualityConstraint(
+            [1],
+            system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
+            params[:a₀s],
+            system.vardim;
+            name="initial and final augmented state constraints"
+        )
+        push!(cons, a0_cons)
+    end
     # initial and final da(t ∈ {1, T}) = 0 constraints
     # aug_cons = EqualityConstraint(
     #     [1, params[:T]],
@@ -184,6 +204,8 @@ function QuantumControlProblem(
     additional_objective=nothing,
     L1_regularized_states::Vector{Int}=Int[],
     α=fill(10.0, length(L1_regularized_states)),
+    zero_a₀=true,
+    a₀s=nothing,
 
     # keyword args below are for initializing the trajactory
     linearly_interpolate=true,
@@ -199,7 +221,9 @@ function QuantumControlProblem(
 )
     @assert mode ∈ (:fixed_time, :free_time, :min_time)
     @assert length(u_bounds) == length(system.G_drives)
-
+    if !isnothing(a₀s)
+        @assert length(a₀s) == system.ncontrols 
+    end
     optimizer = Ipopt.Optimizer()
 
     set!(optimizer, options)
@@ -241,6 +265,8 @@ function QuantumControlProblem(
         :constraints => constraints,
         :Z_indices => Z_indices,
         :Δt_indices => Δt_indices,
+        :zero_a₀ => zero_a₀,
+        :a₀s => a₀s
     )
 
     if mode ∈ (:fixed_time, :free_time)
@@ -378,7 +404,7 @@ function QuantumControlProblem(
         variables,
         optimizer,
         init_traj,
-        params
+        params,
     )
 end
 
@@ -416,7 +442,7 @@ function initialize_optimizer!(
     MOI.set(optimizer, MOI.NLPBlock(), block_data)
     MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     variables = MOI.add_variables(optimizer, n_variables)
-    constrain!(optimizer, variables, constraints, verbose=true)
+    constrain!(optimizer, variables, constraints)
     return variables
 end
 
