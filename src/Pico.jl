@@ -48,17 +48,26 @@ include("constraints.jl")
 include("problems.jl")
 @reexport using .Problems
 
-# include("problems_mintime.jl")
-# @reexport using .MinTimeProblems
-
 include("problem_utils.jl")
 @reexport using .ProblemUtils
 
 include("problem_solvers.jl")
 @reexport using .ProblemSolvers
 
-include("iterative_learning_control.jl")
+include("ilc_trajectories.jl")
+@reexport using .ILCTrajectories
+
+include("ilc_experiments.jl")
+@reexport using .ILCExperiments
+
+include("ilc_quadratic_problems.jl")
+@reexport using .ILCQuadraticProblems
+
+include("ilc.jl")
 @reexport using .IterativeLearningControl
+
+include("plotting_ilc.jl")
+@reexport using .PlottingILC
 
 include("plotting_utils.jl")
 @reexport using .PlottingUtils

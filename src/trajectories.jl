@@ -26,15 +26,15 @@ end
 
 function rollout(
     sys::AbstractSystem,
-    A::Vector{<:AbstractVector},
+    as::Vector{<:AbstractVector},
     Δt::Vector{Float64};
-    integrator=fourth_order_pade
+    integrator=exp
 )
-    T = length(A) + 1
+    T = length(as)
     Ψ̃ = Vector{typeof(sys.ψ̃init)}(undef, T)
     Ψ̃[1] = sys.ψ̃init
     for t = 2:T
-        Gₜ = Integrators.G(A[t - 1], sys.G_drift, sys.G_drives)
+        Gₜ = Integrators.G(as[t - 1], sys.G_drift, sys.G_drives)
         ψ̃ⁱₜ₋₁s = @views [
             Ψ̃[t - 1][slice(i, sys.isodim)]
                 for i = 1:sys.nqstates

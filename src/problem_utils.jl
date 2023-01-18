@@ -106,6 +106,10 @@ function get_and_save_controls(
     save_controls(data.trajectory, data.system, save_path)
 end
 
+function TrajectoryUtils.save_controls(prob::AbstractProblem, path::String)
+    save_controls(prob.trajectory, prob.system, path)
+end
+
 function generate_file_path(extension, file_name, path)
     # Ensure the path exists.
     mkpath(path)

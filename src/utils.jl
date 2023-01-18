@@ -29,9 +29,10 @@ Z[index(t, dim)]      = zₜ[dim]
 
 Z[slice(t, pos1, pos2, dim)]      = zₜ[pos1:pos2]
 Z[slice(t, pos, dim)]             = zₜ[1:pos]
-Z[slice(t, dim)]                  = zₜ[1:dim]
+Z[slice(t, dim)]                  = zₜ[1:dim] := zₜ
 Z[slice(t, dim; stretch=stretch)] = zₜ[1:(dim + stretch)]
 Z[slice(t, indices, dim)]         = zₜ[indices]
+Z[slice(t1:t2, dim)]              = [zₜ₁;...;zₜ₂]
 
 the functions are also used to access the zₜ vectors, e.g.
 
@@ -55,5 +56,7 @@ slice(t, dim; stretch=0) = slice(t, 1, dim + stretch, dim)
 
 slice(t::Int, indices::AbstractVector{Int}, dim::Int) =
     dim * (t - 1) .+ indices
+
+slice(ts::UnitRange{Int}, dim::Int) = slice(ts[1], length(ts) * dim, dim)
 
 end

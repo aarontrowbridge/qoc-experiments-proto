@@ -1,13 +1,21 @@
 using Pico
 
-# data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
 data_dir = "experiments/multimode"
-
-# data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000"
-
 data_name = "g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5"
 
+# data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
+# data_name = "g0_to_g1_T_102_dt_4.0_Q_500.0_R_0.1_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000"
+
+
+# data_dir = "data/multimode/free_time/no_guess/good_solutions"
+# data_name = "g0_to_g1_T_100_dt_10.0_dt_max_factor_1.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-6_alpha_transmon_20.0_alpha_cavity_20.0_resolve_5_00000"
+
+
+
+
 data_path = joinpath(data_dir, data_name * ".jld2")
+
+data_path = "data/multimode/good_solutions/g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5.jld2"
 
 data = load_data(data_path)
 
@@ -36,7 +44,7 @@ transmon_levels = 3
 cavity_levels = 14
 ψ1 = "g0"
 ψf = "g1"
-χ = 1.2 * data.system.params[:χ]
+χ = 1.0 * data.system.params[:χ]
 
 experimental_system = MultiModeSystem(
     transmon_levels,
@@ -72,33 +80,40 @@ function g_pop(x)
     return convert(typeof(x), y)
 end
 
+a_bounds = data.system.a_bounds
+
+function quantize(a::Vector{Float64})
+    res = a_bounds ./ 128
+    return floor.(a ./ res) .* res
+end
+
 experiment = QuantumExperiment(
     experimental_system,
     Ẑ.states[1],
-    Ẑ.times,
-    # x -> x,
-    g_pop,
+    x -> x,
+    # g_pop,
     # [5:5:50; 75; Ẑ.T];
     # [10:10:100; Ẑ.T];
     # [25, 50, 75, Ẑ.T];
     # [50, Ẑ.T];
     # [10, 25, 50, 75, Ẑ.T];
-    [Ẑ.T];
+    # [Ẑ.T];
     # [2:2:Ẑ.T - 10; Ẑ.T];
     # [1:Ẑ.T ÷ 2; Ẑ.T];
-    # 1:Ẑ.T;
-    integrator=exp
+    1:Ẑ.T;
+    integrator=exp,
+    control_transform=quantize
 )
 
 max_iter = 20
 max_backtrack_iter = 10
-fps = 2
+fps = 1
 α = 0.5
-β = 0.01
+β = 1.0
 R = 1.0e2
 Qy = 1.0e1
-Qf = 2.0e2
-QP_tol = 1e-12
+Qf = 1.0e1
+QP_tol = 1e-6
 
 prob = ILCProblem(
     data.system,
@@ -121,7 +136,7 @@ prob = ILCProblem(
 
 solve!(prob)
 
-plot_dir = "plots/multimode/good_solutions/ILC"
+plot_dir = "plots/multimode/quantized/ILC"
 plot_path = generate_file_path("gif", data_name, plot_dir)
 
 animate_ILC_multimode(prob, plot_path; fps=fps)

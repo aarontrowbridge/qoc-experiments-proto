@@ -35,6 +35,7 @@ makedocs(
             "Iterative Learning Control" => "ilc.md",
             "Trajectories"               => "trajectories.md",
             "Plotting"                   => "plotting.md",
+            "ILC Trajectories"           => "ilc_trajectories.md",
         ],
         "Examples" => "examples.md",
     ],

@@ -17,7 +17,7 @@ xs = [
 ]
 
 us = [
-    data.trajectory.actions[t] 
+    data.trajectory.actions[t]
         for t = 1:data.trajectory.T
 ]
 
@@ -53,10 +53,28 @@ g(ψ̃) = abs2.(iso_to_ket(ψ̃))
 
 function g_pop(x)
     y = []
-    append!(y, sum(x[1:cavity_levels].^2 + x[3*cavity_levels .+ (1:cavity_levels)].^2))
-    append!(y, sum(x[cavity_levels .+ (1:cavity_levels)].^2 + x[4*cavity_levels .+ (1:cavity_levels)].^2))
+    append!(y,
+        sum(
+            x[1:cavity_levels].^2 +
+            x[3*cavity_levels .+ (1:cavity_levels)].^2
+        )
+    )
+    append!(y,
+        sum(
+            x[cavity_levels .+ (1:cavity_levels)].^2 +
+            x[4*cavity_levels .+ (1:cavity_levels)].^2
+        )
+    )
     for i = 1:10
-        append!(y, x[i]^2 + x[i+3*cavity_levels]^2 + x[i + cavity_levels]^2 + x[i+4*cavity_levels]^2 + x[i + 2*cavity_levels]^2 + x[i + 5*cavity_levels]^2)
+        append!(
+            y,
+            x[i]^2 +
+            x[i + 3 * cavity_levels]^2 +
+            x[i + cavity_levels]^2 +
+            x[i + 4 * cavity_levels]^2 +
+            x[i + 2 * cavity_levels]^2 +
+            x[i + 5 * cavity_levels]^2
+        )
         #append!(y, x[i + cavity_levels]^2 + x[i+3*cavity_levels]^2)
     end
     return convert(typeof(x), y)
