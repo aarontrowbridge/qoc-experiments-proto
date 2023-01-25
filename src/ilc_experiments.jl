@@ -7,6 +7,8 @@ export AbstractExperiment
 export HardwareExperiment
 export QuantumExperiment
 export experiment
+export rollout
+export nominal_rollout
 
 using ..Trajectories
 using ..ILCTrajectories
@@ -39,7 +41,7 @@ function Base.:-(
     @assert data1.τs == data2.τs
     return MeasurementData(
         data1.ys .- data2.ys,
-        data1.Σs .+ data2.Σs, #TODO: check this -- currently not used in calculations
+        data1.Σs, #TODO: reformulate for correctness -- currently not used in calculations
         data1.τs,
         data1.ydim
     )
@@ -177,13 +179,13 @@ end
 # - show fidelity
 
 function (experiment::QuantumExperiment)(
-    U::AbstractMatrix{Float64},
+    A::AbstractMatrix{Float64},
     times::AbstractVector{Float64};
     backtracking=false,
     σ=1.0
 )::MeasurementData
 
-    Ψ̃ = rollout(experiment, U, times)
+    Ψ̃ = rollout(A, times, experiment)
 
     if backtracking
         Ȳ = measure(
@@ -207,20 +209,22 @@ function (experiment::QuantumExperiment)(
 end
 
 function rollout(
-    experiment::QuantumExperiment,
-    U::AbstractMatrix{Float64},
-    times::AbstractVector{Float64}
+    A::AbstractMatrix{Float64},
+    times::AbstractVector{Float64},
+    experiment::QuantumExperiment
 )
-    T = size(U, 2)
+    T = size(A, 2)
 
     Ψ̃ = zeros(eltype(experiment.ψ̃₁), length(experiment.ψ̃₁), T)
 
     Ψ̃[:, 1] .= experiment.ψ̃₁
 
+    Â = experiment.control_transform(A)
+
     for t = 2:T
-        uₜ₋₁ = experiment.control_transform(U[:, t - 1])
+        âₜ₋₁ = Â[:, t - 1]
         Gₜ = Integrators.G(
-            uₜ₋₁,
+            âₜ₋₁,
             experiment.G_drift,
             experiment.G_drives
         ) + experiment.G_error_term
@@ -232,6 +236,36 @@ function rollout(
 
     return Ψ̃
 end
+
+function nominal_rollout(
+    A::AbstractMatrix{Float64},
+    times::AbstractVector{Float64},
+    experiment::QuantumExperiment;
+    integrator=Integrators.fourth_order_pade
+)
+    T = size(A, 2)
+
+    Ψ̃ = zeros(eltype(experiment.ψ̃₁), length(experiment.ψ̃₁), T)
+
+    Ψ̃[:, 1] .= experiment.ψ̃₁
+
+    for t = 2:T
+        aₜ₋₁ = A[:, t - 1]
+        Gₜ = Integrators.G(
+            aₜ₋₁,
+            experiment.G_drift,
+            experiment.G_drives
+        )
+
+        Δt = times[t] - times[t - 1]
+
+        Ψ̃[:, t] .= integrator(Gₜ * Δt) * Ψ̃[:, t - 1]
+    end
+
+    return Ψ̃
+end
+
+
 
 
 

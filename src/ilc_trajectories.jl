@@ -3,6 +3,7 @@ module ILCTrajectories
 export Traj
 export TimeSlice
 export add_component!
+export update!
 export times
 
 
@@ -212,9 +213,9 @@ function Traj(
     datavec::AbstractVector{Float64},
     Z::Traj
 )
-    data = reshape(view(datavec, :), :, Z.T)
+    @assert length(datavec) == length(Z.datavec)
 
-    @assert size(data, 1) == Z.dim
+    data = reshape(view(datavec, :), :, Z.T)
 
     return Traj(
         data,
@@ -301,6 +302,14 @@ function add_component!(
         dim_dict[:u] += dim
     end
     traj.dims = NamedTuple(dim_dict)
+end
+
+function update!(traj::Traj, comp::Symbol, data::AbstractMatrix{Float64})
+    @assert comp ∈ keys(traj.components)
+    @assert size(data, 1) == length(traj.components[comp])
+    @assert size(data, 2) == traj.T
+    traj.data[traj.components[comp], :] = data
+    traj.datavec = vec(view(traj.data, :, :))
 end
 
 struct TimeSlice

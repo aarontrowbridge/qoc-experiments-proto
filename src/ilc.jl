@@ -38,6 +38,7 @@ mutable struct ILCProblemNew
         Qyf=100.0,
         R=(a=1.0, dda=1.0),
         correction_term=true,
+        dynamic_measurements=true,
         verbose=true,
         max_iter=100,
         max_backtrack_iter=10,
@@ -94,19 +95,22 @@ mutable struct ILCProblemNew
                 Ẑgoal,
                 f,
                 experiment.g,
+                experiment.τs,
                 Qy, Qyf, R,
                 correction_term,
+                dynamic_measurements,
                 QP_settings;
                 mle=mle
             )
         else
-            QP = DynamicQuadraticProblem(
-                f, experiment.g,
-                Q, Qy, Qyf, R, Σ,
-                u_bounds,
+            QP = DynamicQuadraticProblemNew(
+                Ẑgoal,
+                f,
+                experiment.g,
+                Qy, Qyf, R,
                 correction_term,
-                QP_settings,
-                dims
+                QP_settings;
+                mle=mle
             )
         end
 
@@ -137,103 +141,186 @@ mutable struct ILCProblemNew
     end
 end
 
-function ProblemSolvers.solve!(prob::ILCProblemNew; σ=1.0)
+function ProblemSolvers.solve!(
+    prob::ILCProblemNew;
+    σ=1.0,
+    nominal_correction=true,
+    nominal_rollout_integrator=Integrators.fourth_order_pade,
+)
+    # get the initial controls and add to the stored list of controls
     A = prob.Ẑ.a
-    Ȳ = prob.experiment(A, times(prob.Ẑ))
-    push!(prob.Ȳs, Ȳ)
     push!(prob.As, A)
+
+    # get the initial measurement and add to the stored list of measurements
+    Ȳ = prob.experiment(A, times(prob.Ẑ); σ=σ)
+    push!(prob.Ȳs, Ȳ)
+
+    # compute the initial error
     ΔY = Ȳ - prob.Ygoal
+
     println()
-    printstyled()
+
+    # initialize the tracked list of normed measurement errors
     ΔyT_norms = [norm(ΔY.ys[end], prob.settings[:norm_p])]
+
+    # initialize the iteration counter
     k = 1
+
     while true
+
+        # check if we've reached the maximum number of ILC iterations
         if k > prob.settings[:max_iter]
             @info "max iterations reached" max_iter = prob.settings[:max_iter]
             return
         end
+
+        # printed ILC iteratation information
         if prob.settings[:verbose]
             println()
             printstyled("iter    = ", k; color=:magenta)
             println()
-            printstyled("⟨|ΔY|⟩  = ", mean([norm(y, prob.settings[:norm_p]) for y in ΔY.ys]); color=:magenta)
-            println()
+            # printstyled("⟨|ΔY|⟩  = ", mean([norm(y, prob.settings[:norm_p]) for y in ΔY.ys]); color=:magenta)
+            # println()
             printstyled("|ΔY(T)| = ", norm(ΔY.ys[end], prob.settings[:norm_p]); color=:magenta)
             println()
             println()
         end
-        ΔZ = prob.settings[:β] * prob.QP(prob.Ẑ, ΔY)
-        prob.Ẑ = prob.Ẑ + ΔZ
 
+        # get step direction from QP
+        ΔZ = prob.QP(ΔY, prob.Ẑ)
+
+        # mutliply by pre-scaling factor β
+        ΔZ *= prob.settings[:β]
+
+        # update nominal trajectory
+        println("norm(A) = ", norm(prob.Ẑ.a))
+        prob.Ẑ += ΔZ
+        println("norm(A) = ", norm(prob.Ẑ.a))
+
+        # get the updated controls
         A = prob.Ẑ.a
-        Ȳ = prob.experiment(A, times(prob.Ẑ), σ=σ)
-        ΔYnext = Ȳ - prob.Ygoal
-        ΔyTnext = ΔYnext.ys[end]
 
-        # backtracking
-        if norm(ΔyTnext, prob.settings[:norm_p]) >
-            minimum(ΔyT_norms)
+        # run an experiment with the updated controls
+        Ȳ = prob.experiment(A, times(prob.Ẑ); σ=σ)
+
+        # compute the difference between the updated measurements and the goal
+        ΔY_next = Ȳ - prob.Ygoal # type: MeasurementData
+
+        # get the vector valued final measurement difference
+        ΔyT_next = ΔY_next.ys[end]
+
+        # line search phase of ILC
+        # TODO: make this modular
+        if norm(ΔyT_next, prob.settings[:norm_p]) >= minimum(ΔyT_norms)
 
             printstyled("   backtracking"; color=:magenta)
             println()
             println()
-            i = 1
-            backtrack_yts = []
 
+            # initialize the backtracking iteration counter
+            i = 1
+
+            # initialize the list of final measurements during backtracking
+            backtrack_yTs = []
+
+            # initialize the list of measurement errors during backtracking
             iter_ΔyT_norms = []
 
-            while norm(ΔyTnext, prob.settings[:norm_p]) >
-                minimum(ΔyT_norms)
+            # backtracking loop
+            while norm(ΔyT_next, prob.settings[:norm_p]) >= minimum(ΔyT_norms)
+
+                # check if we've reached the maximum number of backtracking iterations
                 if i > prob.settings[:max_backtrack_iter]
                     println()
                     printstyled("   max backtracking iterations reached"; color=:magenta)
                     println()
                     println()
-                    ΔY = ΔYnext
+                    ΔY = ΔY_next
                     return
                 end
 
-                prob.Ẑ = prob.Ẑ - ΔZ
-                ΔZ = prob.settings[:α] * ΔZ
-                prob.Ẑ = prob.Ẑ + ΔZ
+                # reset to previous state
+                prob.Ẑ -= ΔZ
+                println("norm(A) = ", norm(prob.Ẑ.a))
+
+                # decrease step size by a factor of α
+                ΔZ *= prob.settings[:α]
+
+                # take step
+                prob.Ẑ += ΔZ
+                println("norm(A) = ", norm(prob.Ẑ.a))
+
+                # get pulse controls
                 A = prob.Ẑ.a
 
-                yTnext = prob.experiment(A, times(prob.Ẑ); backtracking=true, σ=σ)
-                ΔyTnext = yTnext.ys[end] - prob.Ygoal.ys[end]
+                # get the final measurement of the experiment with the updated controls
+                yT = prob.experiment(A, times(prob.Ẑ); backtracking=true, σ=σ).ys[end]
 
-                push!(backtrack_yts, yTnext.ys[end])
-                push!(iter_ΔyT_norms, norm(ΔyTnext, prob.settings[:norm_p]))
+                display(minimum(abs.(yT)))
 
+                # store the final measurement
+                push!(backtrack_yTs, yT)
+
+                # compute the difference between the updated measurement and the goal
+                ΔyT_next = yT - prob.Ygoal.ys[end]
+
+                # store the norm of the final measurement difference
+                push!(iter_ΔyT_norms, norm(ΔyT_next, prob.settings[:norm_p]))
+
+                # printed backtracking iteration information
                 println()
                 printstyled("       bt_iter     = ", i; color=:cyan)
                 println()
                 printstyled("       min |ΔY(T)| = ", minimum(ΔyT_norms); color=:cyan)
                 println()
-                printstyled("       |ΔY(T)|     = ", norm(ΔyTnext, prob.settings[:norm_p]); color=:cyan)
+                printstyled("       |ΔY(T)|     = ", norm(ΔyT_next, prob.settings[:norm_p]); color=:cyan)
                 println()
                 println()
 
+                # increment backtracking iteration counter
                 i += 1
             end
+
+            # update the list of normed measurement errors
+            # with the minimum of the backtracking iteration errors
             push!(ΔyT_norms, minimum(iter_ΔyT_norms))
-            prob.bt_dict[k] = backtrack_yts
 
-            A = prob.Ẑ.a
+            # store the backtracking per iteration measurement data
+            prob.bt_dict[k] = backtrack_yTs
+
             # remeasure with new controls to get full measurement
-            Ȳ_bt = prob.experiment(A, times(prob.Ẑ); backtracking=true, σ=σ)
-            ΔY = Ȳ_bt - prob.Ygoal
+            Ȳ = prob.experiment(A, times(prob.Ẑ); σ=σ)
 
-            # push remeasured norm(ΔyT) to tracked errors
+            # compute new error
+            ΔY = Ȳ - prob.Ygoal
+
+            # push remeasured norm(ΔY) to tracked errors
             push!(ΔyT_norms, norm(ΔY.ys[end], prob.settings[:norm_p]))
         else
-            ΔY = ΔYnext
+            # if not backtracking, just update the error
+            ΔY = ΔY_next
+
+            # push normed final error to tracked errors
             push!(ΔyT_norms, norm(ΔY.ys[end], prob.settings[:norm_p]))
         end
+
+        # store the updated measurement data
         push!(prob.Ȳs, Ȳ)
+
+        # store the updated controls
         push!(prob.As, A)
+
+        if nominal_correction
+            # get corrected nominal trajectory
+            Ψ̃_corrected = nominal_rollout(A, times(prob.Ẑ), prob.experiment; integrator=nominal_rollout_integrator)
+
+            # update nominal trajectory
+            update!(prob.Ẑ, :ψ̃, Ψ̃_corrected)
+        end
+
+        # increment ILC iteration counter
         k += 1
     end
-    @info "ILC converged!" "|ΔY|" = norm(ΔY, prob.settings[:norm_p]) tol = prob.settings[:tol] iter = k
 end
 
 
@@ -279,7 +366,7 @@ mutable struct ILCProblem
         β=0.5,
         norm_p=Inf,
         static_QP=false,
-        QP_max_iter=100_000,
+        QP_max_iter=1e5,
         QP_verbose=false,
         QP_tol=1e-9,
         QP_linear_solver="mkl pardiso",
@@ -474,7 +561,9 @@ mutable struct ILCProblem
         if static_QP
             QP = StaticQuadraticProblem(
                 Ẑgoal,
-                f, experiment.g,
+                f,
+                experiment.g,
+                experiment.τs,
                 Q, Qy, Qf, R, Σ,
                 u_bounds,
                 correction_term,
@@ -485,7 +574,8 @@ mutable struct ILCProblem
             )
         else
             QP = DynamicQuadraticProblem(
-                f, experiment.g,
+                f,
+                experiment.g,
                 Q, Qy, Qf, R, Σ,
                 u_bounds,
                 correction_term,
@@ -542,7 +632,6 @@ function ProblemSolvers.solve!(prob::ILCProblem)
     U = hcat(U...)
     A = hcat(A...)
     Ȳ = prob.experiment(prob.d2u ? A : U, prob.Ẑ.times)
-    println(length(prob.Ȳs))
     push!(prob.Ȳs, Ȳ)
     push!(prob.Us, prob.d2u ? A : U)
     ΔY = Ȳ - prob.Ygoal

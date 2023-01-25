@@ -23,18 +23,33 @@ using SparseArrays
     P::QuantumIntegrator,
     sys::QuantumSystem
 )::Vector{R} where R <: Real
+
+    # augmented states at time t
     augsₜ = xₜ[(sys.n_wfn_states + 1):end]
+
+    # augmented states at time t+1
     augsₜ₊₁ = xₜ₊₁[(sys.n_wfn_states + 1):end]
+
+    # controls at time t
     controlsₜ = [augsₜ[(sys.ncontrols + 1):end]; uₜ]
+
+    # compute the difference between the augmented states at time t+1 and t
     δaugs = augsₜ₊₁ - (augsₜ + controlsₜ * Δt)
+
+    # init vector for differences between the wavefunction states at time t+1 and t
     δψ̃s = zeros(typeof(xₜ[1]), sys.n_wfn_states)
+
+    # get pulse controls
     aₜ = augsₜ[slice(1 + sys.∫a, sys.ncontrols)]
+
+    # compute the difference between the wavefunction states at time t+1 and t
     for i = 1:sys.nqstates
         ψ̃ⁱ_slice = slice(i, sys.isodim)
         ψ̃ⁱₜ = xₜ[ψ̃ⁱ_slice]
         ψ̃ⁱₜ₊₁ = xₜ₊₁[ψ̃ⁱ_slice]
         δψ̃s[ψ̃ⁱ_slice] = P(ψ̃ⁱₜ₊₁, ψ̃ⁱₜ, aₜ, Δt)
     end
+
     return [δψ̃s; δaugs]
 end
 

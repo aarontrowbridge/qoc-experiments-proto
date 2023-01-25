@@ -26,10 +26,13 @@ struct StaticQuadraticProblemNew <: QuadraticProblem
     A::SparseMatrixCSC
     ∂gs::Vector{Matrix{Float64}}
     ∂²gs::Vector{Array{Float64}}
+    ∂g::Function
+    ∂²g::Function
     Qy::Float64
     Qyf::Float64
     R::NamedTuple{names, <:Tuple{Vararg{Float64}}} where names
     correction_term::Bool
+    dynamic_measurements::Bool
     mle::Bool
     settings::Dict{Symbol, Any}
 end
@@ -38,12 +41,14 @@ function StaticQuadraticProblemNew(
     Ẑgoal::Traj,
     f::Function,
     g::Function,
+    τs::AbstractVector{Int},
     Qy::Float64,
     Qyf::Float64,
     R::NamedTuple{names, <:Tuple{Vararg{Float64}}} where names,
     correction_term::Bool,
+    dynamic_measurements::Bool,
     settings::Dict{Symbol, Any};
-    mle=true
+    mle::Bool=true
 )
     @assert :ψ̃ ∈ keys(Ẑgoal.components) "must specify quantum states component as ψ̃"
     @assert all([k ∈ keys(Ẑgoal.components) for k in keys(R)]) "regularization multiplier keys must match trajectory component keys"
@@ -71,31 +76,27 @@ function StaticQuadraticProblemNew(
 
     ∂gs = Matrix[]
 
-    for t = 1:Ẑgoal.T
-        push!(∂gs, ∂g(Ẑgoal[t].ψ̃))
+    for τ ∈ τs
+        push!(∂gs, ∂g(Ẑgoal[τ].ψ̃))
     end
 
     ∂²gs = Array[]
 
-    for t = 1:Ẑgoal.T
-        push!(∂²gs, ∂²g(Ẑgoal[t].ψ̃))
+    for τ ∈ τs
+        push!(∂²gs, ∂²g(Ẑgoal[τ].ψ̃))
     end
 
 
-    # bounds and initial/final value constraints
-
+    # bounds constraints
     B = build_bounds_constraint_matrix(Ẑgoal)
+
+    # initial/final value constraints
     C = build_initial_and_final_constraint_matrix(Ẑgoal)
 
-
-
     # full constraint matrix
-
     A = sparse_vcat(∂F, B, C)
 
-
     # hessian of regularization objective terms
-
     Hreg = build_regularization_hessian(R, Ẑgoal)
 
     return StaticQuadraticProblemNew(
@@ -103,36 +104,56 @@ function StaticQuadraticProblemNew(
         A,
         ∂gs,
         ∂²gs,
+        ∂g,
+        ∂²g,
         Qy,
         Qyf,
         R,
         correction_term,
+        dynamic_measurements,
         mle,
         settings
     )
 end
 
 function (QP::StaticQuadraticProblemNew)(
-    Ẑ::Traj,
-    ΔY::MeasurementData
+    ΔY::MeasurementData,
+    Ẑ::Traj
 )
 
-    C_lb, C_ub = build_constraints(Ẑ)
+    # constraint values
+    lb, ub = build_constraints(Ẑ)
 
     if QP.mle
         Σinvs = [inv(Σ) for Σ ∈ ΔY.Σs]
-        Hmle, ∇ = build_mle_hessian_and_gradient_new(
-            ΔY,
-            QP.∂gs,
-            QP.∂²gs,
-            QP.Qy,
-            QP.Qyf,
-            Σinvs,
-            Ẑ.dims,
-            Ẑ.components.ψ̃,
-            Ẑ.T,
-            QP.correction_term
-        )
+        if QP.dynamic_measurements
+            Hmle, ∇ = build_mle_hessian_and_gradient_new(
+                ΔY,
+                QP.∂g,
+                QP.∂²g,
+                QP.Qy,
+                QP.Qyf,
+                Σinvs,
+                Ẑ.dims,
+                Ẑ.components.ψ̃,
+                Ẑ.T,
+                QP.correction_term
+            )
+        else
+            Hmle, ∇ = build_mle_hessian_and_gradient_new(
+                ΔY,
+                QP.∂gs,
+                QP.∂²gs,
+                QP.Qy,
+                QP.Qyf,
+                Σinvs,
+                Ẑ.dims,
+                Ẑ.components.ψ̃,
+                Ẑ.T,
+                QP.correction_term
+            )
+        end
+
         H = Hmle + QP.Hreg
         A = QP.A
     else
@@ -152,8 +173,8 @@ function (QP::StaticQuadraticProblemNew)(
         P=H,
         A=A,
         q=QP.mle ? ∇ : nothing,
-        l=C_lb,
-        u=C_ub,
+        l=lb,
+        u=ub,
         QP.settings...
     )
 
@@ -170,6 +191,144 @@ function (QP::StaticQuadraticProblemNew)(
 end
 
 
+struct DynamicQuadraticProblemNew <: QuadraticProblem
+    ∂f::Function
+    ∂g::Function
+    ∂²g::Function
+    Qy::Float64
+    Qyf::Float64
+    R::NamedTuple{names, <:Tuple{Vararg{Float64}}} where names
+    C::SparseMatrixCSC{Float64, Int64}
+    Hreg::SparseMatrixCSC{Float64, Int64}
+    correction_term::Bool
+    mle::Bool
+    settings::Dict{Symbol, Any}
+end
+
+function DynamicQuadraticProblemNew(
+    Z::Traj,
+    f::Function,
+    g::Function,
+    Qy::Float64,
+    Qf::Float64,
+    R::NamedTuple{names, <:Tuple{Vararg{Float64}}} where names,
+    correction_term::Bool,
+    settings::Dict{Symbol, Any};
+    mle::Bool=true
+)
+    @assert :ψ̃ ∈ keys(Z.components) "must specify quantum states component as ψ̃"
+
+    @assert all([k ∈ keys(Z.components) for k in keys(R)])
+        "regularization multiplier keys must match trajectory component keys"
+
+    @assert length(f(vec(Z.data[:, 1:2]))) == Z.dims.states
+
+    ∂f(zz) = ForwardDiff.jacobian(f, zz)
+
+    ∂g(x) = ForwardDiff.jacobian(g, x)
+
+    ydim = length(g(Z[1].ψ̃))
+
+    function ∂²g(x)
+        H = ForwardDiff.jacobian(u -> vec(∂g(u)), x)
+        return reshape(H, ydim, Z.dims.ψ̃, Z.dims.ψ̃)
+    end
+
+    C_bounds = build_bounds_constraint_matrix(Z)
+
+    C_init_final = build_initial_and_final_constraint_matrix(Z)
+
+    C = sparse_vcat(C_bounds, C_init_final)
+
+    Hreg = build_regularization_hessian(R, Z)
+
+    return DynamicQuadraticProblemNew(
+        ∂f,
+        ∂g,
+        ∂²g,
+        Qy,
+        Qf,
+        R,
+        C,
+        Hreg,
+        correction_term,
+        mle,
+        settings
+    )
+end
+
+function (QP::DynamicQuadraticProblemNew)(
+    ΔY::MeasurementData,
+    Ẑ::Traj
+)
+    model = OSQP.Model()
+
+    # get the regularization hessian term
+    Hreg = build_regularization_hessian(QP.R, Ẑ)
+
+    # get the dynamics constraint jacobian
+    ∂F = build_dynamics_constraint_jacobian(Ẑ, QP.∂f)
+
+    # full constraint matrix
+    A = sparse_vcat(∂F, QP.C)
+
+    # get the constraint bounds
+    lb, ub = build_constraints(Ẑ)
+
+    if QP.mle
+
+        # get the inverses of the measurment covariances
+        Σinvs = [inv(Σ) for Σ ∈ ΔY.Σs]
+
+        # get the hessian and gradient of the mle objective term
+        Hmle, ∇ = build_mle_hessian_and_gradient_new(
+            ΔY,
+            QP.∂g,
+            QP.∂²g,
+            QP.Qy,
+            QP.Qyf,
+            Σinvs,
+            Ẑ.dims,
+            Ẑ.components.ψ̃,
+            Ẑ.T,
+            QP.correction_term
+        )
+
+        # build the full hessian
+        H = Hmle + QP.Hreg
+    else
+        ∂G, ∂G_cons = build_measurement_constraint_jacobian(
+            Ẑ, ΔY, QP.∂g, QP.∂²g, QP.dims, QP.correction_term
+        )
+        A = sparse_vcat(∂G, A)
+        lb = vcat(∂G_cons, lb)
+        ub = vcat(∂G_cons, ub)
+        H = Hreg
+    end
+
+    OSQP.setup!(
+        model;
+        P=H,
+        A=A,
+        q=QP.mle ? ∇ : nothing,
+        l=lb,
+        u=ub,
+        QP.settings...
+    )
+
+    results = OSQP.solve!(model)
+
+    if results.info.status != :Solved
+        @warn "OSQP did not solve the problem, status: $(results.info.status)"
+    end
+
+    println("OSQP status: $(results.info.status)")
+    println("norm(x): $(norm(results.x))")
+
+    ΔZ = Traj(results.x, Ẑ)
+
+    return ΔZ
+end
 
 struct StaticQuadraticProblem <: QuadraticProblem
     Hreg::SparseMatrixCSC
@@ -192,6 +351,7 @@ function StaticQuadraticProblem(
     Ẑgoal::Trajectory,
     f::Function,
     g::Function,
+    τs::AbstractVector{Int},
     Q::Float64,
     Qy::Float64,
     Qf::Float64,
@@ -224,14 +384,14 @@ function StaticQuadraticProblem(
 
     ∂gs = Matrix[]
 
-    for t = 1:Ẑgoal.T
-        push!(∂gs, ∂g(Ẑgoal.states[t]))
+    for τ ∈ τs
+        push!(∂gs, ∂g(Ẑgoal.states[τ]))
     end
 
     ∂²gs = Array[]
 
-    for t = 1:Ẑgoal.T
-        push!(∂²gs, ∂²g(Ẑgoal.states[t]))
+    for τ ∈ τs
+        push!(∂²gs, ∂²g(Ẑgoal.states[τ]))
     end
 
     C_u = build_controls_constraint_matrix(dims, d2u=d2u)
@@ -467,6 +627,8 @@ function (QP::DynamicQuadraticProblem)(
         @warn "OSQP did not solve the problem"
     end
 
+    println("norm(x) = $(norm(results.x))")
+
     Δxs = [
         results.x[slice(t, QP.dims.x, QP.dims.z)]
             for t = 1:QP.dims.T
@@ -580,7 +742,7 @@ end
 
     for i = 1:dims.M
 
-        τᵢ = ΔY.times[i]
+        τᵢ = ΔY.τs[i]
 
         ∂gᵢ = ∂gs[i]
 
@@ -633,6 +795,8 @@ Builds the hessian matrix and gradient vector for the MLE objective term.
     M = length(ΔY.τs)
     zdim = dims.states + dims.controls
 
+    # display(Σinvs[1])
+
     Hmle = spzeros(zdim * T, zdim * T)
 
     ∇ = zeros(zdim * T)
@@ -672,6 +836,68 @@ Builds the hessian matrix and gradient vector for the MLE objective term.
     return Hmle, ∇
 end
 
+
+
+"""
+    build_mle_hessian_and_gradient_new()
+
+Builds the hessian matrix and gradient vector for the MLE objective term.
+"""
+@inline function build_mle_hessian_and_gradient_new(
+    ΔY::MeasurementData,
+    ∂g::Function,
+    ∂²g::Function,
+    Qy::Float64,
+    Qyf::Float64,
+    Σinvs::Vector{<:AbstractMatrix},
+    dims::NamedTuple,
+    measured_components::AbstractVector{Int},
+    T::Int, # number of time steps
+    correction_term::Bool
+)
+    M = length(ΔY.τs)
+    zdim = dims.states + dims.controls
+
+    Hmle = spzeros(zdim * T, zdim * T)
+
+    ∇ = zeros(zdim * T)
+
+    for i = 1:M
+
+        τᵢ = ΔY.τs[i]
+        yᵢ = ΔY.ys[i]
+
+        ∂gᵢ = ∂g(yᵢ)
+
+        if correction_term
+            ∂²gᵢ = ∂²g(yᵢ)
+            ϵ̂ᵢ = pinv(∂gᵢ) * yᵢ
+            @einsum ∂gᵢ[j, k] += ∂²gᵢ[j, k, l] * ϵ̂ᵢ[l]
+        end
+
+        Hᵢmle = ∂gᵢ' * Σinvs[i] * ∂gᵢ
+
+        Hmle[
+            slice(τᵢ, measured_components, zdim),
+            slice(τᵢ, measured_components, zdim)
+        ] = sparse(Hᵢmle)
+
+        ∇ᵢmle = yᵢ' * Σinvs[i] * ∂gᵢ
+
+        if i == M
+            Hᵢmle *= Qyf
+            ∇ᵢmle *= Qyf
+        else
+            Hᵢmle *= Qy
+            ∇ᵢmle *= Qy
+        end
+
+        ∇[slice(τᵢ, measured_components, zdim)] = ∇ᵢmle
+    end
+
+    return Hmle, ∇
+end
+
 @inline function build_initial_state_constraint_matrix(
     dims::NamedTuple
 )
@@ -682,14 +908,6 @@ end
     return C_x₁
 end
 
-
-@inline function build_initial_state_constraint_matrix(Z::Traj)
-    C_x₁ = sparse_hcat(
-        I(Z.dims.x),
-        spzeros(Z.dims.x, Z.dims.u + Z.dims.z * (Z.T - 1))
-    )
-    return C_x₁
-end
 
 """
     build_initial_and_final_constraint_matrix(Z::Traj)
@@ -743,12 +961,14 @@ Build the constraint vector for the initial and final states of constrained comp
 """
 @inline function build_initial_and_final_constraints(Z::Traj)
     if !isempty(keys(Z.initial))
-        initial_cons = zeros(sum([Z.dims[key] for key ∈ keys(Z.initial) if key != :ψ̃]))
+        initial_cons = vcat([Z.initial[key] for key ∈ keys(Z.initial) if key != :ψ̃]...)
+        # zeros(sum([Z.dims[key] for key ∈ keys(Z.initial) if key != :ψ̃]))
     else
         initial_cons = zeros(0)
     end
     if !isempty(keys(Z.final))
-        final_cons = zeros(sum([Z.dims[key] for key ∈ keys(Z.final) if key != :ψ̃]))
+        final_cons = vcat([Z.final[key] for key ∈ keys(Z.final) if key != :ψ̃]...)
+        # final_cons = zeros(sum([Z.dims[key] for key ∈ keys(Z.final) if key != :ψ̃]))
     else
         final_cons = zeros(0)
     end
@@ -762,15 +982,15 @@ end
 
 Builds the bounds matrix by vcating the matrices that pick out the states/controls that are bounded in `Z`.
 
-Acts only on intermediate times: `t ∈ 2:T-1`
+Acts on all timeslices: `t ∈ 1:T`
 """
 @inline function build_bounds_constraint_matrix(Z::Traj)
     Cs = []
     for key ∈ keys(Z.bounds)
-        C = spzeros(Z.dims[key] * (Z.T - 2), Z.dim * Z.T)
-        for t = 2:Z.T-1
+        C = spzeros(Z.dims[key] * Z.T, Z.dim * Z.T)
+        for t = 1:Z.T
             C[
-                slice(t - 1, Z.dims[key]),
+                slice(t, Z.dims[key]),
                 slice(t, Z.components[key], Z.dim)
             ] = sparse(I(Z.dims[key]))
         end
@@ -788,20 +1008,25 @@ end
 
 Builds the bounds vector by vcating the bounds vectors for each bounded componenent in `Z`.
 
-Acts only on intermediate times: `t ∈ 2:T-1`
+Acts on all timeslices: `t ∈ 1:T`
 """
 @inline function build_bounds_constraints(Z::Traj)
     b_lbs = []
     b_ubs = []
     for key ∈ keys(Z.bounds)
-        b_lb = -vcat(fill(Z.bounds[key], Z.T - 2)...) -
-            vec(Z[key][:, 2:Z.T - 1])
-        b_ub = vcat(fill(Z.bounds[key], Z.T - 2)...) -
-            vec(Z[key][:, 2:Z.T - 1])
+
+        b_lb = -vcat(fill(Z.bounds[key], Z.T)...) - vec(Z[key][:, 1:Z.T])
+
+        b_ub = vcat(fill(Z.bounds[key], Z.T)...) - vec(Z[key][:, 1:Z.T])
+
         push!(b_lbs, b_lb)
         push!(b_ubs, b_ub)
     end
-    return vcat(b_lbs...), vcat(b_ubs...)
+    if isempty(b_lbs)
+        return zeros(0), zeros(0)
+    else
+        return vcat(b_lbs...), vcat(b_ubs...)
+    end
 end
 
 
@@ -1044,7 +1269,7 @@ Builds the Jacobian of the dynamics constraint for the given trajectory
 
     for t = 1:Ẑ.T - 1
 
-        zₜzₜ₊₁ = vec(Ẑ.data[:, t:t + 1])
+        zₜzₜ₊₁ = vec(Ẑ.data[:, t:t+1])
 
         ∂F[
             slice(t, Ẑ.dims.states),

@@ -75,7 +75,7 @@ function animate_ILC_multimode(
     path::String;
     fps=5
 )
-    fig = Figure(resolution=(1200, 1200))
+    fig = Figure(resolution=(1200, 1500))
 
     color = :glasbey_bw_minc_20_n256
 
@@ -117,15 +117,34 @@ function animate_ILC_multimode(
 
     # axislegend(ΔYax; position=:lb)
 
-    uax = Axis(fig[4, :]; title=@lift("a(t): iter = $($iter)"), xlabel=L"t")
+    U_ax = Axis(fig[4, :]; title=@lift("a(t): iter = $($iter)"), xlabel=L"t")
 
     U₁ = prob.Us[1]
     ts = prob.Ẑ.times
 
-    Usp = series!(uax, ts, U₁;
+    U_sp = series!(U_ax, ts, U₁;
         labels=["a_$j" for j = 1:prob.QP.dims.u]
     )
 
+    U_trans_ax = Axis(fig[5, :]; title=@lift("a(t) quantized: iter = $($iter)"), xlabel=L"t")
+
+    U_trans_1 = prob.experiment.control_transform(prob.Us[1])
+
+    U_trans_sp = series!(U_trans_ax, ts, U_trans_1;
+        labels=["a_$j" for j = 1:prob.QP.dims.u]
+    )
+
+    # add axis plotting difference of previous 2 axes
+
+    # ΔU_ax = Axis(fig[6, :]; title=@lift("Δa(t): iter = $($iter)"), xlabel=L"t")
+
+    # ΔU_1 = U₁ - U_trans_1
+
+    # ΔU_sp = series!(ΔU_ax, ts, ΔU_1;
+    #     labels=["Δa_$j" for j = 1:prob.QP.dims.u]
+    # )
+
+    println(length(prob.Ȳs))
     record(fig, path, 1:length(prob.Ȳs); framerate=fps) do i
         iter[] = i
 
@@ -135,7 +154,9 @@ function animate_ILC_multimode(
 
         Ȳsp[2] = Ȳ
         ΔYsp[2] = ΔY
-        Usp[2] = U
+        U_sp[2] = U
+        U_trans_sp[2] = prob.experiment.control_transform(U)
+        # ΔU_sp[2] = U - prob.experiment.control_transform(U)
     end
 end
 
@@ -144,7 +165,7 @@ function animate_ILC_multimode(
     path::String;
     fps=5
 )
-    fig = Figure(resolution=(1200, 1200))
+    fig = Figure(resolution=(1200, 1500))
 
     color = :glasbey_bw_minc_20_n256
 
@@ -186,13 +207,21 @@ function animate_ILC_multimode(
 
     # axislegend(ΔYax; position=:lb)
 
-    U_ax = Axis(fig[4, :]; title=@lift("a(t): iter = $($iter)"), xlabel=L"t")
+    A_ax = Axis(fig[4, :]; title=@lift("a(t): iter = $($iter)"), xlabel=L"t")
 
-    U₁ = prob.Us[1]
+    A₁ = prob.As[1]
     ts = times(prob.Ẑ)
 
-    U_sp = series!(U_ax, ts, U₁;
-        labels=["a_$j" for j = 1:prob.QP.dims.u]
+    A_sp = series!(A_ax, ts, A₁;
+        labels=["a_$j" for j = 1:prob.Ẑ.dims.a]
+    )
+
+    A_trans_ax = Axis(fig[5, :]; title=@lift("a(t) quantized: iter = $($iter)"), xlabel=L"t")
+
+    A_trans_1 = prob.experiment.control_transform(A₁)
+
+    A_trans_sp = series!(A_trans_ax, ts, A_trans_1;
+        labels=["a_$j" for j = 1:prob.Ẑ.dims.a]
     )
 
     record(fig, path, 1:length(prob.Ȳs); framerate=fps) do i
@@ -200,11 +229,12 @@ function animate_ILC_multimode(
 
         Ȳ = hcat(prob.Ȳs[i].ys...)
         ΔY = Ȳ - Ygoal
-        U = prob.Us[i]
+        A = prob.As[i]
 
         Ȳ_sp[2] = Ȳ
         ΔY_sp[2] = ΔY
-        U_sp[2] = U
+        A_sp[2] = A
+        A_trans_sp[2] = prob.experiment.control_transform(A)
     end
 end
 
