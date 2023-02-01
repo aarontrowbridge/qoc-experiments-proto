@@ -1,4 +1,6 @@
 using Pico
+using NamedTrajectories
+using JLD2
 
 # data_path = "data/multimode/good_solutions/g0_to_g1_T_101_dt_4.0_Q_500.0_R_0.1_u_bound_1.0e-5.jld2"
 data_path = "data/multimode/free_time/no_guess/problems/g0_to_g1_T_100_dt_10.0_Δt_max_factor_1.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-6_alpha_transmon_20.0_alpha_cavity_20.0_resolve_2_00000.jld2"
@@ -18,8 +20,8 @@ ts = data.trajectory.times
 components = (
     ψ̃ = Ψ̃,
     a = A,
-    # da = dA,
-    # dda = ddA,
+    da = dA,
+    dda = ddA,
     # Δt = Δts
 )
 
@@ -30,13 +32,19 @@ bounds = (;
 
 Ẑ = Traj(
     components;
-    # controls=:dda,
-    controls=:a,
+    controls=:dda,
+    # controls=:a,
     bounds=bounds,
     dt=Δts[end],
     initial=(a=zeros(4),),
     final=(a=zeros(4),)
 )
+
+# save the trajectory
+
+@save "test_data.jld2" Ẑ
+
+
 
 
 P = FourthOrderPade(data.system)
@@ -136,7 +144,7 @@ fps = 2
 β = 1.0
 R = (
     a   = 1.0e1,
-    # dda = 1.0e10
+    dda = 1.0e10
 )
 Qy = 1.0e-5
 Qyf = 1.0e3
@@ -154,7 +162,7 @@ correction_term = false
 
 prob = ILCProblemNew(
     Ẑ,
-    dynamics2,
+    dynamics,
     experiment;
     max_iter=max_iter,
     QP_verbose=false,

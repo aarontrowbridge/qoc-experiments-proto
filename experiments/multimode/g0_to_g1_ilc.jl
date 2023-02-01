@@ -104,7 +104,6 @@ end
 # τs = [25, 50, Ẑ.T]
 # τs = [75, Ẑ.T]
 
-
 experiment = QuantumExperiment(
     experimental_system,
     Ẑ.states[1],

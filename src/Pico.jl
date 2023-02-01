@@ -54,8 +54,8 @@ include("problem_utils.jl")
 include("problem_solvers.jl")
 @reexport using .ProblemSolvers
 
-include("ilc_trajectories.jl")
-@reexport using .ILCTrajectories
+# include("ilc_trajectories.jl")
+# @reexport using .ILCTrajectories
 
 include("ilc_experiments.jl")
 @reexport using .ILCExperiments
