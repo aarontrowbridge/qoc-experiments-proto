@@ -30,7 +30,7 @@ bounds = (;
     # dda = data.params[:u_bounds]
 )
 
-Ẑ = Traj(
+Ẑ = NamedTrajectory(
     components;
     controls=:dda,
     # controls=:a,
@@ -41,8 +41,6 @@ Ẑ = Traj(
 )
 
 # save the trajectory
-
-@save "test_data.jld2" Ẑ
 
 
 

@@ -1,5 +1,5 @@
 using Pico
-import Pico.Trajectories: rollout
+using Pico.Trajectories: rollout
 using Makie
 using HDF5
 
@@ -10,6 +10,8 @@ data_path = "data/multimode/free_time/no_guess/problems/g0_to_g1_T_100_dt_10.0_�
 data_path = "data/multimode/free_time/no_guess/problems/g0_to_g1_T_100_dt_4.0_Δt_max_factor_2.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_3_00000.jld2"
 
 data_path = "data/multimode/free_time/no_guess/problems/g0_to_g1_T_100_dt_4.0_Δt_max_factor_2.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_9_00001.jld2"
+
+data_path = "data/multimode/free_time/no_guess/problems/g0_to_g1_T_100_dt_10.0_Δt_max_factor_1.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-6_alpha_transmon_20.0_alpha_cavity_20.0_resolve_2_00000.jld2"
 
 aditya_pulse = "data/multimode/from_aditya/g0_to_g1_T_200_dt_2.0_R_0.1_iter_3000ubound_0.001_00000.h5"
 
@@ -23,9 +25,9 @@ T = read(file, "T")[1]
 
 as_aditya = [A[:, t] for t ∈ axes(A, 2)]
 
-T
-dt
-as
+# T
+# dt
+# as
 
 dts = [dt for t = 1:T]
 
@@ -53,11 +55,20 @@ function quantize2(as::Vector{Vector{Float64}})
     return [floor.(a ./ res) .* res for a in as]
 end
 
+function quantize3(as::Vector{Vector{Float64}})
+    res = a_bounds ./ 128
+    return [round.(a ./ res) .* res for a in as]
+end
+
+
 quantized_controls = quantize(as)
 series(hcat(quantized_controls...))
 
 quantized_controls2 = quantize2(as)
 series(hcat(quantized_controls2...))
+
+quantized_controls3 = quantize3(as)
+series(hcat(quantized_controls3...))
 
 as_aditya
 
@@ -68,6 +79,8 @@ quantized_controls_aditya2 = quantize2(as_aditya)
 fig, ax, = series(hcat(quantized_controls_aditya2...))
 axislegend(ax)
 fig
+
+quantized_controls_aditya3 = quantize3(as_aditya)
 
 
 prob.system.a_bounds
@@ -82,10 +95,12 @@ series(hcat(as...))
 Ψ̃ = rollout(prob.system, as, Δt)
 Ψ̃_quantized = rollout(prob.system, quantized_controls, Δt)
 Ψ̃_quantized2 = rollout(prob.system, quantized_controls2, Δt)
+Ψ̃_quantized3 = rollout(prob.system, quantized_controls3, Δt)
 
 
 Ψ̃_aditya_quantized = rollout(prob.system, quantized_controls_aditya, dts)
 Ψ̃_aditya_quantized2 = rollout(prob.system, quantized_controls_aditya2, dts)
+Ψ̃_aditya_quantized3 = rollout(prob.system, quantized_controls_aditya3, dts)
 Ψ̃_aditya = rollout(prob.system, as_aditya, dts)
 
 
@@ -94,18 +109,24 @@ i = slice(1, prob.system.isodim)
 # smooth controls fidelity
 fidelity(Ψ̃[end][i], prob.system.ψ̃goal[i])
 
-# quantized controls fidelity
+# quantized controls fidelity: rounded, unsigned 8 bit
 fidelity(Ψ̃_quantized[end][i], prob.system.ψ̃goal[i])
 
-# quantized controls fidelity
+# quantized controls fidelity: rounded, signed 8 bit
 fidelity(Ψ̃_quantized2[end][i], prob.system.ψ̃goal[i])
+
+# quantized controls fidelity: floored, signed 8 bit
+fidelity(Ψ̃_quantized3[end][i], prob.system.ψ̃goal[i])
 
 
 # smooth aditya controls fidelity
 fidelity(Ψ̃_aditya[end][i], prob.system.ψ̃goal[i])
 
-# quantized aditya controls fidelity
+# quantized aditya controls fidelity: rounded, unsigned 8 bit
 fidelity(Ψ̃_aditya_quantized[end][i], prob.system.ψ̃goal[i])
 
-# quantized aditya controls fidelity
+# quantized aditya controls fidelity: rounded, signed 8 bit
 fidelity(Ψ̃_aditya_quantized2[end][i], prob.system.ψ̃goal[i])
+
+# quantized aditya controls fidelity: floored, signed 8 bit
+fidelity(Ψ̃_aditya_quantized3[end][i], prob.system.ψ̃goal[i])

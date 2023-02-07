@@ -11,6 +11,8 @@ export quad
 export cavity_state
 export number
 export normalize
+export fidelity
+export population
 
 using LinearAlgebra
 
@@ -89,6 +91,18 @@ iso_to_ket(ψ̃) =
 
 function normalize(state::Vector{C} where C <: Number)
     return state / norm(state)
+end
+
+function fidelity(ψ̃, ψ̃_goal)
+    ψ = iso_to_ket(ψ̃)
+    ψ_goal = iso_to_ket(ψ̃_goal)
+    return abs2(ψ' * ψ_goal)
+end
+
+function population(ψ̃, i)
+    @assert i ∈ 0:length(ψ̃) ÷ 2 - 1
+    ψ = iso_to_ket(ψ̃)
+    return abs2(ψ[i + 1])
 end
 
 end
