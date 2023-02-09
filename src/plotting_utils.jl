@@ -12,7 +12,7 @@ export plot_twoqubit
 export animate_ILC
 export animate_ILC_multimode
 
-using ..Utils
+using ..IndexingUtils
 using ..Trajectories
 using ..TrajectoryUtils
 using ..QuantumSystems

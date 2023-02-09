@@ -12,7 +12,7 @@ export TimeStepEqualityConstraint
 export TimeStepsAllEqualConstraint
 export L1SlackConstraint
 
-using ..Utils
+using ..IndexingUtils
 using ..QuantumSystems
 
 using Ipopt

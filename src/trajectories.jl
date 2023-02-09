@@ -1,8 +1,8 @@
 module Trajectories
 
-using ..Utils
+using ..IndexingUtils
 using ..QuantumSystems
-using ..QuantumLogic
+using ..QuantumUtils
 using ..Integrators
 
 export dumb_downsample

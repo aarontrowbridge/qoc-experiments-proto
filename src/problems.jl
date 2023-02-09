@@ -9,7 +9,7 @@ export update_traj_data!
 export get_traj_data
 export get_variables
 
-using ..Utils
+using ..IndexingUtils
 using ..QuantumSystems
 using ..Trajectories
 using ..Evaluators

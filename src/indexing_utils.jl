@@ -1,4 +1,4 @@
-module Utils
+module IndexingUtils
 
 export index
 export slice

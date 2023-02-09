@@ -3,7 +3,7 @@ module MinTimeProblems
 export MinTimeProblem
 export MinTimeQuantumControlProblem
 
-using ..Utils
+using ..IndexingUtils
 using ..IpoptOptions
 using ..QuantumSystems
 using ..Objectives

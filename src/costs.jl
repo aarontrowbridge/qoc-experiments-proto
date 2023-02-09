@@ -13,8 +13,8 @@ export infidelity_cost
 export quaternionic_cost
 export iso_infidelity
 
-using ..Utils
-using ..QuantumLogic
+using ..IndexingUtils
+using ..QuantumUtils
 using ..QuantumSystems
 
 using LinearAlgebra

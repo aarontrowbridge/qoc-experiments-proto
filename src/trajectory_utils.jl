@@ -16,8 +16,8 @@ export save_trajectory
 export load_trajectory
 export save_controls
 
-using ..Utils
-using ..QuantumLogic
+using ..IndexingUtils
+using ..QuantumUtils
 using ..QuantumSystems
 using ..Trajectories
 

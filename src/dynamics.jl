@@ -3,8 +3,8 @@ module Dynamics
 export AbstractDynamics
 export QuantumDynamics
 
-using ..Utils
-using ..QuantumLogic
+using ..IndexingUtils
+using ..QuantumUtils
 using ..QuantumSystems
 using ..Integrators
 

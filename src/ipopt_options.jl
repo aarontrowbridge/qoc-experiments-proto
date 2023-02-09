@@ -28,7 +28,8 @@ using Base: @kwdef
     diverging_iterates_tol::T = 1.0e8
     mu_target::T = 1.0e-4
     print_level::Int = 5
-    output_file = "output.txt"
+    # output file must be unset if you don't want to write to a file
+    # output_file = "output.txt"
     print_user_options = "no"
     print_options_documentation = "no"
     print_timing_statistics = "no"

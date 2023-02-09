@@ -1,4 +1,4 @@
-module QuantumLogic
+module QuantumUtils
 
 export GATES
 export ⊗
@@ -12,9 +12,22 @@ export cavity_state
 export number
 export normalize
 export fidelity
+export infidelity
 export population
 
 using LinearAlgebra
+
+
+"""
+    kronicker product utility
+"""
+
+⊗(A, B) = kron(A, B)
+
+
+"""
+    quantum gates
+"""
 
 const GATES = Dict(
     :X => [0 1;
@@ -45,20 +58,18 @@ const GATES = Dict(
                    0 0 0 1]
 )
 
-⊗(A, B) = kron(A, B)
 
-function apply(gate::Symbol, ψ::Vector{T} where T<:Number)
+function apply(gate::Symbol, ψ::Vector{<:Number})
     @assert norm(ψ) ≈ 1.0
     @assert gate in keys(GATES) "gate not found"
     U = GATES[gate]
-    @assert size(U)[2] == size(ψ)[1] "gate size does not match ket dim"
+    @assert size(U, 2) == size(ψ, 1) "gate size does not match ket dim"
     return ComplexF64.(normalize(U * ψ))
 end
 
 
 """
     quantum harmonic oscillator operators
-
 """
 
 function annihilate(levels::Int)
@@ -74,30 +85,71 @@ function number(levels::Int)
 end
 
 function quad(levels::Int)
-    return number(levels)*(number(levels) - I(levels))
+    return number(levels) * (number(levels) - I(levels))
 end
 
-function cavity_state(level, cavity_levels)
-    state = zeros(cavity_levels)
+function cavity_state(level::Int, cavity_levels::Int)
+    state = zeros{ComplexF64}(cavity_levels)
     state[level + 1] = 1.
     return state
 end
 
+"""
+    multimode system utilities
+"""
+
+function multimode_state(ψ::String, transmon_levels::Int, cavity_levels::Int)
+    @assert length(ψ) == 2
+
+    @assert transmon_levels ∈ 2:4
+
+    transmon_state = ψ[1]
+
+    @assert transmon_state ∈ ['g', 'e']
+
+    cavity_state = parse(Int, ψ[2])
+
+    @assert cavity_state ∈ 0:cavity_levels - 2 "cavity state must be in [0, ..., cavity_levels - 2] (hightest cavity level is prohibited)"
+
+    ψ_transmon = zeros{ComplexF64}(transmon_levels)
+    ψ_transmon[transmon_state == 'g' ? 1 : 2] = 1.0
+
+    ψ_cavity = zeros{ComplexF64}(cavity_levels)
+    ψ_cavity[cavity_state + 1] = 1.0
+
+    return ψ_transmon ⊗ ψ_cavity
+end
+
+
+"""
+    isomporphism utilities
+"""
+
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]
 
-iso_to_ket(ψ̃) =
-    ψ̃[1:div(length(ψ̃), 2)] +
-    im * ψ̃[(div(length(ψ̃), 2) + 1):end]
+iso_to_ket(ψ̃) = ψ̃[1:div(length(ψ̃), 2)] + im * ψ̃[(div(length(ψ̃), 2) + 1):end]
 
 function normalize(state::Vector{C} where C <: Number)
     return state / norm(state)
 end
+
+
+"""
+    quantum metrics
+"""
 
 function fidelity(ψ̃, ψ̃_goal)
     ψ = iso_to_ket(ψ̃)
     ψ_goal = iso_to_ket(ψ̃_goal)
     return abs2(ψ' * ψ_goal)
 end
+
+infidelity(ψ̃, ψ̃_goal) = 1 - fidelity(ψ̃, ψ̃_goal)
+
+
+"""
+    quantum measurement functions
+"""
 
 function population(ψ̃, i)
     @assert i ∈ 0:length(ψ̃) ÷ 2 - 1
