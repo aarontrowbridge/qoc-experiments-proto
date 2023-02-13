@@ -387,6 +387,4 @@ function MinTimeObjective(;
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
-# TODO: add symmetry objective
-
 end

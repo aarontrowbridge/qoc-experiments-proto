@@ -1,7 +1,7 @@
 # using Pkg
-# ENV["PYTHON"] = Sys.which("python") 
+# ENV["PYTHON"] = Sys.which("python")
 # Pkg.build("PyCall")
-using Pico
+using PicoOld
 using PyCall
 using Statistics
 using JLD2
@@ -77,15 +77,15 @@ function g_hardware(
     times::AbstractVector{Float64},
     τs::AbstractVector{Int}
 )::MeasurementData
-    # display(us) 
+    # display(us)
     intermediate = length(τs) == 1 ? false : true
     ys = py"take_controls_and_measure"(times, us, τs, intermediate) |> transpose
     display(ys)
     println(typeof(ys))
-    ys = collect(eachcol(ys)) 
+    ys = collect(eachcol(ys))
     return MeasurementData(ys, τs, ydim)
 end
-    
+
 
 
 
@@ -106,7 +106,7 @@ end
 # @info "cov matrix"
 # display(Σ)
 
-max_iter = 10 
+max_iter = 10
 max_backtrack_iter = 10
 fps = 2
 α = 0.5
@@ -115,12 +115,12 @@ R = 1.0e0
 Qy = 1.0e1
 Qf = 1.0e2
 
-for τs in [ 
+for τs in [
     # [Ẑ.T],
-    [25, Ẑ.T], 
-    [25, 50, Ẑ.T], 
-    [25, 50, 75, Ẑ.T], 
-] 
+    [25, Ẑ.T],
+    [25, 50, Ẑ.T],
+    [25, 50, 75, Ẑ.T],
+]
     save_dir = "hardware_ILC"
     save_name = "taus_" * join(τs, "_")
 

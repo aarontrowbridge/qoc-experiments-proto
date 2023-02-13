@@ -1,6 +1,6 @@
 push!(LOAD_PATH, "../../")
 
-using Pico
+using PicoOld
 using JLD2
 
 σx = GATES[:X]

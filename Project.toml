@@ -1,4 +1,4 @@
-name = "Pico"
+name = "PicoOld"
 uuid = "ab8d0e8f-64b1-4151-ac61-454c4c5cbda4"
 authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com>"]
 version = "0.1.0"

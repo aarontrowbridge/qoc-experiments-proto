@@ -1,4 +1,4 @@
-using Pico
+using PicoOld
 
 data_path = "experiments/ilc/g0_to_g1_T_581_dt_4.0_R_0.1_iter_3000ubound_0.0001_00001.jld2"
 prob = load_problem(data_path)
@@ -78,4 +78,3 @@ solve!(prob)
 
 # plot_dir = "plots/ILC/multimode"
 # plot_path = generate_file_path("gif", data_name, plot_dir)
-

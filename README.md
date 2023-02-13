@@ -10,7 +10,7 @@ To install and use this repo on your own machine:
 2. open a julia REPL from the repo directory and enter the package manager via `julia> ]`
 3. run `(@v1.7) pkg> activate .` 
 4. then run `(Pico) pkg> instantiate`
-5. now the package can be used via `using Pico`
+5. now the package can be used via `using PicoOld`
 
 ## Launching the docs
 

@@ -1,4 +1,4 @@
-using Pico
+using PicoOld
 
 WDIR = joinpath(@__DIR__, "../../")
 include(joinpath(WDIR, "experiments", "ilqoc", "measurement.jl"))
@@ -69,7 +69,7 @@ function g(x, sys::QuantumSystem)
         append!(y, meas_y_iso(ψ_i))
         append!(y, meas_z_iso(ψ_i))
     end
-    return y 
+    return y
 end
 
 function exp_rollout(utraj::Matrix{Float64})

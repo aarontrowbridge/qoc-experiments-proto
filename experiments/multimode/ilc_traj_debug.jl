@@ -1,4 +1,4 @@
-using Pico
+using PicoOld
 
 # data_dir = "data/multimode/fixed_time_update/guess/pinned/problems"
 data_dir = "experiments/multimode"
@@ -18,7 +18,7 @@ xs = [
 
 
 us = [
-    data.trajectory.actions[t] 
+    data.trajectory.actions[t]
         for t = 1:data.trajectory.T
 ]
 
@@ -40,7 +40,7 @@ function integrate_controls(us, Δt, T)
     for t = 2:T
         int_controls[t][end - 3: end] = int_controls[t-1][end-3:end] + Δt * us[t-1]
         int_controls[t][end - 7: end - 4] = int_controls[t-1][end - 7: end - 4] + Δt*int_controls[t][end - 3: end]
-        #int_controls[t] = int_controls[t-1] + [int_controls[t-1][end - 3 : end]; us[t-1]] * Δt 
+        #int_controls[t] = int_controls[t-1] + [int_controls[t-1][end - 3 : end]; us[t-1]] * Δt
     end
     return int_controls
 end

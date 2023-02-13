@@ -23,7 +23,7 @@
 \pagenumbering{roman}
 
 \begin{abstract}
-  Here we present a novel approach to the problem of quantum optimal control which takes advantage of a relationship between the implicit midpoint method and the Pad\'e approximation of the matrix exponential function. We demonstrate this approach, using an accompanying Julia package, on an assortment of quantum systems including a single qubit system, two qubit system, and a system composed of a qubit coupled to an array of harmonic oscillators.
+  Here we present a novel approach to the problem of quantum optimal control which takes advantage of a relationship between the implicit midpoint method and the Pad\'e approximation of the matrix exponential function. We demonstrate this approach, using an accompanying Julia package, on an assortment of quantum systems including a single qubit system, two-qubit system, and a system composed of a qubit coupled to an array of harmonic oscillators.
 \end{abstract}
 
 \tableofcontents
@@ -33,6 +33,34 @@
 \pagenumbering{arabic}
 
 \section{Introduction}
+
+The goal of QOC is to generate a \textit{pulse} $\vb{a}(t)$ that minimizes some cost between 
+
+\begin{equation} 
+  \ket{\psi(T)} = U(T, 0) \ket{\psi}_{\text{init}}
+\end{equation}
+
+where
+
+\begin{equation}
+  U(T, 0) = \mathcal{T} \exp \qty( \frac{-i}{\hbar} \int_0^T dt \ H(\vb{a}(t), t)) 
+\end{equation}
+
+and $\ket{\psi}_{\text{goal}}$. This cost is typically defined to be the infidelity:
+
+\begin{equation}
+  \ell \qty(\ket{\psi(T)}, \ket{\psi}_{\text{goal}}) = 1 - \abs{\bra{\psi(T)} \ket{\psi}_{\text{goal}}}^2
+\end{equation}
+
+The QOC optimization problem can then be defined as finding the pulse that minimizes the infidelity; this is accomplished by discretizing the trajectory of $\ket{\psi(t)}$ and $\vb{a}(t)$, with a time step $\Delta t$ and solving the following optimization problem:
+
+\begin{align*}
+  \vb{a}^\star_{1:T-1} = \arg \min_{\vb{a}_{1:T-1}} \quad &\ell \qty(\ket{\psi(T)}, \ket{\psi}_{\text{goal}})\\
+  \text{s.t. } \quad 
+    & \ket{\psi(T)} = \prod_{t=1}^{T-1} \exp \qty( \frac{-i}{\hbar} \ H(\vb{a}_t, t) \ \Delta t) \ket{\psi}_{\text{init}} \\
+\end{align*}
+
+
 
 % \newpage
 \section{Problem Formulation}

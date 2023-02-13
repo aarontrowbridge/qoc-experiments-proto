@@ -89,7 +89,7 @@ function quad(levels::Int)
 end
 
 function cavity_state(level::Int, cavity_levels::Int)
-    state = zeros{ComplexF64}(cavity_levels)
+    state = zeros(ComplexF64, cavity_levels)
     state[level + 1] = 1.
     return state
 end
@@ -111,10 +111,10 @@ function multimode_state(ψ::String, transmon_levels::Int, cavity_levels::Int)
 
     @assert cavity_state ∈ 0:cavity_levels - 2 "cavity state must be in [0, ..., cavity_levels - 2] (hightest cavity level is prohibited)"
 
-    ψ_transmon = zeros{ComplexF64}(transmon_levels)
+    ψ_transmon = zeros(ComplexF64, transmon_levels)
     ψ_transmon[transmon_state == 'g' ? 1 : 2] = 1.0
 
-    ψ_cavity = zeros{ComplexF64}(cavity_levels)
+    ψ_cavity = zeros(ComplexF64, cavity_levels)
     ψ_cavity[cavity_state + 1] = 1.0
 
     return ψ_transmon ⊗ ψ_cavity
