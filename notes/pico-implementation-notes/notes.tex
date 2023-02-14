@@ -9,7 +9,7 @@
 \newcommand{\isopsi}{\tilde \psi}
 
 
-\title{Optimal control of quantum systems with Pad\'e integrators and direct collocation: PICO.jl}
+\title{Optimal control of quantum systems with Pad\'e integrators and direct collocation: Pico.jl}
 \author{Aaron Trowbridge}
 \date{}
 
@@ -49,13 +49,13 @@ where
 and $\ket{\psi}_{\text{goal}}$. This cost is typically defined to be the infidelity:
 
 \begin{equation}
-  \ell \qty(\ket{\psi(T)}, \ket{\psi}_{\text{goal}}) = 1 - \abs{\bra{\psi(T)} \ket{\psi}_{\text{goal}}}^2
+  \ell \qty(\ket{\psi(T)}) = 1 - \abs{\bra{\psi(T)} \ket{\psi}_{\text{goal}}}^2
 \end{equation}
 
 The QOC optimization problem can then be defined as finding the pulse that minimizes the infidelity; this is accomplished by discretizing the trajectory of $\ket{\psi(t)}$ and $\vb{a}(t)$, with a time step $\Delta t$ and solving the following optimization problem:
 
 \begin{align*}
-  \vb{a}^\star_{1:T-1} = \arg \min_{\vb{a}_{1:T-1}} \quad &\ell \qty(\ket{\psi(T)}, \ket{\psi}_{\text{goal}})\\
+  \hat{\vb{a}}_{1:T-1} = \arg \min_{\vb{a}_{1:T-1}} \quad &\ell \qty(\ket{\psi(T)})\\
   \text{s.t. } \quad 
     & \ket{\psi(T)} = \prod_{t=1}^{T-1} \exp \qty( \frac{-i}{\hbar} \ H(\vb{a}_t, t) \ \Delta t) \ket{\psi}_{\text{init}} \\
 \end{align*}
@@ -75,18 +75,18 @@ we solve the constrained optimization problem
 
 \begin{align*}
   \underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}} \quad
-    & \sum_{i=1}^n Q \cdot \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{1}{2} \sum_{t=1}^{T-1} R_t \cdot \vb{u}_t^2 \\ 
+    & \frac{1}{2} \sum_{t=1}^{T-1} \qty(\vb{a}_t^\top R_{\vb{a}} \vb{a}_t + \dot{\vb{a}}_t^\top R_{\dot{\vb{a}}} \dot{\vb{a}}_t + \vb{u}_t^\top R_{\vb{u}} \vb{u}_t) + Q \cdot \ell(\isopsi_T^i)\\ 
   \text{subject to} \quad 
     & \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t) = \vb{0}  \\
     &  \isopsi^i_1 = \isopsi^i_\text{init} \\
     & \isopsi^1_T = \isopsi^1_\text{goal} \quad \text{if }\ \textsf{pin\_first\_qstate = true}\\
     & \smallint \vb{a}_1 = \vb{a}_1 = \dd_t \vb{a}_1 = \vb{0} \\  
     & \smallint \vb{a}_T = \vb{a}_T = \dd_t \vb{a}_T = \vb{0} \\
-    & |a^j_t| \leq a^j_\text{bound} \\
+    & \abs{a^j_t} \leq a^j_\text{bound} \\
 \end{align*}
 
 
-The *state* vector $\vb{x}_t$ contains both the $n$ (\textsf{nqstates}) quantum isomorphism states $\isopsi^i_t$ (each of dimension \textsf{isodim = 2*ketdim}) and the augmented control states $\smallint \vb{a}_t$, $\vb{a}_t$, and $\dd_t \vb{a}_t$ (the number of augmented state vector is \textsf{augdim}). The \textit{action} vector $\vb{u}_t$ contains the second derivative of the \textit{control} vector $\vb{a}_t$, which has dimension \textsf{ncontrols}. Thus, we have:
+The \textit{state} vector $\vb{x}_t$ contains both the $n$ (\textsf{nqstates}) quantum isomorphism states $\isopsi^i_t$ (each of dimension \textsf{isodim = 2*ketdim}) and the augmented control states $\smallint \vb{a}_t$, $\vb{a}_t$, and $\dd_t \vb{a}_t$ (the number of augmented state vector is \textsf{augdim}). The \textit{action} vector $\vb{u}_t$ contains the second derivative of the \textit{control} vector $\vb{a}_t$, which has dimension \textsf{ncontrols}. Thus, we have:
 
 \begin{equation}
   \vb{x}_t = \mqty(

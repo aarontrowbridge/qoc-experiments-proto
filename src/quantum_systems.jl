@@ -17,7 +17,7 @@ Im2 = [
     1  0
 ]
 
-iso(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
+G(H) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
 """
 ```julia
@@ -86,8 +86,8 @@ function QuantumSystemNew(
     params = Dict{Symbol, Any}(),
     kwargs...
 )
-    G_drift = iso(H_drift)
-    G_drives = iso.(H_drives)
+    G_drift = G(H_drift)
+    G_drives = G.(H_drives)
     params = merge(params, Dict(kwargs...))
     return QuantumSystemNew(G_drift, G_drives, params)
 end
@@ -149,10 +149,10 @@ function QuantumSystem(
         ψ̃goal = vcat(ket_to_iso.(ψgoal)...)
     end
 
-    G_drift = iso(H_drift)
+    G_drift = G(H_drift)
 
     ncontrols = length(H_drives)
-    G_drives = iso.(H_drives)
+    G_drives = G.(H_drives)
 
     @assert length(a_bounds) == ncontrols
 
@@ -299,6 +299,8 @@ function MultiModeSystem(
             I(transmon_levels),
             quad(cavity_levels)
         )
+
+        println("howdy do!")
 
         H_drive_transmon_R = kron(
             create(transmon_levels) + annihilate(transmon_levels),
