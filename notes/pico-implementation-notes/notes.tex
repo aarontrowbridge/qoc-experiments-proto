@@ -442,8 +442,9 @@ Once a solution has been found for a given \textit{time horizon}, we can solve t
 
 \begin{align*}
   \underset{\Delta t_{1:T-1}}{\underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}}} & 
-  \quad \sum_t \Delta t_t + \frac{R_u}{2} \sum_t \vb{u}_t^2 + \frac{R_s}{2} \sum_t \qty(\vb{u}_{t+1} - \vb{u}_t)^2\\
+  \quad \sum_t \Delta t_t + \frac{1}{2} \sum_t \vb{u}_t^\top R_u \vb{u}_t + \frac{R_s}{2} \sum_t \qty(\vb{u}_{t+1} - \vb{u}_t)^2\\
   \text{subject to} & \quad \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t, \Delta t_t) = \vb{0}\\
+  & \quad \vb{x}_T = \vb{x}^\text{nominal}_T
 \end{align*}
 
 For this problem we will define, with $\vb{Z}$ as defined before 

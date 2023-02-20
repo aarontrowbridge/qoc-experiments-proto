@@ -5,9 +5,15 @@
 \usepackage{physics}
 \usepackage[ruled]{algorithm2e}
 
+
 \setlength{\parindent}{0pt}
 
+\newcommand{\QP}{\text{QP}}
 \newcommand{\isopsi}{\tilde \psi}
+\newcommand{\minimize}[1]{\underset{#1}{\text{minimize}}}
+\newcommand{\st}{\text{subject to}}
+
+
 
 \title{Iterative Learning Control with \\ Nonlinear Measurements}
 \author{Aaron Trowbridge}
@@ -24,6 +30,21 @@ Given a nominal state trajectory $\hat{x}(t)$ and control trajectory $u(t)$, we 
 $$
 u(t) \longrightarrow \bar x (u(t), t) \longrightarrow g(\bar x(t), t) = \bar y(t)
 $$
+
+\begin{equation*}
+\mqty{
+  u(t) & \longrightarrow & \overbrace{\hat x(t) \longrightarrow g(\hat x(t))}^{\text{model}} = \hat y(t) & \\
+  & \searrow & & \searrow \\
+  & &  \underbrace{\bar x(t) \longrightarrow g(\bar x(t))}_{\text{experiment}} = \bar y(t) & \longrightarrow & \Delta y = \bar y - \hat y \\
+}
+\end{equation*}
+
+
+\begin{equation*}
+  \mqty{
+    u^k \longrightarrow \bar y^k \longrightarrow \Delta y^k \longrightarrow \QP(\Delta y^k) \longrightarrow (\Delta x, \Delta u) \longrightarrow u^{k + 1}
+  }
+\end{equation*}
 
  
 which coincides with the simplified model situation:
@@ -342,6 +363,31 @@ Tying everything together, \textit{iterative learning control} (ILC) solves the 
   \Return{$U$}
 \end{algorithm}
 
+\newpage
 
+\section{Misc.}
+
+\begin{align*}
+\underset{\Delta x, \Delta u}{\text{minimize}} &\quad \norm{\Delta y}^2 = \norm{\partial_x g \cdot \Delta x}^2 + \Delta y^\top \cdot \partial_x g \cdot \Delta x \\
+\text{subject to} &\quad \partial_{\vb{z}}f \cdot \Delta {\vb{z}} = 0 \\
+\end{align*}
+
+\begin{align*}
+  \Delta y &= g(\hat x + e + \Delta x) - \hat y \\
+  &\approx g(\hat x) + \partial_x g \cdot e + \partial_x g \cdot \Delta x - \hat y \\
+\end{align*}
+
+\begin{align*}
+  \minimize{\Delta x, \Delta u} \quad \frac{1}{2} \norm{\Delta y^{k+1}}^2 &= 
+    \frac{1}{2} \norm{g(\bar x^k + \Delta x) - \hat y}^2 \\ 
+    &\approx \frac{1}{2} \norm{g(\bar x^k) + M \Delta x - \hat y}^2 \\
+    &= \frac{1}{2} \norm{\Delta y^k + M \Delta x}^2 \\
+\end{align*}
+
+\begin{align*}
+  \minimize{\Delta x, \Delta u} &\quad \frac{1}{2} \Delta x^\top M^\top M \Delta x + \Delta y^\top M \Delta x\\
+  \st &\quad \partial f \cdot \qty(\Delta x_{t+1}, \Delta x_t, \Delta u_t)^\top = 0 \\
+\end{align*}
+ 
  
 \end{document}

@@ -278,6 +278,7 @@ function plot_multimode(
 
     fig = Figure(resolution=(1200, 1500))
 
+
     ψs = pop_matrix(traj, system; components=components)
 
     ψax = Axis(
@@ -347,7 +348,9 @@ end
 
 function plot_multimode_split(
     prob::AbstractProblem,
-    path::String;
+    path::String,
+    transmon_levels::Int,
+    cavity_levels::Int;
     show_highest_modes=false,
     show_augs=false
 )
@@ -359,6 +362,7 @@ function plot_multimode_split(
     end
 
     fig = Figure(resolution=(1200, 1500))
+    ax_count = 0
 
     ketdim = prob.system.isodim ÷ 2
 
@@ -368,33 +372,35 @@ function plot_multimode_split(
         ψs1 = pop_matrix(
             prob.trajectory,
             prob.system;
-            components=1:ketdim÷2
+            components=1:cavity_levels
         )
 
         ψs2 = pop_matrix(
             prob.trajectory,
             prob.system;
-            components=(ketdim÷2 + 1):ketdim
+            components=(cavity_levels + 1):2*cavity_levels
         )
 
         ψax1 = Axis(
             fig[1, :];
-            title="multimode system components 1:$(ketdim÷2)",
+            title="multimode system components 1:$(cavity_levels)",
             xlabel=L"t [ns]"
         )
+        ax_count += 1
 
         ψax2 = Axis(
             fig[2, :];
-            title="multimode system components $(ketdim÷2 + 1):$ketdim",
+            title="multimode system components $(cavity_levels + 1):$cavity_levels",
             xlabel=L"t [ns]"
         )
+        ax_count += 1
 
         series!(
             ψax1,
             prob.trajectory.times,
             ψs1;
             color=color,
-            labels=["|g$(i)⟩" for i = 0:ketdim÷2 - 1]
+            labels=["|g$(i)⟩" for i = 0:cavity_levels - 1]
         )
 
         axislegend(ψax1; position=:lc)
@@ -404,7 +410,7 @@ function plot_multimode_split(
             prob.trajectory.times,
             ψs2;
             color=color,
-            labels=["|e$(i)⟩" for i = 0:ketdim÷2 - 1]
+            labels=["|e$(i)⟩" for i = 0:cavity_levels - 1]
         )
 
         axislegend(ψax2; position=:lc)
@@ -421,7 +427,7 @@ function plot_multimode_split(
         ψgNeN = pop_matrix(
             prob.trajectory,
             prob.system;
-            components=[ketdim÷3, ketdim ÷ 3 * 2]
+            components=[ketdim ÷ transmon_levels, ketdim ÷ transmon_levels * 2]
         )
 
         ψg0g1_ax = Axis(
@@ -435,6 +441,7 @@ function plot_multimode_split(
             title="multimode system components 14 & 28",
             xlabel=L"t [ns]"
         )
+        ax_count += 2
 
         series!(
             ψg0g1_ax,
@@ -451,33 +458,58 @@ function plot_multimode_split(
             prob.trajectory.times,
             ψgNeN;
             color=:tab10,
-            labels=["|g13⟩", "|e13⟩"]
+            labels=["|g$(cavity_levels)⟩", "|e$(cavity_levels)⟩"]
         )
 
         axislegend(ψgNeN_ax; position=:lc)
     end
 
-    ψfstates = pop_matrix(
-        prob.trajectory,
-        prob.system;
-        components=[ketdim ÷ 3 * 2 + 1:ketdim...]
-    )
+    if transmon_levels == 3
+        ψfstates = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=[ketdim ÷ transmon_levels * 2 + 1:ketdim...]
+        )
 
-    ψfstates_ax = Axis(
-        fig[3, :];
-        title="multimode system components 29:$(ketdim)",
-        xlabel=L"t [ns]"
-    )
+        ψfstates_ax = Axis(
+            fig[3, :];
+            title="multimode system components $(ketdim ÷ transmon_levels * 2 + 1):$ketdim",
+            xlabel=L"t [ns]"
+        )
+        ax_count += 1
 
-    series!(
-        ψfstates_ax,
-        prob.trajectory.times,
-        ψfstates;
-        color=color,
-        labels=["|f$(i)⟩" for i = 0:ketdim ÷ 3 - 1]
-    )
+        series!(
+            ψfstates_ax,
+            prob.trajectory.times,
+            ψfstates;
+            color=color,
+            labels=["|f$(i)⟩" for i = 0:ketdim ÷ transmon_levels - 1]
+        )
 
-    axislegend(ψfstates_ax; position=:lc)
+        axislegend(ψfstates_ax; position=:lc)
+    elseif transmon_levels == 4
+        ψhstates = pop_matrix(
+            prob.trajectory,
+            prob.system;
+            components=[ketdim ÷ transmon_levels * 3 + 1:ketdim...]
+        )
+
+        ψhstates_ax = Axis(
+            fig[3, :];
+            title="multimode system components $(ketdim ÷ transmon_levels * 3 + 1):$ketdim",
+            xlabel=L"t [ns]"
+        )
+
+        ax_count += 1
+
+        series!(
+            ψhstates_ax,
+            prob.trajectory.times,
+            ψhstates;
+            color=color,
+            labels=["|h$(i)⟩" for i = 0:ketdim ÷ transmon_levels - 1]
+        )
+    end
 
     if show_augs
         for j = 0:system.control_order
@@ -513,7 +545,8 @@ function plot_multimode_split(
             axislegend(ax_j; position=:lt)
         end
     else
-        ax = Axis(fig[4, :]; xlabel = L"t [ns]")
+        ax = Axis(fig[ax_count + 1, :]; xlabel = L"t [ns]")
+        ax_count += 1
 
         data = jth_order_controls_matrix(
             prob.trajectory,
