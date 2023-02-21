@@ -6,8 +6,12 @@
 \usepackage{mathrsfs}
 \usepackage{physics}
 
-\newcommand{\isopsi}{\tilde \psi}
+\usepackage[a4paper, margin=1.25in, footskip=0.25in]{geometry}
 
+\newcommand{\QP}{\text{QP}}
+\newcommand{\isopsi}{\tilde \psi}
+\newcommand{\minimize}[1]{\underset{#1}{\text{minimize}}}
+\newcommand{\st}{\text{subject to}}
 
 \title{
   Direct Collocation for Quantum Optimal Control 
@@ -17,9 +21,9 @@
 
 \date{}
 
-\setcounter{section}{-1}
+% \setcounter{section}{-1}
 
-\setlength\parindent{0pt}
+% \setlength\parindent{0pt}
 
 \begin{document}
 \maketitle
@@ -27,8 +31,10 @@
 \pagenumbering{roman}
 
 \begin{abstract}
-  We present an adaptation of the \textit{direct collocation} trajectory optimization method for problems in quantum optimal control (QOC).  This approach addresses several limitations of standard QOC methods, including the ability to solve minimum time problems, a crucial objective for realizing high-performance quantum computers.  We demonstrate that this approach leads to improved performance on simulated systems as well as on nascent hardware devices.  
+  We present an adaptation of the \textit{direct collocation} trajectory optimization method for problems in quantum optimal control (QOC).  This approach addresses several limitations of standard methods, including the ability to solve minimum time problems, a crucial objective for realizing high-performance quantum computers.  We demonstrate that this approach leads to improved performance on simulated systems as well as on nascent hardware devices, compared to other existing methods.  To the best of our knowledge, this is the first time that direct collocation, which is commonplace in the field of robotic control, has been applied to QOC. 
 \end{abstract}
+
+\newpage
 
 \tableofcontents
 
@@ -37,6 +43,75 @@
 \pagenumbering{arabic}
 
 \section{Introduction}
+Controlling quantum systems is in principle the problem of optimizing over the space of quantum state trajectories given the ability to control, over an interval of time, certain terms in the time-dependent Hamiltonian describing the system. We will consider time-dependent Hamiltonians of the form
+
+\begin{equation}
+  H(\vb{a}(t), t) = H_0 + \sum_i a^i(t) H_i,
+\end{equation}
+
+\noindent
+where $t \in [0, T]$, $\vb{a}(t) \in \mathbb{R}^m$ is the control trajectory, referred to as the \textit{pulse}, $H_0$ is the system's \textit{drift} term, and $H_i$ are the \textit{drive} terms.  
+
+There are typically three flavors of QOC problems, corresponding to three types of states:
+
+\begin{itemize}
+  \item \textit{Pure quantum states} $\psi(t)$: Minimize the infidelity between the final state $\psi(T)$ and the goal state $\psi_{\text{goal}}$
+
+  \begin{equation}
+    \ell(\psi(T)) = 1 - \abs{\bra{\psi(T)} \ket{\psi_{\text{goal}}}}^2,
+  \end{equation}
+
+  where $\psi(0) = \psi_{\text{init}}$ and $\psi(t)$ satisfies the Schr\"oedinger equation
+
+  \begin{equation}
+    \dot \psi = -i H(\vb{a}(t), t) \psi.
+  \end{equation}
+
+
+  \item \textit{Mixed quantum states} or \textit{density matrices} $\rho(t)$:  Minimize the infidelity or trace distance between the final state $\rho(T)$ and the goal state $\rho_{\text{goal}}$:
+
+  \begin{equation}
+    \ell(\rho(T)) = 1 - \qty(\text{tr}\sqrt{\rho(T) \rho_{\text{goal}}})^2 
+    \quad \text{or} \quad
+    \ell(\rho(T)) = \frac{1}{2} \norm{\rho(T) - \rho_{\text{goal}}}_{\text{tr}},
+  \end{equation}
+
+  respectively. Here $\rho(0) = \rho_{\text{init}}$ and $\rho(t)$ satisfies the von Neumann equation
+
+  \begin{equation}
+    \dot \rho = -i \qty[H(\vb{a}(t), t), \rho].
+  \end{equation}
+
+  \item \textit{Unitary operators} $U(t)$: Minimize the infidelity or trace distance between the final state $U(T)$ and the goal state $U_{\text{goal}}$:
+  
+  \begin{equation}
+    \ell(U(T)) = 1 - \qty(\text{tr}\sqrt{U(T)^\dagger U_{\text{goal}}})^2 
+    \quad \text{or} \quad
+    \ell(U(T)) = \frac{1}{2} \norm{U(T) - U_{\text{goal}}}_{\text{tr}},
+  \end{equation}
+
+  respectively. Here $U(0) = I$ and $U(t)$ satisfies the Schr\"oedinger equation
+
+  \begin{equation}
+    \dot U = -i H(\vb{a}(t), t) U.
+  \end{equation}
+\end{itemize}
+
+\section{Background}
+
+\subsection{Gradient Based Methods}
+
+\subsection{Function Basis Methods}
+
+\section{Direct Collocation}
+
+\subsection{Free Time and Minimum Time Problems}
+
+\subsection{}
+
+\section{Quantum Control Problems}
+
+\section{Experimental Results}
 
 
 \end{document}
