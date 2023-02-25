@@ -1,16 +1,15 @@
 using PicoOld
 
-data_dir = "data/multimode/free_time/no_guess/problems"
-prob_save_dir = "data/multimode/min_time/guess/problems"
-controls_save_dir = "data/multimode/min_time/guess/controls"
-plot_dir = "plots/multimode/min_time/guess"
+data_dir = "data/multimode/fixed_time/no_guess/problems"
+prob_save_dir = "data/multimode/unitary/min_time/problems"
+controls_save_dir = "data/multimode/unitary/min_time/controls"
+plot_dir = "plots/multimode/unitary/min_time"
 
-data_name =
-    "g0_to_g1_T_100_dt_4.0_Δt_max_factor_2.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_3_00002"
+data_name = "g0_to_g1_transmon_4_cavity_14_T_200_dt_max_3.75_R_0.001_iter_3000_ubound_0.0001_00000"
 
 data_path = joinpath(data_dir, data_name * ".jld2")
 
-u_bound = 1e-5
+u_bound = 2e-4
 u_bounds = fill(u_bound, 4)
 
 options = Options(
@@ -57,7 +56,8 @@ controls_save_path = generate_file_path(
 
 plot_multimode_split(
     prob,
-    plot_path;
+    plot_path,
+    4, 14;
     show_highest_modes=true
 )
 
@@ -66,6 +66,7 @@ save_controls(prob.trajectory, prob.system, controls_save_path)
 
 plot_multimode_split(
     prob,
-    plot_path;
+    plot_path,
+    4, 14;
     show_highest_modes=true
 )

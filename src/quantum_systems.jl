@@ -223,8 +223,8 @@ function MultiModeSystem(
     κ=2π * 4e-6,
     χGF=2π * -1.01540302914e-3,
     α=-2π * 0.143,
-    transmon_control_bound=2π * 0.018,
-    cavity_control_bound=0.03,
+    transmon_control_bound = 0.153,
+    cavity_control_bound   = 0.193,
     n_cavities=1, # TODO: add functionality for multiple cavities
     kwargs...
 )

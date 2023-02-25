@@ -5,6 +5,7 @@
 \usepackage{amsfonts}
 \usepackage{mathrsfs}
 \usepackage{physics}
+\usepackage{authblk}
 
 \usepackage[a4paper, margin=1.25in, footskip=0.25in]{geometry}
 
@@ -13,11 +14,18 @@
 \newcommand{\minimize}[1]{\underset{#1}{\text{minimize}}}
 \newcommand{\st}{\text{subject to}}
 
-\title{
-  Direct Collocation for Quantum Optimal Control 
-}
+\title{\LARGE \textsc{
+  Direct Collocation \\ for \\ Quantum Optimal Control 
+}}
 
-\author{Aaron Trowbridge}
+\author[1]{Aaron Trowbridge}
+\author[2]{Aditya Bhardwaj}
+\author[2]{Kevin He}
+
+\affil[1]{Robotics Exploration Lab, Carnegie Mellon University}
+\affil[2]{Schuster Lab, Stanford University}
+
+
 
 \date{}
 
@@ -31,10 +39,10 @@
 \pagenumbering{roman}
 
 \begin{abstract}
-  We present an adaptation of the \textit{direct collocation} trajectory optimization method for problems in quantum optimal control (QOC).  This approach addresses several limitations of standard methods, including the ability to solve minimum time problems, a crucial objective for realizing high-performance quantum computers.  We demonstrate that this approach leads to improved performance on simulated systems as well as on nascent hardware devices, compared to other existing methods.  To the best of our knowledge, this is the first time that direct collocation, which is commonplace in the field of robotic control, has been applied to QOC. 
+  We present an adaptation of the \textit{direct collocation} trajectory optimization method for solving problems in quantum optimal control (QOC).  This approach addresses several limitations of standard methods, including the ability to solve minimum time problems, a crucial objective for realizing high-performance quantum computers.  We demonstrate that this approach leads to improved performance on simulated systems as well as on nascent hardware devices, compared to other existing methods.  To the best of our knowledge, this is the first time that direct collocation, which is commonplace in the field of robotic control, has been applied to QOC. 
 \end{abstract}
 
-\newpage
+% \newpage
 
 \tableofcontents
 
@@ -43,7 +51,7 @@
 \pagenumbering{arabic}
 
 \section{Introduction}
-Controlling quantum systems is in principle the problem of optimizing over the space of quantum state trajectories given the ability to control, over an interval of time, certain terms in the time-dependent Hamiltonian describing the system. We will consider time-dependent Hamiltonians of the form
+Controlling quantum systems is in principle the problem of optimizing over the space of quantum state trajectories given the ability to control, over an interval of time, certain terms in the time-dependent Hamiltonian describing the system. We will consider $n$-dimensional quantum systems with time-dependent Hamiltonians of the form
 
 \begin{equation}
   H(\vb{a}(t), t) = H_0 + \sum_i a^i(t) H_i,
@@ -52,37 +60,21 @@ Controlling quantum systems is in principle the problem of optimizing over the s
 \noindent
 where $t \in [0, T]$, $\vb{a}(t) \in \mathbb{R}^m$ is the control trajectory, referred to as the \textit{pulse}, $H_0$ is the system's \textit{drift} term, and $H_i$ are the \textit{drive} terms.  
 
+The field of optimal control, which has its origins in space systems and robotics, has produced, especially in recent years, a large body of sophisticated methods for solving control problems fundamentally identical to the problems posed in QOC.  However, many of these methods have not seemed to have been adopted by those (primarily physicists) working on control problems for quantum systems. This work aims to bridge the gap between robotic control and quantum control, and in so doing to provide a new perspective on the problem of quantum control. 
+
+\subsection{Types of Problems}
 There are typically three flavors of QOC problems, corresponding to three types of states:
 
-\begin{itemize}
-  \item \textit{Pure quantum states} $\psi(t)$: Minimize the infidelity between the final state $\psi(T)$ and the goal state $\psi_{\text{goal}}$
+\begin{enumerate}
+  \item \textit{Pure quantum states} $\psi(t)$: Minimize the infidelity between the final state $\psi(T)$ and the goal state $\psi_{\text{goal}}$:
 
   \begin{equation}
-    \ell(\psi(T)) = 1 - \abs{\bra{\psi(T)} \ket{\psi_{\text{goal}}}}^2,
+    \ell(\psi(T)) = 1 - \abs{\bra{\psi(T)} \ket{\psi_{\text{goal}}}}^2
   \end{equation}
 
-  where $\psi(0) = \psi_{\text{init}}$ and $\psi(t)$ satisfies the Schr\"oedinger equation
+  Where $\psi(0) = \psi_{\text{init}}$ and $\psi(t)$ satisfies the Schr\"oedinger equation $\dot \psi = -i H(\vb{a}(t), t) \psi$.
 
-  \begin{equation}
-    \dot \psi = -i H(\vb{a}(t), t) \psi.
-  \end{equation}
-
-
-  \item \textit{Mixed quantum states} or \textit{density matrices} $\rho(t)$:  Minimize the infidelity or trace distance between the final state $\rho(T)$ and the goal state $\rho_{\text{goal}}$:
-
-  \begin{equation}
-    \ell(\rho(T)) = 1 - \qty(\text{tr}\sqrt{\rho(T) \rho_{\text{goal}}})^2 
-    \quad \text{or} \quad
-    \ell(\rho(T)) = \frac{1}{2} \norm{\rho(T) - \rho_{\text{goal}}}_{\text{tr}},
-  \end{equation}
-
-  respectively. Here $\rho(0) = \rho_{\text{init}}$ and $\rho(t)$ satisfies the von Neumann equation
-
-  \begin{equation}
-    \dot \rho = -i \qty[H(\vb{a}(t), t), \rho].
-  \end{equation}
-
-  \item \textit{Unitary operators} $U(t)$: Minimize the infidelity or trace distance between the final state $U(T)$ and the goal state $U_{\text{goal}}$:
+  \item \textit{Unitary operators} $U(t)$: Minimize the infidelity or trace distance between the final unitary $U(T)$ and the desired final unitary $U_{\text{goal}}$: respectively,
   
   \begin{equation}
     \ell(U(T)) = 1 - \qty(\text{tr}\sqrt{U(T)^\dagger U_{\text{goal}}})^2 
@@ -90,27 +82,89 @@ There are typically three flavors of QOC problems, corresponding to three types 
     \ell(U(T)) = \frac{1}{2} \norm{U(T) - U_{\text{goal}}}_{\text{tr}},
   \end{equation}
 
-  respectively. Here $U(0) = I$ and $U(t)$ satisfies the Schr\"oedinger equation
+  Here $U(0) = I$ and $U(t)$ also satisfies the Schr\"oedinger equation $\dot U = -i H(\vb{a}(t), t) U$.
+  \item \textit{Mixed quantum states} or \textit{density matrices} $\rho(t)$:  Minimize the infidelity or trace distance between the final state $\rho(T)$ and the goal state $\rho_{\text{goal}}$: respectively,
 
   \begin{equation}
-    \dot U = -i H(\vb{a}(t), t) U.
+    \ell(\rho(T)) = 1 - \qty(\text{tr}\sqrt{\rho(T) \rho_{\text{goal}}})^2 
+    \quad \text{or} \quad
+    \ell(\rho(T)) = \frac{1}{2} \norm{\rho(T) - \rho_{\text{goal}}}_{\text{tr}}.
   \end{equation}
-\end{itemize}
 
+  Here $\rho(0) = \rho_{\text{init}}$ and $\rho(t)$ satisfies the von Neumann equation $\dot \rho = -i \qty[H(\vb{a}(t), t), \rho]$. 
+  
+\end{enumerate}
+
+\noindent
+\textbf{Remark:} In this paper, for simplicity, we will focus on the first type of problem, and just consider the case of optimizing a single pure quantum state $\psi(t)$ --- all methods discussed apply to the other two types of problems as well.
+
+\newpage
 \section{Background}
+In practice, to do any type of trajectory optimization it is necessary to discretize the time interval $[0, T]$ into $N$ time steps of size $\Delta t$, the states and controls at each time step are denoted $\psi_k$ and $\vb{a}_k$, respectively. Typically the following optimization is then solved to find the optimal pulse: 
 
-\subsection{Gradient Based Methods}
+\begin{align}
+  \minimize{\vb{a}_{1:T-1}} \quad &J(\vb{a}_{1:T-1}) = \ell(\psi_N(\vb{a}_{1:T-1})), \\
+  \st \quad &c(\vb{a}_k) \leq 0, \quad \forall k
+\end{align}
 
-\subsection{Function Basis Methods}
+\noindent
+where 
 
+\begin{equation}
+  \psi_{k + 1} = \exp\qty(-i H(\vb{a}_k) \Delta t) \ \psi_k 
+\end{equation}
+
+\noindent
+and $\psi_1 = \psi_{\text{init}}$.  Here, during the time interval $\Delta t$ the controls $\vb{a}_k$ are held constant, which is referred to as a \textit{zero-order hold}, and allows the dynamics to exactly take the form above. 
+
+Current approaches for solving this problem fall into two categories: \textit{gradient-based} methods and \textit{basis function} methods.  Both of these are \textit{indirect} methods, as they optimize only over the controls $\vb{a}_{1:T-1}$, as opposed to considering both the states and controls as decision variables in what is known as \text{direct} methods. The advantages of direct methods, over indirect methods, are the main point of this paper.  Before getting to the details of direct methods we will first introduce these two current mainstream approaches to solving QOC problems.
+
+\subsection{Gradient-Based Methods}
+This method involves initializing the controls $\vb{a}_{1:T-1}$ to some initial guess, and then iteratively updating them using a gradient descent algorithm.  At each iteration is necessary to \textit{rollout} the system with the given controls (this is also referred to as a \textit{shooting method}) to get $\psi_N$ and evaluate the cost function $J(\vb{a})$ to be able to take a gradient of it and update the controls:
+
+\begin{equation}
+  \vb{a} \leftarrow \vb{a} - \beta \nabla J(\vb{a})
+\end{equation}
+
+There are efficient ways to compute this gradient, but the approach is still limited in other ways.  These include the fact that the solution is dependent on the initial guess, gradient-based methods are in general prone to falling into local minima, and it is not possible to enforce constraints on the states.
+
+The most popular gradient-based method is known as GRAPE (GRadient Ascent Pulse Engineering), which is available through the popular QuTiP python library.  Q-CTRL also implements its own gradient-based optimization tool, which is virtually identical, is the industry standard, and is what we compare our results to in this paper.
+
+\subsection{Gradient-Free Methods}
+For this class of approaches, the key idea is to reduce the number of decision variables enough so that gradient-free optimization algorithms---e.g. the Nelder-Mead downhill simplex method---can be utilized. In the case of the popular CRAB algorithm (also implemented in QuTiP and compared against later on) this is accomplished by parameterizing the pulse by a set of basis functions.  The CRAB algorithm, specifically, utilizes a Fourier basis parameterization for each pulse component:
+
+\begin{equation}
+  a(t) = 1 + \frac{\sum_{n=1}^{N_c} b_n \sin(\omega_n t) + c_n \cos(\omega_n t)}{\lambda(t)}.
+\end{equation}
+
+\noindent
+Where $N_c$ is the number of terms to \textit{chop} the series off at and $\lambda(t)$ is chosen to enforce the boundary conditions. Standard gradient-free methods can then be used to solve the new optimization problem:
+
+\begin{equation}
+  \minimize{b_{1:N_c}, c_{1:N_c}, \omega_{1:N_c}} \quad J(b_{1:N_c}, c_{1:N_c}, \omega_{1:N_c}).
+\end{equation}
+  
+
+
+\newpage
 \section{Direct Collocation}
 
-\subsection{Free Time and Minimum Time Problems}
+\subsection{State Transfer Problems}
 
-\subsection{}
+\subsection{Free Time Problems}
 
+\subsection{Minimum Time Problems}
+
+\newpage
 \section{Quantum Control Problems}
 
+\subsection{Isomorphic Problem Formulation}
+
+\subsection{Pad\'e Integrator Dynamics}
+
+\subsection{Special Considerations}
+
+\newpage
 \section{Experimental Results}
 
 

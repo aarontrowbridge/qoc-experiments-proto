@@ -1,12 +1,7 @@
 using PicoOld
 
-data_dir = "data/multimode/free_time/no_guess/problems"
-
-# experiment =
-    # "g0_to_g1_T_500_dt_0.8_R_1.0_iter_1000_resolve_10_00000"
-
-experiment =
-    "g0_to_g1_T_100_dt_4.0_Δt_max_factor_2.0_Q_1000.0_R_1.0e-5_iter_2000_u_bound_1.0e-5_alpha_transmon_20.0_alpha_cavity_20.0_resolve_1_00000"
+experiment = "g0_to_g1_transmon_4_cavity_14_T_200_dt_max_3.75_R_0.001_iter_3000_ubound_0.0001_00000"
+subprob_data_dir = "data/multimode/fixed_time/no_guess/problems"
 
 subprob_data_path =
     joinpath(subprob_data_dir, experiment * ".jld2")

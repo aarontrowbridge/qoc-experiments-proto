@@ -5,7 +5,7 @@ using HDF5
 
 const EXPERIMENT_NAME = "MM_X_GATE"
 
-const TRANSMON_LEVELS = 4
+const TRANSMON_LEVELS = 3
 const CAVITY_LEVELS = 14
 const ketdim = TRANSMON_LEVELS * CAVITY_LEVELS
 
@@ -21,21 +21,24 @@ function run_solve(;
     iter = 3000,
     T = 200,
     Δt = 2.5,
-    Δt_max = 1.2 * Δt,
+    Δt_max = 1.5 * Δt,
     Q = 200.,
     R = 0.001,
     hess = true,
     αval = 20.0,
     ub = 1e-4,
     abfrac = 0.01,
-    mode = :free_time
+    mode = :free_time,
+    resolves = 10,
 )
 
 
     TRANSMON_G = [1; zeros(TRANSMON_LEVELS - 1)]
     TRANSMON_E = [zeros(1); 1; zeros(TRANSMON_LEVELS - 2)]
     TRANSMON_F = [zeros(2); 1; zeros(TRANSMON_LEVELS - 3)]
-    TRANSMON_H = [zeros(3); 1; zeros(TRANSMON_LEVELS - 4)]
+    if TRANSMON_LEVELS == 4
+        TRANSMON_H = [zeros(3); 1; zeros(TRANSMON_LEVELS - 4)]
+    end
 
     α_ef = -143.277e-3 * 2π
     α_fh = -162.530e-3 * 2π
@@ -112,11 +115,11 @@ function run_solve(;
 
     # bounds on controls
 
-    qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
+    # qubit_a_bounds = [0.018 * 2π, 0.018 * 2π]
 
-    cavity_a_bounds = fill(0.03, 2)
+    # cavity_a_bounds = fill(0.03, 2)
 
-    a_bounds = [qubit_a_bounds; cavity_a_bounds]
+    # a_bounds = [qubit_a_bounds; cavity_a_bounds]
 
 
 
@@ -125,7 +128,6 @@ function run_solve(;
         H_drives,
         ψ1,
         ψf,
-        a_bounds=a_bounds,
     )
 
     options = Options(
@@ -137,20 +139,20 @@ function run_solve(;
 
 
 
-    u_bounds = BoundsConstraint(
-        1:T,
-        system.n_wfn_states .+
-        slice(system.∫a + 1 + system.control_order, system.ncontrols),
-        ub,
-        system.vardim
-    )
+    # u_bounds = BoundsConstraint(
+    #     1:T,
+    #     system.n_wfn_states .+
+    #     slice(system.∫a + 1 + system.control_order, system.ncontrols),
+    #     ub,
+    #     system.vardim
+    # )
 
-    da_bounds = BoundsConstraint(
-        1:T,
-        system.n_wfn_states .+ slice(system.∫a + 1 , system.ncontrols),
-        abfrac.*[qubit_a_bounds; cavity_a_bounds],
-        system.vardim
-    )
+    # da_bounds = BoundsConstraint(
+    #     1:T,
+    #     system.n_wfn_states .+ slice(system.∫a + 1 , system.ncontrols),
+    #     abfrac.*[qubit_a_bounds; cavity_a_bounds],
+    #     system.vardim
+    # )
 
     # top_pop = EqualityConstraint(
     #     1:T,
@@ -193,18 +195,17 @@ function run_solve(;
         "T_$(T)_dt_max_$(Δt_max)_R_$(R)_iter_$(iter)_ubound_$(ub)"
 
     plot_dir = "plots/multimode/fermiumL1band"
-    data_dir = "data/multimode/fixed_time/no_guess/problems"
-
-    plot_path = generate_file_path("png", experiment, plot_dir)
+    data_dir = "data/multimode/fermiumL1band/problems"
 
 
 
-    prob = QuantumControlProblem(
+
+    global prob = QuantumControlProblem(
         system;
         T=T,
         Δt=Δt,
         Δt_max=Δt_max,
-        Q = Q,
+        Q=Q,
         R=R,
         options=options,
         u_bounds=fill(ub, 4),
@@ -212,55 +213,66 @@ function run_solve(;
         L1_regularized_states=reg_states,
         α = fill(αval, length(reg_states)),
         mode = mode
-
     )
 
-    data_path = generate_file_path(
-        "jld2",
-        experiment,
-        data_dir
-    )
+    for i = 1:resolves
 
-    plot_multimode_split(prob, plot_path, TRANSMON_LEVELS, CAVITY_LEVELS)
-    solve!(prob, save_path = data_path)
-    plot_multimode_split(prob, plot_path, TRANSMON_LEVELS, CAVITY_LEVELS)
+        resolve_experiment = experiment * "_resolve_$i"
 
-    raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)
-    # display(raw_controls)
-    controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
-    # display(controls)
-    # controls = controls'
-    # display(controls)
-    infidelity = iso_infidelity(final_state(prob.trajectory, system), ket_to_iso(kron(TRANSMON_G, cavity_state(1))))
-    g = final_state_i(prob.trajectory, system, 1)
-    e = final_state_i(prob.trajectory, system, 2)
+        data_file_path = generate_file_path(
+            "jld2",
+            resolve_experiment,
+            data_dir
+        )
+        plot_path = generate_file_path("png", resolve_experiment, plot_dir)
 
-    display(iso_to_ket(g))
-    display(iso_to_ket(e))
-    println(iso_infidelity(g, ket_to_iso(ψf[1])))
-    println(iso_infidelity(e, ket_to_iso(ψf[2])))
+        plot_multimode_split(prob, plot_path, TRANSMON_LEVELS, CAVITY_LEVELS)
+        solve!(prob, save_path = data_file_path)
+        plot_multimode_split(prob, plot_path, TRANSMON_LEVELS, CAVITY_LEVELS)
 
-    U = hcat(iso_to_ket(g)[1:2], iso_to_ket(e)[1:2])
-    Utarg = [0 -im; -im 0]
-    println(1/2 * abs(tr(U'Utarg)))
+        # raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)
+        # # display(raw_controls)
+        # controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
+        # # display(controls)
+        # # controls = controls'
+        # # display(controls)
+        # infidelity = iso_infidelity(final_state(prob.trajectory, system), ket_to_iso(kron(TRANSMON_G, cavity_state(1))))
+        g = final_state_i(prob.trajectory, system, 1)
+        e = final_state_i(prob.trajectory, system, 2)
 
-    result = Dict(
-        "total_time" => T * Δt,
-        "T" => T,
-        "delta_t" => Δt,
-        # "trajectory" => prob.trajectory,
-        #"a_max" => amax,
-        "controls" => controls,
-        "infidelity" => infidelity
-    )
+        # display(iso_to_ket(g))
+        # display(iso_to_ket(e))
+        # println(iso_infidelity(g, ket_to_iso(ψf[1])))
+        # println(iso_infidelity(e, ket_to_iso(ψf[2])))
+
+        U = hcat(iso_to_ket(g)[1:2], iso_to_ket(e)[1:2])
+        Utarg = [0 -im; -im 0]
+        println(1/2 * abs(tr(U'Utarg)))
+
+        # result = Dict(
+        #     "total_time" => T * Δt,
+        #     "T" => T,
+        #     "delta_t" => Δt,
+        #     # "trajectory" => prob.trajectory,
+        #     #"a_max" => amax,
+        #     "controls" => controls,
+        #     "infidelity" => infidelity
+        # )
 
 
-    save_file_path = generate_file_path("h5", experiment, "pulses/multimode/fermiumL1band/")
-    println("Saving this optimization to $(save_file_path)")
-    h5open(save_file_path, "cw") do save_file
-        for key in keys(result)
-            write(save_file, key, result[key])
-        end
+        controls_file_path = generate_file_path("h5", resolve_experiment, "pulses/multimode/fermiumL1band/")
+
+        println("Saving this optimization to $(controls_file_path)")
+
+        get_and_save_controls(data_file_path, controls_file_path)
+
+        # h5open(save_file_path, "cw") do save_file
+        #     for key in keys(result)
+        #         write(save_file, key, result[key])
+        #     end
+        # end
+
+        global prob = load_problem(data_file_path)
     end
 end
 
