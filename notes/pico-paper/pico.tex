@@ -148,21 +148,153 @@ Where $N_c$ is the number of terms to \textit{chop} the series off at and $\lamb
 
 \newpage
 \section{Direct Collocation}
+In this section we describe \textit{direct collocation}, a direct approach to solving trajectory optimization problems.  At a high level direct collocation allows us to overcome the limitations of indirect methods by including the states as decision variables, along side the controls, at each time-step; respectively denoted $x_k$ and $u_k$.  In this formalation the dynamics---which are implicit in indirect methods, coming in during the rollout phase---are enforced as constraints between \textit{knot points} $z_k = (x_k, u_k)^\top$.  
+
+With the dynamics enforced as constraints, numerical non-linear solvers are free to violate these constraints during intermediate points of the optimization routine, en route to satisfying them at convergence.  This capability, along with the ability to enforce constraints on the state variables, lend theoretical and empirical evidence towards the superiority of direct methods over indirect. 
+
+\subsection{Notation}
+In this section we will adopt the following (mostly) conventional control theory notation to focus on the structure of the problems  --- in the following section we will apply these methods to quantum systems.
+
+\begin{itemize}
+  \item $x$: represents the states, where $x_k \in \mathbb{R}^n$
+  \item $u$: represents the controls, where $u_k \in \mathbb{R}^m$
+  \item $z$: represents a knot point, where $z_k = (x_k, u_k)^\top \in \mathbb{R}^{n+m}$
+\end{itemize}
 
 \subsection{State Transfer Problems}
 
+A core problem in trajectory optimization is the state transfer from problem, where we want to begin in an initial state, i.e. $x_1 = x_{\text{goal}}$, and find a control sequence $u_{1:N-1}$ such that $x_N$ minimizes a loss $\ell$ relative to the goal state $x_{\text{goal}}$, .  We will enforce the dynamics constraints implicitly, i.e. as $f(x_{k+1}, x_k, u_k) = 0$, for reasons of generality here, but as elucidated later, to increase computational efficiency. We can write this problem like so: 
+
+\begin{align}
+  \minimize{x, u} \quad & \ell(x_N) \\
+  \st \quad & f(x_{k+1}, x_k, u_k) = 0 \\
+            & x_1 = x_{\text{init}} 
+\end{align}
+
 \subsection{Free Time Problems}
+If we do not know the optimal time interval in which to solve our problem, this framework allows us to easily modify our the previous problem so that the solver can find the optimal time on its own.  This is accomplished by including making each time step $\Delta t_k$ a decision variable and including it in the dynamics constraint:
+
+\begin{align}
+  \minimize{x, u, \Delta t} \quad & \ell(x_N) \\
+  \st \quad & f(x_{k+1}, x_k, u_k, \Delta t_k) = 0 \\
+            & \Delta t^{\min} < \Delta t_k < \Delta t^{\max} \\
+            & x_1 = x_{\text{init}} 
+\end{align}
+
+Here the time steps, $\Delta t_k$ are constrained to be within some reasonable bounds, $0 < \Delta t^{\min} < \Delta t^{\max}$, in order to prevent the solver from taking advantage of negative values and discretization error.   
 
 \subsection{Minimum Time Problems}
 
-\newpage
+Given a \textit{nominal} solution, $(x_{1:N}^{\text{nominal}}, u_{1:N-1}^{\text{nominal}})$, to the free time problem, we can warm start a new optimization problem where we seek to minimize the total time.  This problem can be set up as follows:
+
+\begin{align}
+  \minimize{x, u, \Delta t} \quad & \sum_{k=1}^{N-1} \Delta t_k \\
+  \st \quad & f(x_{k+1}, x_k, u_k, \Delta t_k) = 0 \\
+            & \Delta t^{\min} < \Delta t_k < \Delta t^{\max} \\
+            & x_1 = x_{\text{init}} \\
+            & x_N = x_N^{\text{nominal}}
+\end{align}
+
+Here we constrain the final state $x_N$ to equal the final state of the nominal trajectory---which can not be done with indirect methods---and forces the solver to find solutions that minimize the time objective without sacrificing the $\ell(x_T)$ objective.
+
+\subsection{Overview}
+In summary, direct collocation allows us to solve QOC type problems in way that overcomes the shortcomings of available indirect methods.  In this framework it is possible to solve a wide variety of trajectory optimization problems -- e.g., for an arbitrary non-linear objective $J(z)$, where $z = z_{1:N}$ is the collection of knot points at each time step, non-linear (or linear) constraints, abstractly written as $c(z) \in \mathcal{Z}$, where $\mathcal{Z}$ is the set of admissable values, we can write the following generalized direct collocation optimization problem:
+
+\begin{align}
+  \minimize{z} \quad & J(z) \\
+  \st \quad & f(z_k, z_{k+1}) = 0 \\
+            & c(z) \in \mathcal{Z} 
+\end{align}
+
+Here $f(z_{k+1}, z_k) = 0$ is the dynamics constraints generalized to knot points -- e.g, we might have $z_k = (x_k, u_k, \Delta t_k)^\top$ and $f(z_k, z_{k+1}) = f(x_{k+1}, x_k, u_k, \Delta t_k)$ along with $J(z) = J(x, u, \Delta t) = \ell(x_N)$. We write the problem in the form above, as it is the convention we have adopted in the corresponding software package, Pico.jl. 
+
+
+
 \section{Quantum Control Problems}
 
-\subsection{Isomorphic Problem Formulation}
+This section deals with formulating QOC problems as direct collocation trajectory optimization problems as described in the previous section. In this case we must deal with a handful of quantum specific issues.  First we will cover how to convert to real values the complex valued states $\psi \in \mathbb{C}^n$ and Hamiltonians $H \in \mathbb{C}^{n \times n}$.  Next, we will discuss a novel, efficient way to enforce the dynamics, which naively requires a potentially very high dimensional matrix exponential. Finally we will discuss a few tricks for achieving certain types of solutions, such as \textit{bang-bang} solutions, \textit{smooth} solutions, and \textit{guard state} solutions. 
+
+
+
+\subsection{Isomorphic Formulation}
+To move between complex valued quantum states and real valued problem variables we will utilize the following isomorphic representations for complex vectors and matrices.  We will use \textit{tildes} to represent isomorphic representations from here on out. For the quantum states we then have
+
+\begin{equation}
+  \psi \in \mathbb{C}^n \quad \longrightarrow \quad \isopsi = \mqty(\Re \psi \\ \Im \psi) \in \mathbb{R}^{2n},
+\end{equation}
+
+\noindent
+and for matrices we have
+
+\begin{align}
+  H \in \mathbb{C}^{n \times n} \quad \longrightarrow \quad \tilde{H} &= \mqty(\Re H & -\Im H \\ \Im H & \Re H) \in \mathbb{R}^{2n \times 2n} \\
+  &= \mqty(1 & 0 \\ 0 & 1) \otimes \Re H + \mqty(0 & -1 \\ 1 & 0) \otimes \Im H.
+\end{align}
+
+\noindent
+Where $\otimes$ is the Kronicker product and the matrix in front of $\Im H$ may be recognized as the isomorphic matrix representation of the unit imaginary number. 
+
+The Schr\"oedinger dynamics involve a matrix exponential of $-iH$, so it will behoove us to define the following objective
+
+\begin{equation}
+  G(H) = \widetilde{-iH} = \mqty(1 & 0 \\ 0 & 1) \otimes \Im H - \mqty(0 & -1 \\ 1 & 0) \otimes \Re H
+\end{equation}
+
+\noindent
+Which, as can be easily shown, aligns with the previous definition.
+
+Now, $G$ is a linear function of $H$ so we then have
+
+\begin{equation}
+  G(\vb{a}) = G(H(\vb{a})) = G_0 + \sum_j a^j G_j.
+\end{equation}
+
+\noindent
+Where $G_j := G(H_j)$ mnemonically represents the \textit{generator} of the dynamics.
+
+
 
 \subsection{Pad\'e Integrator Dynamics}
+Our dynamics can be precisely written in the form 
+
+\begin{equation}
+  f(\isopsi_{t+1}, \isopsi_t, \vb{a}_t) = \isopsi_{t+1} - \exp\qty(G(\vb{a}_t) \cdot \Delta t) \ \isopsi_t,
+\end{equation}
+
+\noindent
+but this does not account for how matrix exponentials are actually computed numerically. A common approach is to use the Pad\'e approximant for the exponential,
+
+\begin{equation}
+  \exp(A) = \qty(I - \frac{1}{2} A + \frac{1}{9} A^2 + \dots)^{-1} \qty(I + \frac{1}{2} A + \frac{1}{9} A^2 + \dots),
+\end{equation}
+
+\noindent
+and truncate the series at some order in the numerator and denominator.  
+
+We can take advantage of this structure by recognizing that in our framework the leading matrix inverse is computationally expensive and not necessary to compute directly --- we can simply shift it over; i.e.,
+
+\begin{equation}
+  f(\isopsi_{t+1}, \isopsi_t, \vb{a}_t) = \qty(I - \frac{\Delta t}{2} G + \frac{\Delta t^2}{9} G^2 + \dots) \isopsi_{t+1} - \qty(I + \frac{\Delta t}{2} G + \frac{\Delta t^2}{9} G^2 + \dots) \isopsi_t.
+\end{equation}
+\noindent
+Here, $G = G(\vb{a}_t)$.
+
+Given we can assume our dynamics model is not perfect and that numerical inprecision will arise regardless it prompts us to lean toward efficiency. With these considerations we define the second and fourth order \textit{Pad\'e integrators} as 
+
+\begin{align}
+  \vb{P}^{(2)}(\isopsi_{t+1}, \isopsi_t, \vb{a}_t) &= \qty(I - \frac{\Delta t}{2} G(\vb{a}_t) ) \isopsi_{t+1} - \qty(I + \frac{\Delta t}{2} G(\vb{a}_t) ) \isopsi_t \\
+  \vb{P}^{(4)}(\isopsi_{t+1}, \isopsi_t, \vb{a}_t) &= \qty(I - \frac{\Delta t}{2} G(\vb{a}_t)  + \frac{\Delta t^2}{9} G(\vb{a}_t) ^2) \isopsi_{t+1} - \qty(I + \frac{\Delta t}{2} G(\vb{a}_t)  + \frac{\Delta t^2}{9} G(\vb{a}_t) ^2) \isopsi_t
+\end{align}
+
 
 \subsection{Special Considerations}
+
+\subsubsection*{Bang-Bang Solutions}
+
+\subsubsection*{Smooth Solutions}
+
+\subsubsection*{Guard State Solutions}
+
 
 \newpage
 \section{Experimental Results}
