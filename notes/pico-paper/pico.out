@@ -8,9 +8,12 @@
 \BOOKMARK [2][-]{subsection.3.2}{State Transfer Problems}{section.3}% 8
 \BOOKMARK [2][-]{subsection.3.3}{Free Time Problems}{section.3}% 9
 \BOOKMARK [2][-]{subsection.3.4}{Minimum Time Problems}{section.3}% 10
-\BOOKMARK [2][-]{subsection.3.5}{Overview}{section.3}% 11
+\BOOKMARK [2][-]{subsection.3.5}{Summary}{section.3}% 11
 \BOOKMARK [1][-]{section.4}{Quantum Control Problems}{}% 12
 \BOOKMARK [2][-]{subsection.4.1}{Isomorphic Formulation}{section.4}% 13
 \BOOKMARK [2][-]{subsection.4.2}{Pad\351 Integrator Dynamics}{section.4}% 14
-\BOOKMARK [2][-]{subsection.4.3}{Special Considerations}{section.4}% 15
-\BOOKMARK [1][-]{section.5}{Experimental Results}{}% 16
+\BOOKMARK [2][-]{subsection.4.3}{Base Problem Definition}{section.4}% 15
+\BOOKMARK [1][-]{section.5}{Results}{}% 16
+\BOOKMARK [2][-]{subsection.5.1}{Solution Examples}{section.5}% 17
+\BOOKMARK [2][-]{subsection.5.2}{Comparison to Other Methods}{section.5}% 18
+\BOOKMARK [2][-]{subsection.5.3}{Hardware Results}{section.5}% 19
