@@ -70,7 +70,7 @@ R = 0.01
 cost = :infidelity_cost
 eval_hess = true
 pinqstate = false
-mode = :free_time
+mode = :min_time
 
 options = Options(
     max_iter = iter,

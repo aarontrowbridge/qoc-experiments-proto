@@ -1,6 +1,6 @@
 using PicoOld
 
-experiment = "cnot_iter_200_00000"
+experiment = "cnot_iter_200_00000_00002"
 
 data_dir  = "data/twoqubit/cnot_update"
 data_path = joinpath(data_dir, experiment * ".jld2")
