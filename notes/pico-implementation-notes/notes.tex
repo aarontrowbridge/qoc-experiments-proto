@@ -7,6 +7,17 @@
 \usepackage{physics}
 
 \newcommand{\isopsi}{\tilde \psi}
+\newcommand{\isoU}{\widetilde{U}}
+\newcommand{\isovecU}{\vec{\widetilde{U}}}
+\newcommand{\isovec}{\text{isovec}}
+\newcommand{\HI}{H^{\text{I}}}
+\newcommand{\HR}{H^{\text{R}}}
+\newcommand{\BR}{B^{\text{R}}}
+\newcommand{\BI}{B^{\text{I}}}
+\newcommand{\FR}{F^{\text{R}}}
+\newcommand{\FI}{F^{\text{I}}}
+\newcommand{\UR}{U^{\text{R}}}
+\newcommand{\UI}{U^{\text{I}}}
 
 
 \title{Optimal control of quantum systems with Pad\'e integrators and direct collocation: Pico.jl}
@@ -758,6 +769,106 @@ and
     = -\frac{1}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) 
 \end{equation}
 
+\newpage
+
+\section{Unitary Implementation}
+
+\subsection{Definitions}
+
+\begin{equation*}
+  \isovec\qty(I_2 \otimes A + \Im \otimes B) = \mqty(\text{vec}(A) \\ \text{vec}(B))
+\end{equation*}
+
+\begin{align*}
+  B(\vb{a}_t, h_t) &= I_2 \otimes \BR + \Im \otimes \BI 
+\end{align*}
+
+\begin{align*}
+  \BR &= I - \frac{h_t}{2} \HI + \frac{h_t^2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \BI &= \frac{h_t}{2} \HR - \frac{h_t^2}{9}\qty(\qty{\HR,\HI})
+\end{align*}
+
+\begin{align*}
+  F(\vb{a}_t, h_t) &= I_2 \otimes \FR - \Im \otimes \FI
+\end{align*}
+
+\begin{align*}
+  \FR &= I + \frac{h_t}{2} \HI + \frac{h_t^2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \FI &= \frac{h_t}{2} \HR + \frac{h_t^2}{9}\qty(\qty{\HR,\HI})
+\end{align*}
+
+
+\begin{align*}
+  f(\isovecU_{t}, \vb{a}_t, h_t, \isovecU_{t+1}) &= \isovec\qty(\vb{P}(\isoU_{t+1}, \isoU_t, \vb{a}_t, h_t)) \\ 
+  &= \isovec\qty(B(\vb{a}_t, h_t) \isoU_{t+1} - F(\vb{a}_t, h_t) \isoU_t) \\
+  &= \isovec\Big(I_2 \otimes \qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t)\\
+  & \quad + \Im \otimes \qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)\Big)\\
+  &= \mqty( 
+    \text{vec}\qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t) \\ 
+    \text{vec}\qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)
+  )
+\end{align*}
+
+\newpage
+
+\subsection{Derivatives}
+
+For the states we have
+
+\begin{align*}
+  \pdv{f}{\isovecU_t} &= - \hat F, \\
+\end{align*}
+
+where
+
+\begin{equation*}
+  \hat F = \qty(I_2 \otimes I_N) \otimes \FR - (\Im \otimes \ I_N) \otimes \FI
+\end{equation*}
+
+and
+
+\begin{align*}
+  \pdv{f}{\isovecU_{t+1}} &= \hat B,  
+\end{align*}
+
+where
+
+\begin{equation*}
+  \hat B = \qty(I_2 \otimes I_N) \otimes \BR + (\Im \otimes \ I_N) \otimes \BI.
+\end{equation*}
+
+
+For the drives we have
+
+\begin{align*}
+  \pdv{f}{a^j_t} &= \isovec\qty(\pdv{B}{a^j_t} \isoU_{t+1} - \pdv{F}{a^j_t} \isoU_t) \\
+  &= \isovec\Bigg(\qty(I_2 \otimes \pdv{\BR}{a^j_t} + \Im \otimes \pdv{\BI}{a^j_t}) \isoU_{t+1} \\
+  & \quad \quad \quad \quad - \qty(I_2 \otimes \pdv{\FR}{a^j_t} - \Im \otimes \pdv{\FI}{a^j_t}) \isoU_t\Bigg) \\
+  &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1}) \\
+  & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1}) \\
+  & \quad \quad \quad \quad - I_2 \otimes \qty(\pdv{\FR}{a^j_t} \UR_t + \pdv{\FI}{a^j_t} \UI_t) \\
+  & \quad \quad \quad \quad - \Im \otimes \qty(\pdv{\FR}{a^j_t} \UI_t - \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
+  &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t) \\
+  & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
+  &= \mqty(
+    \text{vec} \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t)\\
+    \text{vec}\qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)
+    )
+\end{align*}
+
+where, for $H$ linear in $a^j_t$, 
+
+\begin{align*}
+  \pdv{\BR}{a^j_t} &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HR_j} - \qty{\HI, \HI_j}) \\
+  \pdv{\BI}{a^j_t} &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})
+\end{align*}
+
+and 
+
+\begin{align*}
+  \pdv{\FR}{a^j_t} &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HR_j} - \qty{\HI, \HI_j}) \\
+  \pdv{\FI}{a^j_t} &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})
+\end{align*}
 
 
 
@@ -765,5 +876,7 @@ and
 
 
 
-    
+
+
+
 \end{document}
