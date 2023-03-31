@@ -5,6 +5,8 @@
 \usepackage{amsfonts}
 \usepackage{mathrsfs}
 \usepackage{physics}
+\usepackage[a4paper, margin=1in]{geometry}
+
 
 \newcommand{\isopsi}{\tilde \psi}
 \newcommand{\isoU}{\widetilde{U}}
@@ -20,7 +22,7 @@
 \newcommand{\UI}{U^{\text{I}}}
 
 
-\title{Optimal control of quantum systems with Pad\'e integrators and direct collocation: Pico.jl}
+\title{Pico.jl Implementation Notes}
 \author{Aaron Trowbridge}
 \date{}
 
@@ -33,9 +35,9 @@
 
 \pagenumbering{roman}
 
-\begin{abstract}
-  Here we present a novel approach to the problem of quantum optimal control which takes advantage of a relationship between the implicit midpoint method and the Pad\'e approximation of the matrix exponential function. We demonstrate this approach, using an accompanying Julia package, on an assortment of quantum systems including a single qubit system, two-qubit system, and a system composed of a qubit coupled to an array of harmonic oscillators.
-\end{abstract}
+% \begin{abstract}
+%   Here we present a novel approach to the problem of quantum optimal control which takes advantage of a relationship between the implicit midpoint method and the Pad\'e approximation of the matrix exponential function. We demonstrate this approach, using an accompanying Julia package, on an assortment of quantum systems including a single qubit system, two-qubit system, and a system composed of a qubit coupled to an array of harmonic oscillators.
+% \end{abstract}
 
 \tableofcontents
 
@@ -785,7 +787,7 @@ and
 
 \begin{align*}
   \BR &= I - \frac{h_t}{2} \HI + \frac{h_t^2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2) \\
-  \BI &= \frac{h_t}{2} \HR - \frac{h_t^2}{9}\qty(\qty{\HR,\HI})
+  \BI &= \frac{h_t}{2} \HR - \frac{h_t^2}{9}\qty{\HR,\HI}
 \end{align*}
 
 \begin{align*}
@@ -794,85 +796,249 @@ and
 
 \begin{align*}
   \FR &= I + \frac{h_t}{2} \HI + \frac{h_t^2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2) \\
-  \FI &= \frac{h_t}{2} \HR + \frac{h_t^2}{9}\qty(\qty{\HR,\HI})
+  \FI &= \frac{h_t}{2} \HR + \frac{h_t^2}{9}\qty{\HR,\HI}
 \end{align*}
 
 
 \begin{align*}
   f(\isovecU_{t}, \vb{a}_t, h_t, \isovecU_{t+1}) &= \isovec\qty(\vb{P}(\isoU_{t+1}, \isoU_t, \vb{a}_t, h_t)) \\ 
   &= \isovec\qty(B(\vb{a}_t, h_t) \isoU_{t+1} - F(\vb{a}_t, h_t) \isoU_t) \\
-  &= \isovec\Big(I_2 \otimes \qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t)\\
-  & \quad + \Im \otimes \qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)\Big)\\
-  &= \mqty( 
-    \text{vec}\qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t) \\ 
-    \text{vec}\qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)
-  )
+  % &= \isovec\Big(I_2 \otimes \qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t)\\
+  % & \quad + \Im \otimes \qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)\Big)\\
+  % &= \mqty( 
+  %   \text{vec}\qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t) \\ 
+  %   \text{vec}\qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)
+  % ) 
+  &= \hat B(\vb{a}_t, h_t) \isovecU_{t+1} - \hat F(\vb{a}_t, h_t) \isovecU_{t}
+\end{align*}
+
+where 
+
+\begin{align*}
+  \hat B(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \BR + (\Im \otimes \ I_N) \otimes \BI \\
+  \hat F(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \FR - (\Im \otimes \ I_N) \otimes \FI 
 \end{align*}
 
 \newpage
 
 \subsection{Derivatives}
 
+\subsubsection*{Jacobian}
+
 For the states we have
 
 \begin{align*}
-  \pdv{f}{\isovecU_t} &= - \hat F, \\
+  \pdv{f}{\isovecU_t} &= - \hat F \quad \text{and} \quad
+  \pdv{f}{\isovecU_{t+1}} = \hat B
 \end{align*}
-
-where
-
-\begin{equation*}
-  \hat F = \qty(I_2 \otimes I_N) \otimes \FR - (\Im \otimes \ I_N) \otimes \FI
-\end{equation*}
-
-and
-
-\begin{align*}
-  \pdv{f}{\isovecU_{t+1}} &= \hat B,  
-\end{align*}
-
-where
-
-\begin{equation*}
-  \hat B = \qty(I_2 \otimes I_N) \otimes \BR + (\Im \otimes \ I_N) \otimes \BI.
-\end{equation*}
 
 
 For the drives we have
 
 \begin{align*}
-  \pdv{f}{a^j_t} &= \isovec\qty(\pdv{B}{a^j_t} \isoU_{t+1} - \pdv{F}{a^j_t} \isoU_t) \\
-  &= \isovec\Bigg(\qty(I_2 \otimes \pdv{\BR}{a^j_t} + \Im \otimes \pdv{\BI}{a^j_t}) \isoU_{t+1} \\
-  & \quad \quad \quad \quad - \qty(I_2 \otimes \pdv{\FR}{a^j_t} - \Im \otimes \pdv{\FI}{a^j_t}) \isoU_t\Bigg) \\
-  &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1}) \\
-  & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1}) \\
-  & \quad \quad \quad \quad - I_2 \otimes \qty(\pdv{\FR}{a^j_t} \UR_t + \pdv{\FI}{a^j_t} \UI_t) \\
-  & \quad \quad \quad \quad - \Im \otimes \qty(\pdv{\FR}{a^j_t} \UI_t - \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
-  &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t) \\
-  & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
-  &= \mqty(
-    \text{vec} \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t)\\
-    \text{vec}\qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)
-    )
+  \pdv{f}{a^j_t} % &= \isovec\qty(\pdv{B}{a^j_t} \isoU_{t+1} - \pdv{F}{a^j_t} \isoU_t) \\
+  % &= \isovec\Bigg(\qty(I_2 \otimes \pdv{\BR}{a^j_t} + \Im \otimes \pdv{\BI}{a^j_t}) \isoU_{t+1} \\
+  % & \quad \quad \quad \quad - \qty(I_2 \otimes \pdv{\FR}{a^j_t} - \Im \otimes \pdv{\FI}{a^j_t}) \isoU_t\Bigg) \\
+  % &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1}) \\
+  % & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1}) \\
+  % & \quad \quad \quad \quad - I_2 \otimes \qty(\pdv{\FR}{a^j_t} \UR_t + \pdv{\FI}{a^j_t} \UI_t) \\
+  % & \quad \quad \quad \quad - \Im \otimes \qty(\pdv{\FR}{a^j_t} \UI_t - \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
+  % &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t) \\
+  % & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
+  &= \pdv{\hat B}{a^j_t} \isovecU_{t+1} - \pdv{\hat F}{a^j_t} \isovecU_{t} \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{a^j_t}) \isovecU_{t+1} \\
+  & \quad - \qty((I_2 \otimes I_N) \otimes \pdv{\FR}{a^j_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{a^j_t}) \isovecU_{t} 
+  % \\
+  % &= \mqty(
+  %   \text{vec} \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t)\\
+  %   \text{vec}\qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)
+  % )
 \end{align*}
 
-where, for $H$ linear in $a^j_t$, 
+where, writing $\partial_{a^j_t} H = H_j$, we have 
 
 \begin{align*}
-  \pdv{\BR}{a^j_t} &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HR_j} - \qty{\HI, \HI_j}) \\
-  \pdv{\BI}{a^j_t} &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})
+  \pdv{\BR}{a^j_t} &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
+  &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_{i=0}^d a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
+  \pdv{\BI}{a^j_t} &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j}) \\
+  &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
 \end{align*}
 
 and 
 
 \begin{align*}
-  \pdv{\FR}{a^j_t} &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HR_j} - \qty{\HI, \HI_j}) \\
-  \pdv{\FI}{a^j_t} &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})
+  \pdv{\FR}{a^j_t} &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
+  &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_i a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
+  \pdv{\FI}{a^j_t} &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})\\
+  &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
+\end{align*}
+
+For the timestep $h_t$ we have
+
+\begin{align*}
+  \pdv{f}{h_t} % &= \isovec\qty(\pdv{B}{h_t} \isoU_{t+1} - \pdv{F}{h_t} \isoU_t) \\
+  % &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{h_t} \UR_{t+1} - \pdv{\BI}{h_t} \UI_{t+1} - \pdv{\FR}{h_t} \UR_t - \pdv{\FI}{h_t} \UI_t) \\
+  % & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{h_t} \UI_{t+1} + \pdv{\BI}{h_t} \UR_{t+1} - \pdv{\FR}{h_t} \UI_t + \pdv{\FI}{h_t} \UR_t)\Bigg) \\
+  &= \pdv{\hat B}{h_t} \isovecU_{t+1} - \pdv{\hat F}{h_t} \isovecU_{t} \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{h_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{h_t}) \isovecU_{t+1} \\
+  & \quad - \qty((I_2 \otimes I_N) \otimes \pdv{\FR}{h_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{h_t}) \isovecU_{t}
+  % &= \mqty(
+    % \text{vec} \qty(\pdv{\BR}{h_t} \UR_{t+1} - \pdv{\BI}{h_t} \UI_{t+1} - \pdv{\FR}{h_t} \UR_t - \pdv{\FI}{h_t} \UI_t)\\
+    % \text{vec}\qty(\pdv{\BR}{h_t} \UI_{t+1} + \pdv{\BI}{h_t} \UR_{t+1} - \pdv{\FR}{h_t} \UI_t + \pdv{\FI}{h_t} \UR_t)
+    % )
+\end{align*}
+
+where 
+
+\begin{align*} 
+  \pdv{\BR}{h_t} &= -\frac{1}{2} \HI + \frac{2h_t}{9} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \pdv{\BI}{h_t} &= \frac{1}{2} \HR - \frac{2h_t}{9} \qty{\HR,\HI}
+\end{align*}
+
+and
+
+\begin{align*}
+  \pdv{\FR}{h_t} &= \frac{1}{2} \HI + \frac{2h_t}{9} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \pdv{\FI}{h_t} &= \frac{1}{2} \HR + \frac{2h_t}{9} \qty{\HR,\HI}.
+\end{align*}
+
+So we then have, with $z_t = \mqty(\isovecU_t & \vb{a}_t & h_t)^\top$
+
+\begin{equation*}
+  \partial_{z_t:z_{t+1}} f = \mqty(\partial_{z_t}f & \partial_{z_{t+1}}f) = \mqty(-\hat F & \partial_{\vb{a}_t}f & \partial_{h_t} f & \hat B & \vb{0} & \vb{0} )
+\end{equation*}
+
+\subsubsection*{Hessian of the Lagrangian}
+
+\begin{align*}
+  \mathcal{L} = \vb*{\mu}^\top \vb{F}(\vb{Z}) = \sum_t \mu_t^\top f(z_t, z_{t+1}) = \sum_t \mathcal{L}_t
+\end{align*}
+
+\begin{align*}
+  \mathcal{L}_t = \mu_t^\top f(z_t, z_{t+1})
+\end{align*}
+
+\begin{align*}
+  \partial^2_{z_t:z_{t+1}} \mathcal{L}_t 
+  % &= \mqty(
+  %   \partial^2_{z_t} \mathcal{L}_t & \partial_{z_t}\partial_{z_{t+1}} \mathcal{L}_t \\
+  %   \partial_{z_t}\partial_{z_{t+1}} \mathcal{L}_t & \partial^2_{z_{t+1}} \mathcal{L}_t
+  % ) \\ 
+  &= \mqty(
+    \partial^2_{z_t} \mathcal{L}_t & \partial_{z_{t+1}} \partial_{z_t} \mathcal{L}_t \\
+    \ddots & \vb{0}
+  )
+\end{align*}
+
+
+\begin{align*}
+  \partial^2_{z_t} \mathcal{L}_t = \mqty(
+    \vb{0} & \partial_{\vb{a}_t} \partial_{\isovecU_t} \mathcal{L}_t & \partial_{h_t} \partial_{\isovecU_t} \mathcal{L}_t \\
+    & \partial^2_{\vb{a}_t} \mathcal{L}_t & \partial_{h_t} \partial_{\vb{a}_t} \mathcal{L}_t \\
+    & & \partial^2_{h_t} \mathcal{L}_t
+  )
+\end{align*}
+
+\begin{align*}
+  \partial_{z_{t+1}} \partial_{z_t}\mathcal{L}_t = \mqty(
+    \vb{0} & \partial_{\isovecU_{t+1}} \partial_{\vb{a}_t} \mathcal{L}_t & \partial_{\isovecU_{t+1}} \partial_{h_t} \mathcal{L}_t \\
+    & \vb{0} & \vb{0} \\
+    & & \vb{0} 
+  )
 \end{align*}
 
 
 
 
+\begin{align*}
+  \pdv{\mathcal{L}_t}{a^j_t}{\isovecU_t} &= \pdv{a^j_t} \pdv{\mathcal{L}_t}{\isovecU_t} \\
+  &= \pdv{a^j_t} \qty(-\hat F^\top \mu_t) \\
+  &= -\qty(\pdv{\hat F}{a^j_t})^\top \mu_t \\
+  &= -\qty((I_2 \otimes I_N) \otimes \pdv{\FR}{a^j_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{a^j_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{a^j_t}{\isovecU_{t+1}} &= \pdv{a^j_t} \pdv{\mathcal{L}_t}{\isovecU_{t+1}} \\
+  &= \pdv{a^j_t} \qty(\hat B^\top \mu_t) \\
+  &= \qty(\pdv{\hat B}{a^j_t})^\top \mu_t \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{a^j_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{a^i_t}{a^j_t} &= \mu_t^\top \pdv{f_t}{a^i_t}{a^j_t} \\
+  &= \mu_t^\top \qty(\pdv{\hat B}{a^i_t}{a^j_t} \isovecU_{t+1} - \pdv{\hat F}{a^i_t}{a^j_t} \isovecU_t) \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\hat B}{a^i_t}{a^j_t} &= \qty(I_2 \otimes I_N) \otimes \pdv{\BR}{a^i_t}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{a^i_t}{a^j_t} \\
+  \pdv{\hat F}{a^i_t}{a^j_t} &= \qty(I_2 \otimes I_N) \otimes \pdv{\FR}{a^i_t}{a^j_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{a^i_t}{a^j_t} \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\BR}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
+  \pdv{\BI}{a^i_t}{a^j_t} &= -\frac{h_t^2}{9}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
+\end{align*}
+
+and
+
+\begin{align*}
+  \pdv{\FR}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
+  \pdv{\FI}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{h_t}{\isovecU_t} &= \pdv{h_t} \pdv{\mathcal{L}_t}{\isovecU_t} \\
+  &= \pdv{h_t} \qty(-\hat F^\top \mu_t) \\
+  &= -\qty(\pdv{\hat F}{h_t})^\top \mu_t \\
+  &= -\qty((I_2 \otimes I_N) \otimes \pdv{\FR}{h_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{h_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{h_t}{\isovecU_{t+1}} &= \pdv{h_t} \pdv{\mathcal{L}_t}{\isovecU_{t+1}} \\
+  &= \pdv{h_t} \qty(\hat B^\top \mu_t) \\
+  &= \qty(\pdv{\hat B}{h_t})^\top \mu_t \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{h_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{h_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{h_t}{a^j_t} &= \mu_t^\top \pdv{f_t}{h_t}{a^j_t} \\
+  &= \mu_t^\top \qty(\pdv{\hat B}{h_t}{a^j_t} \isovecU_{t+1} - \pdv{\hat F}{h_t}{a^j_t} \isovecU_t) \\
+  &= \mu_t^\top \Bigg( \qty(\qty(I_2 \otimes I_N) \otimes \pdv{\BR}{h_t}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{h_t}{a^j_t}) \isovecU_{t+1} \\
+  & \quad - \qty(\qty(I_2 \otimes I_N) \otimes \pdv{\FR}{h_t}{a^j_t} - \qty(\Im \otimes I_N) \otimes \pdv{\FI}{h_t}{a^j_t}) \isovecU_t \Bigg)
+\end{align*}
+
+\begin{align*}
+  \pdv{\BR}{h_t}{a^j_t} &= -\frac{1}{2}\HI_j + \frac{2h_t}{9}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
+  \pdv{\BI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j - \frac{2h_t}{9}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
+\end{align*}
+
+and
+
+\begin{align*}
+  \pdv{\FR}{h_t}{a^j_t} &= \frac{1}{2}\HI_j + \frac{2h_t}{9}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
+  \pdv{\FI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j + \frac{2h_t}{9}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
+\end{align*}
+
+\begin{align*}
+  \pdv[2]{\mathcal{L}_t}{h_t} &= \mu_t^\top \pdv[2]{f_t}{h_t} \\
+  &= \mu_t^\top \qty(\pdv[2]{\hat B}{h_t} \isovecU_{t+1} - \pdv[2]{\hat F}{h_t} \isovecU_t) \\
+  &= \mu_t^\top \Bigg( \qty(\qty(I_2 \otimes I_N) \otimes \pdv[2]{\BR}{h_t} + (\Im \otimes I_N) \otimes \pdv[2]{\BI}{h_t}) \isovecU_{t+1} \\
+  & \quad - \qty(\qty(I_2 \otimes I_N) \otimes \pdv[2]{\FR}{h_t} - \qty(\Im \otimes I_N) \otimes \pdv[2]{\FI}{h_t}) \isovecU_t \Bigg) \\
+\end{align*}
+
+where
+
+\begin{align*}
+  \pdv[2]{\BR}{h_t} &= \frac{2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
+  \pdv[2]{\BI}{h_t} &= -\frac{2}{9}\qty{\HR, \HI}\\
+\end{align*}
+
+and 
+
+\begin{align*}
+  \pdv[2]{\FR}{h_t} &= \frac{2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
+  \pdv[2]{\FI}{h_t} &= \frac{2}{9}\qty{\HR, \HI}\\
+\end{align*}
 
 
 
