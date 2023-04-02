@@ -1,7 +1,7 @@
 # Fdb version 3
-["pdflatex"] 1680199327 "/home/aaron/projects/qoc-experiments-proto/notes/pico-implementation-notes/notes.tex" "notes.pdf" "notes" 1680199327
+["pdflatex"] 1680391204 "/home/aaron/projects/qoc-experiments-proto/notes/pico-implementation-notes/notes.tex" "notes.pdf" "notes" 1680391204
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/aaron/projects/qoc-experiments-proto/notes/pico-implementation-notes/notes.tex" 1680199327 33613 bab919b347e826a6ef1b661359adb987 ""
+  "/home/aaron/projects/qoc-experiments-proto/notes/pico-implementation-notes/notes.tex" 1680391203 40485 18c74ebde7c98f648f69e09fcb4a8ab1 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy5.tfm" 1246382020 1120 1e8878807317373affa7f7bba4cf2f6a ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy7.tfm" 1246382020 1120 7f9f170e8aa57527ad6c49feafd45d54 ""
@@ -114,10 +114,10 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1644012257 39432 7155514e09a3d69036fac785183a21c2 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1661382061 166835 3237b25953d3dec94d74e36efc3a402b ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1661382066 1435853 7dc55129da6aefe46d2d311fdea676e1 ""
-  "notes.aux" 1680199327 2494 cac2a9c571220ff1ad8c5982c16b00b1 "pdflatex"
-  "notes.out" 1680199327 2095 7d37019b049fd45fa0e4456ca4035f06 "pdflatex"
-  "notes.tex" 1680199327 33613 bab919b347e826a6ef1b661359adb987 ""
-  "notes.toc" 1680199327 1192 2a0707c0cfa3657b3cc0c8317cdaece0 "pdflatex"
+  "notes.aux" 1680391204 2662 2e15a94e0376fdd909c2153076bca8e5 "pdflatex"
+  "notes.out" 1680391204 2467 3ce298c9a221efaface2087045f69abf "pdflatex"
+  "notes.tex" 1680391203 40485 18c74ebde7c98f648f69e09fcb4a8ab1 ""
+  "notes.toc" 1680391204 1319 05eb0ec2e7dd586fbac09a2923137c26 "pdflatex"
   (generated)
   "notes.aux"
   "notes.log"

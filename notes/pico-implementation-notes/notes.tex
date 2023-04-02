@@ -20,6 +20,10 @@
 \newcommand{\FI}{F^{\text{I}}}
 \newcommand{\UR}{U^{\text{R}}}
 \newcommand{\UI}{U^{\text{I}}}
+\newcommand{\AR}{A^{\text{R}}}
+\newcommand{\AI}{A^{\text{I}}}
+\newcommand{\Pre}{P_{\text{Re}}}
+\newcommand{\Pim}{P_{\text{Im}}}
 
 
 \title{Pico.jl Implementation Notes}
@@ -28,7 +32,7 @@
 
 \setcounter{section}{-1}
 
-\setlength\parindent{0pt}
+% \setlength\parindent{0pt}
 
 \begin{document}
 \maketitle
@@ -775,52 +779,174 @@ and
 
 \section{Unitary Implementation}
 
-\subsection{Definitions}
+\subsection{Vectorized Isomorphic Unitary Pad\'e Dynamics}
 
-\begin{equation*}
-  \isovec\qty(I_2 \otimes A + \Im \otimes B) = \mqty(\text{vec}(A) \\ \text{vec}(B))
-\end{equation*}
+We show later on that we can efficiently vectorize the Pad\'e dynamics for the isomorphic representation of the unitary, i.e. retain information about only the real and imaginary parts of the unitary.  The resulting dynamics expression is given by
 
 \begin{align*}
-  B(\vb{a}_t, h_t) &= I_2 \otimes \BR + \Im \otimes \BI 
+  \hat{\vb{P}}(\isovecU_{t+1}, \isovecU_t, \vb{a}_t, h_t) 
+  &= \hat B(\vb{a}_t, h_t) \isovecU_{t+1} - \hat F(\vb{a}_t, h_t) \isovecU_{t}.
 \end{align*}
+
+\noindent
+Here 
 
 \begin{align*}
-  \BR &= I - \frac{h_t}{2} \HI + \frac{h_t^2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2) \\
-  \BI &= \frac{h_t}{2} \HR - \frac{h_t^2}{9}\qty{\HR,\HI}
+  \hat B(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \BR(\vb{a}_t, h_t) + (\Im \otimes \ I_N) \otimes \BI(\vb{a}_t, h_t) \\
+  \hat F(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \FR(\vb{a}_t, h_t) - (\Im \otimes \ I_N) \otimes \FI(\vb{a}_t, h_t), 
 \end{align*}
+
+\noindent
+along with
 
 \begin{align*}
-  F(\vb{a}_t, h_t) &= I_2 \otimes \FR - \Im \otimes \FI
+  \BR(\vb{a}_t, h_t) &= I - \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{9}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
+  \BI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) - \frac{h_t^2}{9}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)},
 \end{align*}
+
+\noindent
+and
 
 \begin{align*}
-  \FR &= I + \frac{h_t}{2} \HI + \frac{h_t^2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2) \\
-  \FI &= \frac{h_t}{2} \HR + \frac{h_t^2}{9}\qty{\HR,\HI}
+  \FR(\vb{a}_t, h_t) &= I + \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{9}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
+  \FI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) + \frac{h_t^2}{9}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)}.
 \end{align*}
 
-
-\begin{align*}
-  f(\isovecU_{t}, \vb{a}_t, h_t, \isovecU_{t+1}) &= \isovec\qty(\vb{P}(\isoU_{t+1}, \isoU_t, \vb{a}_t, h_t)) \\ 
-  &= \isovec\qty(B(\vb{a}_t, h_t) \isoU_{t+1} - F(\vb{a}_t, h_t) \isoU_t) \\
-  % &= \isovec\Big(I_2 \otimes \qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t)\\
-  % & \quad + \Im \otimes \qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)\Big)\\
-  % &= \mqty( 
-  %   \text{vec}\qty(\BR \UR_{t+1} - \BI \UI_{t+1} - \FR \UR_t - \FI \UI_t) \\ 
-  %   \text{vec}\qty(\BR \UI_{t+1} + \BI \UR_{t+1} - \FR \UI_t + \FI \UR_t)
-  % ) 
-  &= \hat B(\vb{a}_t, h_t) \isovecU_{t+1} - \hat F(\vb{a}_t, h_t) \isovecU_{t}
-\end{align*}
-
-where 
-
-\begin{align*}
-  \hat B(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \BR + (\Im \otimes \ I_N) \otimes \BI \\
-  \hat F(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \FR - (\Im \otimes \ I_N) \otimes \FI 
-\end{align*}
 
 \newpage
 
+\subsection{Derivation of the Dynamics}
+
+\subsubsection*{Isomorphic Vectorization}
+
+To store just the real and imaginary parts of complex-valued matrices $A = \AR + i \AI \in \mathbb{C}^{N \times N}$ in a vector, for numerical purposes,  we define a projection matrix $\hat P \in \mathbb{R}^{2N^2 \times 4N^2}$ that will act on the vectorization of the real-valued isomorphic representation $\tilde A = \text{iso}(A) = I_2 \otimes \AR + \Im \otimes \AI \in \mathbb{R}^{2N \times 2N}$ as follows: 
+
+\begin{align*}
+  \isovec\qty(\tilde A)
+  &= \hat P \ \text{vec}(\tilde A) \\
+  &= \hat P \ \text{vec}\qty(I_2 \otimes \AR + \Im \otimes \AI) \\
+  &= \mqty(\text{vec}(\AR) \\ \text{vec}(\AI)).
+\end{align*}
+
+Given projection matrices $\Pre = \mqty(I_N & \vb{0}) \in \mathbb{R}^{N \times 2N}$ and $\Pim = \mqty(\vb{0} & I_N) \in \mathbb{R}^{N \times 2N}$ we can write the projection matrix $\hat P$ as
+
+\begin{align*}
+  \hat P_1 &= (\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre, 
+\end{align*}
+
+\noindent
+or equivalently as
+
+\begin{align*}
+  \hat P_2 &= \qty(\Pim^\top\Pre + \Pre^\top\Pim) \otimes \Pim.
+\end{align*}
+
+\noindent
+Both of these projectors produce identically correct results, i.e. $\hat P_1 \text{vec}(\tilde A) = \hat P_2 \text{vec}(\tilde A)$, so we will write $\hat P_1 \simeq \hat P_2$. This is demonstrated as follows: 
+
+\begin{align*}
+  \hat P_1 \text{vec}(\tilde A) 
+  &= \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre) \ \text{vec}(\tilde A) \\
+  &= \qty(\Pre^\top\Pre \otimes \Pre) \ \text{vec}(\tilde A) - \qty(\Pim^\top\Pim \otimes \Pre) \ \text{vec}(\tilde A) \\
+  &= \text{vec}\qty(\Pre \tilde A \Pre^\top\Pre - \Pre \tilde A \Pim^\top\Pim) \\
+  &= \text{vec}\qty(\mqty(I_N & \vb{0}) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(I_N \\ \vb{0}) \mqty(I_N & \vb{0}) - \mqty(I_N & \vb{0}) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(\vb{0} \\ I_N) \mqty(\vb{0} & I_N)) \\
+  &= \text{vec}\qty(\mqty(I_N & \vb{0}) \mqty(\AR \\ \AI) \mqty(I_N & \vb{0}) - \mqty(I_N & \vb{0}) \mqty(-\AI \\ \AR) \mqty(\vb{0} & I_N)) \\
+  &= \text{vec}\qty(\AR\mqty(I_N & \vb{0}) + \AI \mqty(\vb{0} & I_N)) \\
+  &= \text{vec}\qty(\mqty(\AR & \AI)) \\
+  &= \mqty(\text{vec}(\AR) \\ \text{vec}(\AI)).
+\end{align*}
+
+\noindent
+And also
+
+\begin{align*}
+  \hat P_2 \text{vec}(\tilde A) 
+  &= \qty(\qty(\Pim^\top\Pre + \Pre^\top\Pim) \otimes \Pim) \ \text{vec}(\tilde A) \\
+  &= \qty(\Pim^\top\Pre \otimes \Pim) \ \text{vec}(\tilde A) + \qty(\Pre^\top\Pim \otimes \Pim) \ \text{vec}(\tilde A) \\
+  &= \text{vec}\qty(\Pim \tilde A \Pre^\top\Pim + \Pim \tilde A \Pim^\top\Pre) \\
+  &= \text{vec}\qty(\mqty(\vb{0} & I_N) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(I_N \\ \vb{0}) \mqty(\vb{0} & I_N) + \mqty(\vb{0} & I_N) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(\vb{0} \\ I_N) \mqty(I_N & \vb{0})) \\
+  &= \text{vec}\qty(\mqty(\vb{0} & I_N) \mqty(\AR \\ \AI) \mqty(\vb{0} & I_N) + \mqty(\vb{0} & I_N) \mqty(-\AI \\ \AR) \mqty(I_N & \vb{0})) \\
+  &= \text{vec}\qty(\AI \mqty(\vb{0} & I_N) + \AR \mqty(I_N & \vb{0})) \\
+  &= \text{vec}\qty(\mqty(\AR & \AI)) \\
+  &= \mqty(\text{vec}(\AR) \\ \text{vec}(\AI)).
+\end{align*}
+
+For later convenience let's now look at the expression $\hat P_1 \qty(I_{2N} \otimes \tilde A)$
+
+\begin{align*}
+  \hat P_1 \qty(I_{2N} \otimes \tilde A)
+  &= \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre) \qty(I_{2N} \otimes \tilde A) \\
+  &= \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\Pre \tilde A) \\
+  &= \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\AR \Pre - \AI \Pim) \\
+  &= \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\AR \Pre) - \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\AI \Pim) \\
+  &= \qty(I_{2N} \otimes \AR) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre) - \qty(I_{2N} \otimes \AI) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 - \qty(I_2 \otimes I_N \otimes \AI) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im^2 \otimes I_N \otimes \AI) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \qty(\Im \otimes I_N \otimes I_N) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \qty( \qty(\qty(\Im \otimes I_N)\Pre^\top\Pre - \qty(\Im \otimes I_N)\Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \qty( \qty(\Pim^\top\Pre + \Pre^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \hat P_2\\ 
+  &\simeq \qty(I_2 \otimes I_N \otimes \AR + \Im \otimes I_N \otimes \AI) \hat P_1 \\
+  &= \hat A \hat P_1,
+\end{align*}
+
+\noindent
+Where we used 
+
+\begin{align*}
+  \Pre \tilde A &= \mqty(I_N & \vb{0}) \mqty(\AR & -\AI \\ \AI & \AR) \\
+  &= \mqty(\AR & -\AI) \\
+  &= \AR \Pre - \AI \Pim,
+\end{align*}
+
+\noindent
+and
+
+\begin{align*}
+  (\Im \otimes I_N)\Pre^\top &= \mqty(& -I_N \\ I_N &) \mqty(I_N \\ \vb{0}) = \mqty(\vb{0} \\ I_N) = \Pim^\top \\ 
+  (\Im \otimes I_N)\Pim^\top &= \mqty(& -I_N \\ I_N &) \mqty(\vb{0} \\ I_N) = -\mqty(I_N \\ \vb{0}) = -\Pre^\top.
+\end{align*}
+
+\noindent
+We can then conclude that
+
+\begin{align*}
+  \boxed{\hat P \qty(I_{2N} \otimes \tilde A) \simeq \hat A \hat P.}
+\end{align*}
+
+\newpage
+\subsubsection*{Isomorphic Pad\'e Dynamics}
+Our motivation here is to compute the unitary Pad\'e dynamics on the isomorphic vector representation of the unitary, $\isovecU = \isovec(\isoU) = \hat P \ \text{vec}(\isoU) = \hat P \ \text{vec}(\text{iso}(U))$. We can write these dynamics As
+
+\begin{align*}
+  f(z_t, z_{t+1}) &= f(\isovecU_t, \vb{a}_t, h_t, \isovecU_{t+1}, \vb{a}_{t+1}, h_{t+1}) \\
+  &= \hat{\vb{P}}(\isovecU_{t+1}, \isovecU_t, \vb{a}_t, h_t) \\
+  &= \isovec\qty(\vb{P}(\isoU_{t+1}, \isoU_t, \vb{a}_t, h_t)) \\
+  &= \hat P \ \text{vec}\qty(\tilde B(\vb{a}_t, h_t) \isoU_{t+1} - \tilde F(\vb{a}_t, h_t) \isoU_t) \\
+  &= \hat P \qty(I_{2N} \otimes \tilde B(\vb{a}_t, h_t)) \text{vec}\qty(\isoU_{t+1}) - \hat P \qty(I_{2N} \otimes \tilde F(\vb{a}_t, h_t)) \text{vec}\qty(\isoU_t) \\
+  &= \hat B(\vb{a}_t, h_t) \hat P \ \text{vec}\qty(\isoU_{t+1})  - \hat F(\vb{a}_t, h_t) \hat P \ \text{vec}\qty(\isoU_t) \\
+  &= \hat B(\vb{a}_t, h_t) \isovecU_{t+1} - \hat F(\vb{a}_t, h_t) \isovecU_t
+\end{align*}
+
+\noindent
+where
+
+\begin{align*}
+  \tilde B(\vb{a}_t, h_t) &= I_2 \otimes \BR(\vb{a}_t, h_t) + \Im \otimes \BI(\vb{a}_t, h_t), \\
+  \tilde F(\vb{a}_t, h_t) &= I_2 \otimes \FR(\vb{a}_t, h_t) - \Im \otimes \FI(\vb{a}_t, h_t)
+\end{align*}
+
+\noindent
+and 
+
+\begin{align*}
+  \hat B(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \BR(\vb{a}_t, h_t) + \qty(\Im \otimes I_N) \otimes \BI(\vb{a}_t, h_t), \\
+  \hat F(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \FR(\vb{a}_t, h_t) - \qty(\Im \otimes I_N) \otimes \FI(\vb{a}_t, h_t). 
+\end{align*}
+
+
+
+\newpage
 \subsection{Derivatives}
 
 \subsubsection*{Jacobian}
