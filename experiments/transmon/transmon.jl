@@ -3,7 +3,7 @@ using HDF5
 
 iter = 3000
 
-const EXPERIMENT_NAME = "8-5-2022-transmon_no_int_a"
+const EXPERIMENT_NAME = "5-2-2023-transmon_no_int_a"
 plot_path = generate_file_path("png", EXPERIMENT_NAME * "_iter_$(iter)", "plots/transmon/")
 
 #system parameters
@@ -15,8 +15,8 @@ levels = 3
 ψg = [1. + 0*im, 0 , 0]
 ψe = [0, 1. + 0*im, 0]
 
-ψ1 = [ψg, ψe]
-ψf = [-im*ψe, -im*ψg]
+ψ1 = [ψg, ψe, 1 / √2 * (ψg + im * ψe), 1 / √2 * (ψg - ψe)]
+ψf = [-im*ψe, -im*ψg, 1 / √2 * (-im*ψe + ψg), 1 / √2 * (-im*ψe + im*ψg)]
 
 H_drift = α/2 * quad(levels)
 H_drive = [create(levels) + annihilate(levels),
@@ -26,8 +26,8 @@ system = QuantumSystem(
     H_drift,
     H_drive,
     ψ1,
-    ψf,
-    [2π * 19e-3,  2π * 19e-3]
+    ψf;
+    a_bounds = 0.9 * [2π * 19e-3,  2π * 19e-3]
 )
 
 #T is number of time steps, not total time
@@ -58,25 +58,27 @@ prob = QuantumControlProblem(
     options = options
 )
 
-display(prob.trajectory.states[2])
+# display(prob.trajectory.states[2])
 
 solve!(prob)
 
-display(prob.trajectory.states[2])
+# display(prob.trajectory.states[2])
 
 raw_controls = jth_order_controls(prob.trajectory, system, 0, d2pi = false)
 
-display(raw_controls)
+# display(raw_controls)
 
 controls = permutedims(reduce(hcat, map(Array, raw_controls)), [2,1])
 
-display(controls)
+# display(controls)
 
 infidelity = iso_infidelity(final_state_2(prob.trajectory, system), ket_to_iso(-im*ψg))
 
 println(infidelity)
 
-display(final_state2(prob.trajectory, system))
+# display(final_state_2(prob.trajectory, system))
+
+times = cumsum([0.0])
 
 result = Dict(
     "Q" => Q,
